@@ -4,21 +4,32 @@ import email
 import json
 import re
 import requests
+import os
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
 from email.header import decode_header
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+# .env dosyasını yükle
+load_dotenv()
+
 # ==========================================
 # 1. BİLGİLER VE E-POSTA / CSM AYARLARI
 # ==========================================
-EMAIL_USER = "karaguneyyoguz@gmail.com"
-EMAIL_PASS = "wkfg kmah vllg hwgf"  # Gmail Uygulama Şifresi
+EMAIL_USER = os.getenv("EMAIL_USER")
+EMAIL_PASS = os.getenv("EMAIL_PASS")
 
+CSM_USERNAME = os.getenv("CSM_USERNAME")
+CSM_PASSWORD = os.getenv("CSM_PASSWORD")
+
+CSM_AUTH_URL = "https://tatilbudur-api.cloudcsmetiya.com/api/v1/auth/authenticate"
 CSM_CREATE_TICKET_URL = "https://tatilbudur-api.cloudcsmetiya.com/api/v1/business/ticket/add"
 CSM_CANCEL_TICKET_URL = "https://tatilbudur-api.cloudcsmetiya.com/api/v1/business/ticket/cancel"
 
-RAW_TOKEN = "Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJvZ3V6LmthcmFndW5leSIsImV4cCI6MTc4NjkwMjYwNSwiaWF0IjoxNzg2ODk5MDA1LCJjcmVhdGVkIjoxNzg2ODk5MDA1MzYxfQ.lI0BdZTlW2BEqU2709B0DtdMsIO_zHxT9XVJQNDwtDan1dwnXWqKqqdAEr05pBSx"
-BEARER_TOKEN = RAW_TOKEN.replace("Bearer ", "").strip()
+# Token Cache (süresi dolunca yenilenir)
+BEARER_TOKEN = None
+TOKEN_EXPIRY = None
 
 # ==========================================
 # 2. CSM SABİT ID'LERİ VE KIRILIM TANIMLARI
@@ -50,7 +61,61 @@ ATTR_TUTAR = 100000192
 ATTR_SIPARIS_NO = 100000194
 
 # ==========================================
-# 3. DOĞRULAMA VE KONTROL FONKSİYONLARI
+# 3. TOKEN YÖNETIM FONKSİYONLARI
+# ==========================================
+def get_bearer_token() -> str:
+    """CSM API'den dinamik olarak token alır. Token cache'de tutulur ve süresi dolunca yenilenir."""
+    global BEARER_TOKEN, TOKEN_EXPIRY
+    
+    # Token geçerliyse ve süresi dolmadıysa mevcut token'ı döndür
+    if BEARER_TOKEN and TOKEN_EXPIRY and datetime.now() < TOKEN_EXPIRY:
+        print("✅ Cache'den token kullanılıyor...")
+        return BEARER_TOKEN
+    
+    print("🔄 Yeni token alınıyor...")
+    try:
+        payload = {
+            "userName": CSM_USERNAME,
+            "password": CSM_PASSWORD
+        }
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
+        response = requests.post(CSM_AUTH_URL, json=payload, headers=headers)
+        
+        if response.status_code == 200:
+            # Authorization header'dan token al (case-insensitive)
+            auth_header = response.headers.get("authorization") or response.headers.get("Authorization") or ""
+            if auth_header:
+                # Bearer prefix'i temizle
+                BEARER_TOKEN = auth_header.replace("Bearer ", "").replace("bearer ", "").strip()
+            else:
+                # Response body'den token dene
+                try:
+                    res_data = response.json()
+                    BEARER_TOKEN = res_data.get("token") or res_data.get("access_token")
+                except:
+                    pass
+            
+            # Token'ın süresi 55 dakika (token genelde 60 dakika, 5 dakika öncesinde yenile)
+            TOKEN_EXPIRY = datetime.now() + timedelta(minutes=55)
+            
+            print(f"✅ [TOKEN ALINDİ] Süresi dolacağı zaman: {TOKEN_EXPIRY.strftime('%Y-%m-%d %H:%M:%S')}")
+            return BEARER_TOKEN
+        else:
+            print(f"❌ [TOKEN HATASI] Status Code: {response.status_code}")
+            print(f"Response: {response.text}")
+            raise Exception(f"Token alınamadı. Hata: {response.status_code}")
+    
+    except Exception as e:
+        print(f"❌ Token alırken hata oluştu: {e}")
+        raise
+
+# ==========================================
+# 4. DOĞRULAMA VE KONTROL FONKSİYONLARI
 # ==========================================
 KUFUR_LISTESI = [
     "orospu", "amk", "aq", "salak", "aptal", "mal", "yarrak", 
@@ -139,7 +204,7 @@ def otomatik_mail_gonder(alici_email: str, orijinal_konu: str, icerik_metni: str
         print(f"Mail gönderilirken hata oluştu: {e}")
 
 # ==========================================
-# 4. FATURA ATTRIBUTE AYRIŞTIRICI VE DOĞRULAYICI
+# 5. FATURA ATTRIBUTE AYRIŞTIRICI VE DOĞRULAYICI
 # ==========================================
 def fatura_attributelarini_ayristir(metin: str, gonderen_email: str) -> tuple:
     attribute_list = []
@@ -195,7 +260,7 @@ def fatura_attributelarini_ayristir(metin: str, gonderen_email: str) -> tuple:
     return attribute_list, eksik_alanlar
 
 # ==========================================
-# 5. KIRILIM TESPİT MOTORU
+# 6. KIRILIM TESPİT MOTORU
 # ==========================================
 def kirilim_belirle(konu: str, icerik: str, gonderen_email: str) -> dict:
     ham_metin = f"{konu} {icerik}"
@@ -259,7 +324,7 @@ def kirilim_belirle(konu: str, icerik: str, gonderen_email: str) -> dict:
     }
 
 # ==========================================
-# 6. CSM PAYLOAD OLUŞTURUCU
+# 7. CSM PAYLOAD OLUŞTURUCU
 # ==========================================
 def csm_ticket_payload_olustur(gonderen_email: str, gonderen_adi: str, konu: str, icerik: str, kirilim: dict) -> dict:
     temiz_tam_isim = header_metni_coz(gonderen_adi) if gonderen_adi else "Oğuz Karagüney"
@@ -373,13 +438,14 @@ def csm_ticket_payload_olustur(gonderen_email: str, gonderen_adi: str, konu: str
     }
 
 # ==========================================
-# 7. HTTP POST VE TICKET ID OKUMA
+# 8. HTTP POST VE TICKET ID OKUMA
 # ==========================================
 def csm_ticket_olustur_post(payload: dict) -> bool:
+    token = get_bearer_token()  # Dinamik token al
     headers = {
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "tr,en;q=0.9,en-US;q=0.8,tr-TR;q=0.7",
-        "Authorization": f"Bearer {BEARER_TOKEN}",
+        "Authorization": f"Bearer {token}",
         "Multilanguage": "true",
         "Origin": "https://tatilbudur-new-ui.cloudcsmetiya.com",
         "Referer": "https://tatilbudur-new-ui.cloudcsmetiya.com/",
@@ -411,7 +477,7 @@ def csm_ticket_olustur_post(payload: dict) -> bool:
         return False
 
 # ==========================================
-# 8. ANA MAİL TARAMA VE İŞLEME MOTORU
+# 9. ANA MAİL TARAMA VE İŞLEME MOTORU
 # ==========================================
 def gelen_mailleri_isle():
     try:
