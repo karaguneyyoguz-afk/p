@@ -49,9 +49,9 @@ class EmailProcessor:
             self.mail_connection = imaplib.IMAP4_SSL(IMAP_SERVER)
             self.mail_connection.login(self.username, self.password)
             self.mail_connection.select("inbox")
-            print("✅ Connected to email server")
+            print("✅ E-posta sunucusuna bağlandı")
         except Exception as e:
-            print(f"❌ Email connection error: {e}")
+            print(f"❌ E-posta bağlantı hatası: {e}")
             raise
     
     def disconnect(self) -> None:
@@ -59,9 +59,9 @@ class EmailProcessor:
         if self.mail_connection:
             try:
                 self.mail_connection.logout()
-                print("✅ Disconnected from email server")
+                print("✅ E-posta sunucusundan bağlantı kesildi")
             except Exception as e:
-                print(f"⚠️ Error disconnecting: {e}")
+                print(f"⚠️ Bağlantı kesilirken hata: {e}")
     
     def get_unread_emails(self) -> List[bytes]:
         """
@@ -108,7 +108,7 @@ class EmailProcessor:
                 if isinstance(response_part, tuple):
                     return email.message_from_bytes(response_part[1])
         except Exception as e:
-            print(f"❌ Error fetching email: {e}")
+            print(f"❌ E-posta getirilirken hata: {e}")
         
         return None
     
@@ -246,9 +246,9 @@ def send_notification_email(recipient_email: str, subject: str, body: str) -> No
         message = MIMEMultipart()
         message['From'] = EMAIL_USER
         message['To'] = recipient_email
-        message['Subject'] = f"Re: {subject} - NOTIFICATION: Request Could Not Be Processed"
+        message['Subject'] = f"Re: {subject} - BİLDİRİM: Talebiniz İşleme Alınamadı"
         
-        formatted_body = f"Dear Customer,\n\n{body}\n\nBest regards."
+        formatted_body = f"Sayın Müşterimiz,\n\n{body}\n\nSaygılarımızla."
         message.attach(MIMEText(formatted_body, 'plain', 'utf-8'))
         
         server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
@@ -256,7 +256,127 @@ def send_notification_email(recipient_email: str, subject: str, body: str) -> No
         server.sendmail(EMAIL_USER, recipient_email, message.as_string())
         server.quit()
         
-        print(f"✉️ [NOTIFICATION SENT] -> {recipient_email}")
+        print(f"✉️ [BİLDİRİM MAİLİ GÖNDERİLDİ] -> {recipient_email}")
     
     except Exception as e:
-        print(f"❌ Error sending notification email: {e}")
+        print(f"❌ Bildirim maili gönderilirken hata: {e}")
+
+
+def send_ticket_confirmation_email(recipient_email: str, subject: str, ticket_id: str, customer_name: str) -> None:
+    """
+    Send ticket confirmation email to customer.
+    
+    Args:
+        recipient_email: Recipient email address
+        subject: Original email subject
+        ticket_id: Ticket ID created in CSM
+        customer_name: Customer name
+    """
+    try:
+        message = MIMEMultipart()
+        message['From'] = EMAIL_USER
+        message['To'] = recipient_email
+        message['Subject'] = f"Re: {subject} - Talebiniz Başarıyla Oluşturulmuştur (#{ticket_id})"
+        
+        formatted_body = (
+            f"Sayın {customer_name},\n\n"
+            f"Talebiniz sistemimizde başarıyla oluşturulmuştur.\n\n"
+            f"🎫 Ticket No: #{ticket_id}\n"
+            f"📝 Konu: {subject}\n"
+            f"📅 Oluşturma Tarihi: Bugün\n\n"
+            f"Bu ticket numarasını kullanarak talebinizin durumunu izleyebilirsiniz.\n\n"
+            f"Talebiniz en kısa zamanda değerlendirilecektir.\n\n"
+            f"Saygılarımızla,\n"
+            f"Müşteri Hizmetleri Ekibi"
+        )
+        message.attach(MIMEText(formatted_body, 'plain', 'utf-8'))
+        
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, recipient_email, message.as_string())
+        server.quit()
+        
+        print(f"✉️ [TICKET ONAY MAİLİ GÖNDERİLDİ] Ticket #{ticket_id} -> {recipient_email}")
+    
+    except Exception as e:
+        print(f"❌ Ticket onay maili gönderilirken hata: {e}")
+
+
+def send_rejection_email(recipient_email: str, subject: str, customer_name: str) -> None:
+    """
+    Send rejection email for inappropriate/hateful content.
+    
+    Args:
+        recipient_email: Recipient email address
+        subject: Original email subject
+        customer_name: Customer name
+    """
+    try:
+        message = MIMEMultipart()
+        message['From'] = EMAIL_USER
+        message['To'] = recipient_email
+        message['Subject'] = f"Re: {subject} - Talebiniz İşleme Alınamadı"
+        
+        formatted_body = (
+            f"Sayın {customer_name},\n\n"
+            f"E-postanız incelenmiş olup, talebiniz işleme alınamıştır.\n\n"
+            f"❌ Neden: Mesajınız uygunsuz ifadeler veya hakaret içermektedir.\n\n"
+            f"Müşterilerimize karşı saygılı ve nazik iletişim bekliyoruz.\n\n"
+            f"Lütfen uygun bir dil kullanarak talebinizi yeniden iletiniz.\n\n"
+            f"Anlayışınız için teşekkür ederiz.\n\n"
+            f"Saygılarımızla,\n"
+            f"Müşteri Hizmetleri Ekibi"
+        )
+        message.attach(MIMEText(formatted_body, 'plain', 'utf-8'))
+        
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, recipient_email, message.as_string())
+        server.quit()
+        
+        print(f"🚫 [RED ONAY MAİLİ GÖNDERİLDİ] (Uygunsuz içerik) -> {recipient_email}")
+    
+    except Exception as e:
+        print(f"❌ Red maili gönderilirken hata: {e}")
+
+
+def send_missing_fields_email(recipient_email: str, subject: str, missing_fields: List[str], customer_name: str) -> None:
+    """
+    Send email notifying customer about missing/invalid fields.
+    
+    Args:
+        recipient_email: Recipient email address
+        subject: Original email subject
+        missing_fields: List of missing or invalid fields
+        customer_name: Customer name
+    """
+    try:
+        message = MIMEMultipart()
+        message['From'] = EMAIL_USER
+        message['To'] = recipient_email
+        message['Subject'] = f"Re: {subject} - Eksik Bilgiler"
+        
+        missing_fields_str = "\n".join([f"  • {field}" for field in missing_fields])
+        
+        formatted_body = (
+            f"Sayın {customer_name},\n\n"
+            f"Talebiniz alınmış ancak eksik veya geçersiz bilgiler nedeniyle işleme alınamıştır.\n\n"
+            f"⚠️ Lütfen aşağıdaki bilgileri sağlayınız:\n\n"
+            f"{missing_fields_str}\n\n"
+            f"Eksik bilgileri tamamlayarak bu e-postaya yanıt gönderiniz.\n\n"
+            f"Böylelikle talebiniz hızlıca işleme alınabilecektir.\n\n"
+            f"Sabırınız için teşekkür ederiz.\n\n"
+            f"Saygılarımızla,\n"
+            f"Müşteri Hizmetleri Ekibi"
+        )
+        message.attach(MIMEText(formatted_body, 'plain', 'utf-8'))
+        
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, recipient_email, message.as_string())
+        server.quit()
+        
+        print(f"📋 [EKSİK ALAN BİLDİRİM MAİLİ GÖNDERİLDİ] -> {recipient_email}")
+    
+    except Exception as e:
+        print(f"❌ Eksik alan maili gönderilirken hata: {e}")

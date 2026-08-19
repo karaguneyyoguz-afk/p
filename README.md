@@ -1,5 +1,7 @@
 # Email Automation System
 
+Kapsamlı uygulama ve kullanıcı dokümanı: [Uygulama Dokümanı](docs/uygulama-dokumani.md)
+
 Professional email automation and ticket management system for CSM (Customer Service Management).
 
 ## Project Structure

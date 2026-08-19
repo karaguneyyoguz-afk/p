@@ -146,7 +146,7 @@ def extract_invoice_attributes(
             "textValue": person_name
         })
     else:
-        missing_fields.append("Person Name-Surname")
+        missing_fields.append("Ad-Soyad")
     
     # Extract Turkish ID or Tax ID
     tc_match = re.search(
@@ -182,7 +182,7 @@ def extract_invoice_attributes(
                 "textValue": int(tc_value)
             })
         else:
-            missing_fields.append("Valid Turkish ID Number")
+            missing_fields.append("Geçerli TC Kimlik Numarası")
     elif tax_match:
         tax_value = tax_match.group(1)
         if is_valid_tax_id(tax_value):
@@ -205,18 +205,22 @@ def extract_invoice_attributes(
                 "textValue": int(tax_value)
             })
         else:
-            missing_fields.append("Valid Tax ID Number (VKN)")
+            missing_fields.append("Geçerli Vergi Kimlik Numarası (VKN)")
     else:
-        missing_fields.append("Turkish ID or Tax ID (VKN)")
+        missing_fields.append("TC Kimlik Numarası veya VKN")
     
-    # Extract invoice address
+    # Extract invoice address - multiple pattern attempts for robustness
+    address_match = None
+    
+    # Try pattern 1: "Fatura Adresi:" followed by content until next field or line break
     address_match = re.search(
         r'(?:fatura\s*adresi|adres)[:\s]*'
-        r'([a-zA-ZğüşıöçĞÜŞİÖÇ0-9\s/.,:-]+?)(?=\r?\n\s*(?:fatura\s*mail|mail|iyi|saygılarla|$))',
+        r'([a-zA-ZğüşıöçĞÜŞİÖÇ0-9\s/.,:-]+?)(?=\r?\n\s*(?:fatura\s*mail|fatura\s*e-posta|mail|e-posta|iyi|saygılarla|$))',
         text,
-        re.IGNORECASE
+        re.IGNORECASE | re.MULTILINE
     )
     
+    # Try pattern 2: Simple "Fatura Adresi:" with end of line
     if not address_match:
         address_match = re.search(
             r'(?:fatura\s*adresi|adres)[:\s]*([^\n]+)',
@@ -224,23 +228,36 @@ def extract_invoice_attributes(
             re.IGNORECASE
         )
     
+    # Try pattern 3: Capture multi-line address (handle line breaks)
+    if not address_match:
+        address_match = re.search(
+            r'(?:fatura\s*adresi|adres)[:\s]*\n\s*(.+?)(?:\n\s*\n|\n\s*(?:fatura|mail|e-posta|tc|vkn))',
+            text,
+            re.IGNORECASE | re.DOTALL
+        )
+    
     if address_match:
         invoice_address = address_match.group(1).strip()
+        # Remove email patterns that might be attached
         invoice_address = re.split(
-            r'fatura\s*mail|mail:',
+            r'\s*(?:fatura\s*mail|fatura\s*e-posta|mail|e-posta).*',
             invoice_address,
             flags=re.IGNORECASE
         )[0].strip()
         
-        attribute_list.append({
-            "attribute": {
-                "id": 100000233,
-                "shortCode": "FATURA_ADRESI"
-            },
-            "textValue": invoice_address
-        })
+        # Ensure address is not empty and has reasonable length
+        if invoice_address and len(invoice_address) > 5:
+            attribute_list.append({
+                "attribute": {
+                    "id": 100000233,
+                    "shortCode": "FATURA_ADRESI"
+                },
+                "textValue": invoice_address
+            })
+        else:
+            missing_fields.append("Fatura Adresi")
     else:
-        missing_fields.append("Invoice Address")
+        missing_fields.append("Fatura Adresi")
     
     # Extract email address
     email_match = re.search(

@@ -6,10 +6,12 @@ Handles all interactions with the CSM (Customer Service Management) API.
 
 import requests
 import json
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from config import (
     CSM_CREATE_TICKET_URL, DEFAULT_HEADERS,
-    TICKET_TYPE_COMPLAINT, TICKET_TYPE_THANK_YOU
+    CSM_SEARCH_PARTY_ROLES_URL,
+    TICKET_TYPE_COMPLAINT, TICKET_TYPE_THANK_YOU,
+    CUSTOMER_SEARCH_TYPE, CUSTOMER_CONTACT_MEDIUM_TYPE
 )
 from auth import get_bearer_token
 from utils import parse_name_parts
@@ -38,7 +40,73 @@ class CSMAPIClient:
         
         return headers
     
-    def create_ticket(self, payload: Dict) -> bool:
+    def search_customer_by_email(self, email: str) -> Optional[Dict]:
+        """
+        Search for customer in database by email address.
+        
+        Args:
+            email: Customer email address
+            
+        Returns:
+            Dict with customer info if found, None otherwise
+            Contains: id, firstName, lastName, email
+        """
+        try:
+            headers = self._get_headers()
+            
+            # Build query parameters
+            params = {
+                'searchType': CUSTOMER_SEARCH_TYPE,
+                'contactMediumType': CUSTOMER_CONTACT_MEDIUM_TYPE,
+                'contactMediumValue': email
+            }
+            
+            response = requests.get(
+                CSM_SEARCH_PARTY_ROLES_URL,
+                headers=headers,
+                params=params
+            )
+            
+            # Status 204 = No Content (customer not found)
+            if response.status_code == 204:
+                print(f"ℹ️ [BİLGİ] Müşteri veritabanında bulunamadı: {email}")
+                return None
+            
+            # Status 200 = Customer found
+            if response.status_code == 200:
+                # Check if response has content
+                if not response.text or response.text.strip() == '':
+                    print(f"ℹ️ [BİLGİ] Boş yanıt - müşteri bulunamadı: {email}")
+                    return None
+                
+                try:
+                    response_data = response.json()
+                    # API returns array of results
+                    if isinstance(response_data, list) and len(response_data) > 0:
+                        customer = response_data[0]
+                        print(f"✅ [BULUNDU] Veritabanında müşteri: {email}")
+                        return {
+                            'id': customer.get('id'),
+                            'firstName': customer.get('party', {}).get('firstName', ''),
+                            'lastName': customer.get('party', {}).get('lastName', ''),
+                            'email': email,
+                            'fullData': customer
+                        }
+                    else:
+                        print(f"ℹ️ [BİLGİ] Boş sonuç listesi - müşteri bulunamadı: {email}")
+                        return None
+                except Exception as e:
+                    print(f"⚠️ [UYARI] Müşteri verisi ayrıştırılamadı: {e}")
+                    return None
+            else:
+                print(f"⚠️ [HATA] Müşteri arama başarısız. Status: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Müşteri aranırken hata: {e}")
+            return None
+    
+    def create_ticket(self, payload: Dict) -> Optional[str]:
         """
         Create a new ticket in CSM system.
         
@@ -46,7 +114,7 @@ class CSMAPIClient:
             payload: Ticket payload dictionary
             
         Returns:
-            bool: True if successful, False otherwise
+            str: Ticket ID if successful, None otherwise
         """
         try:
             headers = self._get_headers()
@@ -70,21 +138,21 @@ class CSMAPIClient:
                         response_data.get("id") or
                         response_data.get("ticketNo") or
                         response_data.get("idNum") or
-                        "Created"
+                        "Oluşturuldu"
                     )
-                    print(f"🚀 [SUCCESS] Ticket created in CSM! Ticket ID: #{ticket_id}")
-                except Exception:
-                    print("🚀 [SUCCESS] Ticket created in CSM!")
-                
-                return True
+                    print(f"🚀 [BAŞARILI] CSM'de Ticket oluşturuldu! Ticket ID: #{ticket_id}")
+                    return str(ticket_id)
+                except Exception as e:
+                    print(f"🚀 [BAŞARILI] CSM'de Ticket oluşturuldu!")
+                    return "Oluşturuldu"
             else:
-                print(f"⚠️ [ERROR] CSM request failed. Status: {response.status_code}")
-                print(f"Response: {response.text}")
-                return False
+                print(f"⚠️ [HATA] CSM isteği başarısız. Status: {response.status_code}")
+                print(f"Yanıt: {response.text}")
+                return None
         
         except Exception as e:
-            print(f"❌ Error creating ticket: {e}")
-            return False
+            print(f"❌ Ticket oluşturulurken hata: {e}")
+            return None
 
 
 class TicketPayloadBuilder:
@@ -96,7 +164,8 @@ class TicketPayloadBuilder:
         sender_name: str,
         subject: str,
         body: str,
-        categorization: Dict
+        categorization: Dict,
+        customer_id: Optional[int] = None
     ) -> Dict:
         """
         Build a complete ticket payload for CSM API.
@@ -107,6 +176,7 @@ class TicketPayloadBuilder:
             subject: Ticket subject
             body: Ticket description
             categorization: Categorization dictionary from EmailCategorizer
+            customer_id: Optional customer ID (if registered customer)
             
         Returns:
             Complete ticket payload dictionary
@@ -155,6 +225,13 @@ class TicketPayloadBuilder:
             "attributeValueList": [],
             "contactMediumList": [contact_medium]
         }
+        
+        # Add customer ID if this is a registered customer
+        if customer_id is not None:
+            party_role["id"] = customer_id
+            print(f"✅ [KAYITLI] Kayıtlı müşteri ID ekleniyor: {customer_id}")
+        else:
+            print(f"🆕 [POTANSİYEL] Yeni potansiyel müşteri kaydı oluşturuluyor")
         
         # Determine ticket type code
         ticket_type_code = "COMPLAINT" if categorization["ticket_type_id"] == TICKET_TYPE_COMPLAINT else "THANK_YOU"

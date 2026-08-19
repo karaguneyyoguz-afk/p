@@ -36,10 +36,10 @@ def get_bearer_token() -> str:
     
     # Return cached token if valid
     if _cached_token and _token_expiry and datetime.now() < _token_expiry:
-        print("✅ Using cached token...")
+        print("✅ Cache'den token kullanılıyor...")
         return _cached_token
     
-    print("🔄 Acquiring new token...")
+    print("🔄 Yeni token alınıyor...")
     try:
         payload = {
             "userName": CSM_USERNAME,
@@ -75,13 +75,13 @@ def get_bearer_token() -> str:
             # Set token expiry (refresh 5 minutes before actual expiry)
             _token_expiry = datetime.now() + timedelta(minutes=TOKEN_CACHE_DURATION_MINUTES)
             
-            print(f"✅ [TOKEN ACQUIRED] Expiry: {_token_expiry.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"✅ [TOKEN ALINDI] Süresi Dolacağı Zaman: {_token_expiry.strftime('%Y-%m-%d %H:%M:%S')}")
             return _cached_token
         else:
-            raise Exception(f"Token acquisition failed with status code: {response.status_code}")
+            raise Exception(f"Token alınamadı. Status Code: {response.status_code}")
     
     except Exception as e:
-        print(f"❌ Token acquisition error: {e}")
+        print(f"❌ Token alınamadı: {e}")
         raise
 
 
@@ -90,4 +90,4 @@ def invalidate_token_cache() -> None:
     global _cached_token, _token_expiry
     _cached_token = None
     _token_expiry = None
-    print("🔄 Token cache invalidated")
+    print("🔄 Token cache temizlendi")

@@ -32,7 +32,14 @@ CSM_PASSWORD = os.getenv("CSM_PASSWORD", "")
 CSM_AUTH_URL = "https://tatilbudur-api.cloudcsmetiya.com/api/v1/auth/authenticate"
 CSM_CREATE_TICKET_URL = "https://tatilbudur-api.cloudcsmetiya.com/api/v1/business/ticket/add"
 CSM_CANCEL_TICKET_URL = "https://tatilbudur-api.cloudcsmetiya.com/api/v1/business/ticket/cancel"
+CSM_SEARCH_PARTY_ROLES_URL = "https://tatilbudur-api.cloudcsmetiya.com/api/v1/business/partyRole/getPartyRoles"
 CSM_BASE_URL = "https://tatilbudur-api.cloudcsmetiya.com"
+
+# ==========================================
+# CUSTOMER LOOKUP CONFIGURATION
+# ==========================================
+CUSTOMER_SEARCH_TYPE = "CUSTOMER"
+CUSTOMER_CONTACT_MEDIUM_TYPE = "EMAIL"
 
 # ==========================================
 # CSM CHANNEL CONFIGURATION
@@ -45,6 +52,7 @@ CHANNEL_ID = 100000043  # Email Channel ID
 TICKET_TYPE_THANK_YOU = 100000062
 TICKET_TYPE_COMPLAINT = 100000061
 TICKET_TYPE_INFO_REQUEST = 100000057
+TICKET_TYPE_RESERVATION = 100000059  # Backoffice İşlemleri
 
 # ==========================================
 # CATEGORY IDs
@@ -52,6 +60,15 @@ TICKET_TYPE_INFO_REQUEST = 100000057
 CATEGORY_THANK_YOU = 100000154
 CATEGORY_COMPLAINT = 100000132
 CATEGORY_FACILITY = 100000171
+
+# RESERVATION CATEGORIES
+CATEGORY_PAYMENT = 100000134               # Ödeme Sistemleri
+CATEGORY_CONFIRMATION = 100000139         # Konfirme
+CATEGORY_CHANGE = 100000140               # Değişiklik
+CATEGORY_CANCELLATION = 100000141         # İptal
+CATEGORY_ADDITIONAL_SERVICE = 100000142   # Ek Hizmet Ekleme/Çıkarma
+CATEGORY_SHIFT = 100000143                # Kaydırma
+CATEGORY_OTHER_OPERATIONS = 100000172     # Diğer İşlemler
 
 # ==========================================
 # SUB-CATEGORY IDs - THANK YOU
@@ -75,9 +92,60 @@ SUB_CATEGORY_INVOICE_MODIFICATION = 100000525
 SUB_CATEGORY_INVOICE_REQUEST = 100000562
 
 # ==========================================
-# FACILITY RELATED IDs
+# SUB-CATEGORY IDs - FACILITY
 # ==========================================
 SUB_CATEGORY_FACILITY_CONTACT = 100000702
+
+# ==========================================
+# SUB-CATEGORY IDs - RESERVATION (PAYMENT)
+# ==========================================
+SUB_CATEGORY_PAYMENT_REFLECTION = 100000591  # Ödemenin Yansımaması
+
+# ==========================================
+# SUB-CATEGORY IDs - RESERVATION (CONFIRMATION)
+# ==========================================
+SUB_CATEGORY_CONFIRMATION = 100000531       # Konfirme
+
+# ==========================================
+# SUB-CATEGORY IDs - RESERVATION (CHANGE/DEGISIKLIK)
+# ==========================================
+SUB_CATEGORY_CHANGE_PAYMENT_TYPE = 100000527         # Ödeme Tipi Değişikliği
+SUB_CATEGORY_CHANGE_BIRTH_DATE = 100000540          # Doğum Tarihi Değişikliği
+SUB_CATEGORY_CHANGE_EXTRA_SERVICES = 100000541      # Ek Hizmetler
+SUB_CATEGORY_CHANGE_NAME = 100000542                # İsim Değişikliği
+SUB_CATEGORY_CHANGE_PERSON_ADD_REMOVE = 100000543   # Kişi Ekleme/Çıkarma
+SUB_CATEGORY_CHANGE_NOTE_ADD = 100000544            # Not Ekleme Talebi
+SUB_CATEGORY_CHANGE_ROOM = 100000545                # Oda
+SUB_CATEGORY_CHANGE_ROOM_TYPE = 100000546           # Oda Tipi Değişikliği
+SUB_CATEGORY_CHANGE_HOTEL = 100000547               # Otel Değişikliği
+SUB_CATEGORY_CHANGE_DATE = 100000548                # Tarih Değişikliği
+SUB_CATEGORY_CHANGE_TOUR = 100000549                # Tur Değişikliği
+SUB_CATEGORY_CHANGE_TRANSPORT = 100000550           # Ulaşım
+SUB_CATEGORY_CHANGE_AIRPLANE_TICKET = 100000521    # Uçak Bileti
+SUB_CATEGORY_CHANGE_OTHER = 100000539               # Diğer
+
+# ==========================================
+# SUB-CATEGORY IDs - RESERVATION (CANCELLATION)
+# ==========================================
+SUB_CATEGORY_CANCELLATION_ROOM = 100000545          # Oda
+SUB_CATEGORY_CANCELLATION_REQUEST = 100000551       # İptal Talebi
+SUB_CATEGORY_CANCELLATION_AIRPLANE = 100000521      # Uçak Bileti
+
+# ==========================================
+# SUB-CATEGORY IDs - RESERVATION (ADDITIONAL SERVICE)
+# ==========================================
+SUB_CATEGORY_ADDITIONAL_CANCELLATION_INSURANCE = 100000552  # İptal Sigortası
+
+# ==========================================
+# SUB-CATEGORY IDs - RESERVATION (SHIFT)
+# ==========================================
+SUB_CATEGORY_SHIFT_HOTEL_BASED = 100000669          # Otel Kaynaklı
+SUB_CATEGORY_SHIFT_OPERATION_BASED = 100000671      # Operasyon Kaynaklı
+
+# ==========================================
+# SUB-CATEGORY IDs - RESERVATION (OTHER OPERATIONS)
+# ==========================================
+SUB_CATEGORY_OTHER_OPERATIONS_PAYMENT_COMPLETION = 100000554  # Ödeme Tamamlama
 
 # ==========================================
 # ATTRIBUTE IDs
@@ -93,6 +161,7 @@ ATTRIBUTE_INVOICE_ADDRESS = 100000233
 ATTRIBUTE_EMAIL = 100000234
 ATTRIBUTE_TAX_NUMBER = 100000235
 ATTRIBUTE_TAX_ID_NUMBER = 100000236
+ATTRIBUTE_WG_LIST = 100000057  # WG Listesi
 
 # ==========================================
 # TOKEN CACHE CONFIGURATION

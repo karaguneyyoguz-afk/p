@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Automation Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo">
+                <a href="#dashboard" class="brand-link" data-section="dashboard" aria-label="Dashboard ana sayfa">
+                    <span class="brand-mark" aria-hidden="true">
+                        <svg viewBox="0 0 32 32" role="img">
+                            <rect x="3" y="5" width="26" height="22" rx="3"></rect>
+                            <path d="m5 8 11 9L27 8"></path>
+                        </svg>
+                    </span>
+                    <span><strong>Inbox</strong><small>Operations</small></span>
+                </a>
+            </div>
+            <nav class="nav-menu">
+                <a href="#dashboard" class="nav-link active" data-section="dashboard">
+                    <span class="nav-icon" aria-hidden="true">⌂</span> Dashboard
+                </a>
+                <a href="#emails" class="nav-link" data-section="emails">
+                    <span class="nav-icon" aria-hidden="true">✉</span> E-Postalar
+                </a>
+                <a href="#token" class="nav-link" data-section="token">
+                    <span class="nav-icon" aria-hidden="true">⌁</span> Token Yönetimi
+                </a>
+                <a href="#validation" class="nav-link" data-section="validation">
+                    <span class="nav-icon" aria-hidden="true">✓</span> Doğrulama
+                </a>
+                <a href="#errors" class="nav-link" data-section="errors">
+                    <span class="nav-icon" aria-hidden="true">!</span> Hatalar
+                </a>
+                <a href="#logs" class="nav-link" data-section="logs">
+                    <span class="nav-icon" aria-hidden="true">≡</span> İşlem Logları
+                </a>
+                <a href="#tickets" class="nav-link" data-section="tickets">
+                    <span class="nav-icon" aria-hidden="true">#</span> Oluşturulan Ticketlar
+                </a>
+                <a href="#settings" class="nav-link" data-section="settings">
+                    <span class="nav-icon" aria-hidden="true">⚙</span> Ayarlar
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div>
+                    <p class="eyebrow">OPERATIONS / MAIL FLOW</p>
+                    <h1>Yönetim Paneli</h1>
+                </div>
+                <div class="header-actions">
+                    <span class="status-indicator" id="status-indicator">● Online</span>
+                    <span class="current-time" id="current-time">--:--:--</span>
+                </div>
+            </header>
+
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="section active">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">TODAY AT A GLANCE</p>
+                        <h2>Sistem Özeti</h2>
+                    </div>
+                    <span class="date-label" id="dashboard-date">--</span>
+                </div>
+                
+                <div class="stats-grid">
+                    <button class="stat-card" type="button" data-target-section="emails">
+                        <span class="stat-icon stat-icon-mail" aria-hidden="true">✉</span>
+                        <div class="stat-content">
+                            <h3>E-Postalar İşlendi</h3>
+                            <p class="stat-value" id="stat-emails">0</p>
+                            <p class="stat-label">toplam</p>
+                        </div>
+                        <span class="card-arrow" aria-hidden="true">↗</span>
+                    </button>
+                    
+                    <button class="stat-card" type="button" data-target-section="tickets">
+                        <span class="stat-icon stat-icon-ticket" aria-hidden="true">#</span>
+                        <div class="stat-content">
+                            <h3>Ticket Oluşturuldu</h3>
+                            <p class="stat-value" id="stat-tickets">0</p>
+                            <p class="stat-label">başarılı</p>
+                        </div>
+                        <span class="card-arrow" aria-hidden="true">↗</span>
+                    </button>
+                    
+                    <button class="stat-card" type="button" data-target-section="logs">
+                        <span class="stat-icon stat-icon-rate" aria-hidden="true">%</span>
+                        <div class="stat-content">
+                            <h3>Başarı Oranı</h3>
+                            <p class="stat-value" id="stat-success">0%</p>
+                            <p class="stat-label">işlenen</p>
+                        </div>
+                        <span class="card-arrow" aria-hidden="true">↗</span>
+                    </button>
+                    
+                    <button class="stat-card" type="button" data-target-section="errors">
+                        <span class="stat-icon stat-icon-error" aria-hidden="true">!</span>
+                        <div class="stat-content">
+                            <h3>Hatalar</h3>
+                            <p class="stat-value" id="stat-errors">0</p>
+                            <p class="stat-label">son 24 saat</p>
+                        </div>
+                        <span class="card-arrow" aria-hidden="true">↗</span>
+                    </button>
+                </div>
+
+                <div class="cards-container">
+                    <!-- System Status Card -->
+                    <div class="card">
+                        <h3>Sistem Durumu</h3>
+                        <div class="status-content">
+                            <p><strong>Durum:</strong> <span id="sys-status">Hazır</span></p>
+                            <p><strong>Son Çalışma:</strong> <span id="last-run">Henüz çalışmadı</span></p>
+                            <p><strong>Saat:</strong> <span id="sys-time">--:--:--</span></p>
+                            <button class="btn btn-primary" onclick="runNow()">
+                                Şimdi Çalıştır
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Token Status Card -->
+                    <div class="card">
+                        <h3>Token Durumu</h3>
+                        <div class="token-content">
+                            <p><strong>Token:</strong> <span id="token-status">Kontrol ediliyor...</span></p>
+                            <p><strong>Geçerlilik:</strong> <span id="token-expire">55 dakika</span></p>
+                            <p><strong>Son Güncelleme:</strong> <span id="token-update">--:--:--</span></p>
+                            <button class="btn btn-secondary" onclick="refreshToken()">
+                                Token Yenile
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity Chart -->
+                <div class="card">
+                    <h3>Aktivite</h3>
+                    <div class="chart-placeholder">
+                        <p>Sistem günlük aktivite grafiği (beta)</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Emails Section -->
+            <section id="emails" class="section">
+                <h2>Gelen E-Postalar</h2>
+                <div class="section-toolbar">
+                    <button class="btn btn-secondary" onclick="loadEmails()">
+                        E-Postaları Yenile
+                    </button>
+                    <input type="text" id="email-filter" class="filter-input" placeholder="E-posta ara...">
+                </div>
+                
+                <div class="emails-container" id="emails-list">
+                    <p class="loading">Yükleniyor...</p>
+                </div>
+            </section>
+
+            <!-- Token Management Section -->
+            <section id="token" class="section">
+                <h2>Token Yönetimi</h2>
+                
+                <div class="card">
+                    <h3>Mevcut Token Bilgisi</h3>
+                    <div class="token-info-box">
+                        <p><strong>Token:</strong></p>
+                        <code id="token-value" class="token-display">Yükleniyor...</code>
+                        <p class="text-small" id="token-details">Detaylar yükleniyor...</p>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn btn-primary" onclick="refreshToken()">
+                            Token Yenile
+                        </button>
+                        <button class="btn btn-secondary" onclick="copyToken()">
+                            📋 Token'ı Kopyala
+                        </button>
+                        <button class="btn btn-danger" onclick="invalidateToken()">
+                            Cache'i Temizle
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Token Geçmişi</h3>
+                    <div class="token-history" id="token-history">
+                        <p>Henüz işlem yok</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Validation Section -->
+            <section id="validation" class="section">
+                <h2>Veri Doğrulama</h2>
+                
+                <div class="validation-grid">
+                    <!-- Turkish ID Validation -->
+                    <div class="card">
+                        <h3>Türk Kimlik Numarası Doğrulama</h3>
+                        <input type="text" id="turkish-id-input" class="form-input" 
+                               placeholder="11 haneli TC kimlik numarası..." maxlength="11">
+                        <button class="btn btn-secondary" onclick="validateTurkishID()">
+                            Doğrula
+                        </button>
+                        <div class="validation-result" id="turkish-id-result"></div>
+                    </div>
+
+                    <!-- Tax ID Validation -->
+                    <div class="card">
+                        <h3>Vergi Kimlik Numarası Doğrulama</h3>
+                        <input type="text" id="tax-id-input" class="form-input" 
+                               placeholder="10 haneli VKN..." maxlength="10">
+                        <button class="btn btn-secondary" onclick="validateTaxID()">
+                            Doğrula
+                        </button>
+                        <div class="validation-result" id="tax-id-result"></div>
+                    </div>
+
+                    <!-- Profanity Check -->
+                    <div class="card full-width">
+                        <h3>Uygunsuz İçerik Kontrolü</h3>
+                        <textarea id="profanity-input" class="form-textarea" 
+                                  placeholder="Kontrol etmek istediğiniz metni girin..."></textarea>
+                        <button class="btn btn-secondary" onclick="checkProfanity()">
+                            🔍 Kontrol Et
+                        </button>
+                        <div class="validation-result" id="profanity-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Errors Section -->
+            <section id="errors" class="section">
+                <h2>Sistem Hataları</h2>
+                <div class="section-toolbar">
+                    <button class="btn btn-danger" onclick="clearErrors()">
+                        Hataları Temizle
+                    </button>
+                    <span id="error-count">0 hata</span>
+                </div>
+                
+                <div class="errors-container" id="errors-list">
+                    <p class="no-data">Hata yok</p>
+                </div>
+            </section>
+
+            <section id="logs" class="section">
+                <h2>E-Posta ve Ticket İşlem Logları</h2>
+                <div class="section-toolbar">
+                    <button class="btn btn-secondary" onclick="loadMailLogs()">
+                        Logları Yenile
+                    </button>
+                    <button class="btn btn-danger" onclick="clearMailLogs()">
+                        Logları Temizle
+                    </button>
+                    <span id="mail-log-count">0 kayıt</span>
+                </div>
+                <div class="errors-container" id="mail-logs-list">
+                    <p class="loading">Loglar yükleniyor...</p>
+                </div>
+            </section>
+
+            <section id="tickets" class="section">
+                <h2>Oluşturulan Ticket Detayları</h2>
+                <div class="section-toolbar">
+                    <button class="btn btn-secondary" onclick="loadTickets()">
+                        Ticketları Yenile
+                    </button>
+                    <span id="ticket-count">0 ticket</span>
+                </div>
+                <div class="errors-container" id="tickets-list">
+                    <p class="loading">Ticketlar yükleniyor...</p>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="settings" class="section">
+                <h2>Ayarlar</h2>
+                
+                <div class="card">
+                    <h3>Sistem Ayarları</h3>
+                    <div class="settings-form">
+                        <div class="form-group">
+                            <label>Otomatik Kontrol Süresi (dakika)</label>
+                            <input type="number" id="auto-check-interval" class="form-input" 
+                                   value="5" min="1" max="60">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>E-posta Saklama Süresi (gün)</label>
+                            <input type="number" id="email-retention" class="form-input" 
+                                   value="30" min="1" max="365">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="enable-notifications" checked>
+                                Başarılı ticket oluşturmada bildirim gönder
+                            </label>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="enable-profanity-check" checked>
+                                Uygunsuz içerik kontrolünü etkinleştir
+                            </label>
+                        </div>
+                        
+                        <button class="btn btn-primary" onclick="saveSettings()">
+                            Ayarları Kaydet
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Veritabanı İşlemleri</h3>
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="exportData()">
+                            Verileri Dışa Aktar
+                        </button>
+                        <button class="btn btn-warning" onclick="resetStats()">
+                            İstatistikleri Sıfırla
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <div id="mail-content-modal" class="mail-modal" hidden>
+        <div class="mail-modal-panel" role="dialog" aria-modal="true" aria-labelledby="mail-modal-title">
+            <div class="mail-modal-header">
+                <div>
+                    <p class="eyebrow">MAIL CONTENT</p>
+                    <h2 id="mail-modal-title">E-posta İçeriği</h2>
+                </div>
+                <button class="modal-close" type="button" onclick="closeMailContent()" aria-label="İçeriği kapat">×</button>
+            </div>
+            <pre id="mail-modal-body" class="mail-modal-body"></pre>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
