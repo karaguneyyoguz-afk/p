@@ -132,12 +132,18 @@ def process_email(
         )
     else:
         print("⚠️ CSM'de ticket oluşturulamadı")
+        send_notification_email(
+            sender_email,
+            subject,
+            "Talebiniz teknik bir nedenle şu anda işleme alınamadı. Lütfen daha sonra tekrar deneyiniz."
+        )
         record_mail_event(
             event="ticket_not_created",
             status="failed",
             sender_email=sender_email,
             subject=subject,
             reason="CSM API ticket oluşturamadı",
+            details=csm_client.last_error,
             classification=categorization.get("classification", ""),
             mail_body=body,
         )

@@ -15,10 +15,12 @@ from config import (
     SMTP_SERVER, SMTP_PORT, CHANNEL_ID,
     TICKET_TYPE_THANK_YOU, TICKET_TYPE_COMPLAINT,
     TICKET_TYPE_INFO_REQUEST, CATEGORY_THANK_YOU,
-    CATEGORY_COMPLAINT, CATEGORY_FACILITY,
+    CATEGORY_COMPLAINT, CATEGORY_FACILITY, CATEGORY_AGENCY,
     SUB_CATEGORY_THANK_YOU_GENERAL, SUB_CATEGORY_THANK_YOU_GUIDE,
     SUB_CATEGORY_THANK_YOU_CONSULTANT, SUB_CATEGORY_COMPLAINT_INVOICE,
-    SUB_CATEGORY_FACILITY_CONTACT, MAIL_CHARSET_DEFAULT,
+    CATEGORY_INVOICE, SUB_CATEGORY_GUEST_INVOICE, SUB_CATEGORY_INVOICE_MODIFICATION,
+    SUB_CATEGORY_FACILITY_CONTACT, SUB_CATEGORY_AGENCY_CONTACT_INFORMATION,
+    MAIL_CHARSET_DEFAULT,
     MAIL_CHARSET_FALLBACK
 )
 from utils import (
@@ -154,13 +156,37 @@ class EmailCategorizer:
     """Categorizes emails and determines ticket routing."""
     
     THANK_YOU_KEYWORDS = [
-        "tesekkur", "sagol", "tesekkurler", 
-        "tesekkur ederim", "teşekkur"
+        "tesekkur", "tesekkurler", "tesekkur ederim", "sagol",
+        "tsk", "tks", "tessskur", "tesegkur"
     ]
     
     INVOICE_KEYWORDS = ["fatura", "efatura", "e-fatura"]
+
+    INVOICE_MODIFICATION_KEYWORDS = [
+        "degisiklik", "duzeltme", "revize", "onay",
+        "yeniden duzenle", "yeniden kes", "bu bilgilere kes",
+        "dogrusu bu sekildedir", "bilgilere kesil"
+    ]
+
+    INVOICE_CONTEXT_KEYWORDS = [
+        "fatura", "efatura", "e-fatura", "vergi dairesi",
+        "vergi kimlik no", "vergi no", "fatura unvani"
+    ]
+
+    INVOICE_COMPLAINT_KEYWORDS = [
+        "magduriyet", "aksaklik", "sikayet", "merkeze bildir",
+        "olumsuz etk", "red veriyoruz", "reddediyoruz", "yanitsiz",
+        "geciktiril", "yasal hak", "yasal merci", "tuketici hak"
+    ]
+
+    AGENCY_KEYWORDS = ["acente", "acenteye", "acentesi"]
+
+    AGENCY_CONTACT_KEYWORDS = [
+        "iletisim", "telefon", "numara", "ula", "ulas",
+        "yanit alam", "geri donus", "erisim"
+    ]
     
-    GUIDE_KEYWORDS = ["rehber", "tur lideri", "oguz", "rehbere"]
+    GUIDE_KEYWORDS = ["rehber", "tur lideri"]
     
     CONSULTANT_KEYWORDS = [
         "danisman", "temsilci", "cagri merkezi", "telefondaki"
@@ -181,55 +207,142 @@ class EmailCategorizer:
         """
         combined_text = f"{subject} {body}"
         normalized_text = normalize_turkish_characters(combined_text)
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_COMPLAINT_KEYWORDS)
+        ):
+            attributes, missing_fields = extract_invoice_attributes(combined_text, sender_email)
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_INVOICE,
+                "category_name": "Fatura",
+                "sub_category_id": SUB_CATEGORY_COMPLAINT_INVOICE,
+                "sub_category_name": "Fatura Talebi ve Şikayetleri",
+                "sub_category_code": "FATURA_TALEBI_SIKAYETLERI",
+                "attributes": attributes,
+                "missing_fields": missing_fields,
+                "classification": "SIKAYET > FATURA > FATURA_TALEBI_SIKAYETLERI"
+            }
         
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_CONTEXT_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_MODIFICATION_KEYWORDS)
+        ):
+            attributes, missing_fields = extract_invoice_attributes(combined_text, sender_email)
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi İstek",
+                "category_id": CATEGORY_INVOICE,
+                "category_name": "Fatura",
+                "sub_category_id": SUB_CATEGORY_INVOICE_MODIFICATION,
+                "sub_category_name": "Fatura Bilgi Değişikliği",
+                "sub_category_code": "FATURA_BILGI_DEGISIKLIGI",
+                "attributes": attributes,
+                "missing_fields": missing_fields,
+                "classification": "BILGI_ISTEK > FATURA > FATURA_BILGI_DEGISIKLIGI"
+            }
+
+        if any(
+            keyword in normalized_text
+            for keyword in ["dogrusu bu sekildedir", "bilgilere kesilmesi rica"]
+        ):
+            attributes, missing_fields = extract_invoice_attributes(combined_text, sender_email)
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi İstek",
+                "category_id": CATEGORY_INVOICE,
+                "category_name": "Fatura",
+                "sub_category_id": SUB_CATEGORY_INVOICE_MODIFICATION,
+                "sub_category_name": "Fatura Bilgi Değişikliği",
+                "sub_category_code": "FATURA_BILGI_DEGISIKLIGI",
+                "attributes": attributes,
+                "missing_fields": missing_fields,
+                "classification": "BILGI_ISTEK > FATURA > FATURA_BILGI_DEGISIKLIGI"
+            }
+
         # Check for invoice requests
         if any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_KEYWORDS):
             attributes, missing_fields = extract_invoice_attributes(combined_text, sender_email)
             return {
                 "channel_id": CHANNEL_ID,
-                "ticket_type_id": TICKET_TYPE_COMPLAINT,
-                "category_id": CATEGORY_COMPLAINT,
-                "sub_category_id": SUB_CATEGORY_COMPLAINT_INVOICE,
-                "sub_category_code": "INVOICE_REQUEST",
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi İstek",
+                "category_id": CATEGORY_INVOICE,
+                "category_name": "Fatura",
+                "sub_category_id": SUB_CATEGORY_GUEST_INVOICE,
+                "sub_category_name": "Misafir Faturası",
+                "sub_category_code": "MISAFIR_FATURASI",
                 "attributes": attributes,
                 "missing_fields": missing_fields,
-                "classification": "COMPLAINT > INVOICE > INVOICE_REQUEST"
+                "classification": "BILGI_ISTEK > FATURA > MISAFIR_FATURASI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.AGENCY_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.AGENCY_CONTACT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_AGENCY,
+                "category_name": "Acente",
+                "sub_category_id": SUB_CATEGORY_AGENCY_CONTACT_INFORMATION,
+                "sub_category_name": "İletişim Bilgileri",
+                "sub_category_code": "ILETISIM_BILGILERI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > ACENTE > ILETISIM_BILGILERI"
             }
         
         # Check for thank you messages
         if any(keyword in normalized_text for keyword in EmailCategorizer.THANK_YOU_KEYWORDS):
             # Determine sub-category based on keywords
-            if any(kw in normalized_text for kw in EmailCategorizer.GUIDE_KEYWORDS):
-                sub_category_id = SUB_CATEGORY_THANK_YOU_GUIDE
-                sub_category_code = "GUIDE_THANK_YOU"
-            elif any(kw in normalized_text for kw in EmailCategorizer.CONSULTANT_KEYWORDS):
+            if any(kw in normalized_text for kw in EmailCategorizer.CONSULTANT_KEYWORDS):
                 sub_category_id = SUB_CATEGORY_THANK_YOU_CONSULTANT
-                sub_category_code = "CONSULTANT_THANK_YOU"
+                sub_category_name = "Danışman Teşekkür"
+                sub_category_code = "DANISMAN_TESEKKUR"
+            elif any(kw in normalized_text for kw in EmailCategorizer.GUIDE_KEYWORDS):
+                sub_category_id = SUB_CATEGORY_THANK_YOU_GUIDE
+                sub_category_name = "Rehber Teşekkür"
+                sub_category_code = "REHBER_TESEKKUR"
             else:
                 sub_category_id = SUB_CATEGORY_THANK_YOU_GENERAL
-                sub_category_code = "GENERAL_THANK_YOU"
+                sub_category_name = "Genel Teşekkür"
+                sub_category_code = "GENEL_TESEKKUR"
             
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_THANK_YOU,
+                "ticket_type_name": "Teşekkür",
                 "category_id": CATEGORY_THANK_YOU,
+                "category_name": "Teşekkür",
                 "sub_category_id": sub_category_id,
+                "sub_category_name": sub_category_name,
                 "sub_category_code": sub_category_code,
                 "attributes": [],
                 "missing_fields": [],
-                "classification": f"THANK_YOU > THANK_YOU > {sub_category_code}"
+                "classification": f"TESEKKUR > TESEKKUR > {sub_category_code}"
             }
         
         # Default: General information request
         return {
             "channel_id": CHANNEL_ID,
             "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+            "ticket_type_name": "Bilgi-İstek",
             "category_id": CATEGORY_FACILITY,
+            "category_name": "Tesis",
             "sub_category_id": SUB_CATEGORY_FACILITY_CONTACT,
-            "sub_category_code": "FACILITY_CONTACT",
+            "sub_category_name": "Tesis İletişim",
+            "sub_category_code": "TESIS_ILETISIM",
             "attributes": [],
             "missing_fields": [],
-            "classification": "GENERAL > FACILITY > FACILITY_CONTACT"
+            "classification": "BILGI_ISTEK > TESIS > TESIS_ILETISIM"
         }
 
 
@@ -365,7 +478,7 @@ def send_missing_fields_email(recipient_email: str, subject: str, missing_fields
             f"{missing_fields_str}\n\n"
             f"Eksik bilgileri tamamlayarak bu e-postaya yanıt gönderiniz.\n\n"
             f"Böylelikle talebiniz hızlıca işleme alınabilecektir.\n\n"
-            f"Sabırınız için teşekkür ederiz.\n\n"
+            f"Anlayışınız için teşekkür ederiz.\n\n"
             f"Saygılarımızla,\n"
             f"Müşteri Hizmetleri Ekibi"
         )

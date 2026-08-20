@@ -10,7 +10,9 @@ from typing import Dict, Optional, List
 from config import (
     CSM_CREATE_TICKET_URL, DEFAULT_HEADERS,
     CSM_SEARCH_PARTY_ROLES_URL,
-    TICKET_TYPE_COMPLAINT, TICKET_TYPE_THANK_YOU,
+    TICKET_TYPE_COMPLAINT, TICKET_TYPE_THANK_YOU, TICKET_TYPE_INFO_REQUEST,
+    CATEGORY_INVOICE, CATEGORY_THANK_YOU, CATEGORY_AGENCY,
+    SUB_CATEGORY_GUEST_INVOICE, SUB_CATEGORY_INVOICE_MODIFICATION,
     CUSTOMER_SEARCH_TYPE, CUSTOMER_CONTACT_MEDIUM_TYPE
 )
 from auth import get_bearer_token
@@ -23,6 +25,7 @@ class CSMAPIClient:
     def __init__(self):
         """Initialize CSM API client."""
         self.base_headers = DEFAULT_HEADERS.copy()
+        self.last_error = ""
     
     def _get_headers(self) -> Dict[str, str]:
         """
@@ -146,11 +149,13 @@ class CSMAPIClient:
                     print(f"🚀 [BAŞARILI] CSM'de Ticket oluşturuldu!")
                     return "Oluşturuldu"
             else:
+                self.last_error = f"HTTP {response.status_code}: {response.text}"
                 print(f"⚠️ [HATA] CSM isteği başarısız. Status: {response.status_code}")
                 print(f"Yanıt: {response.text}")
                 return None
         
         except Exception as e:
+            self.last_error = str(e)
             print(f"❌ Ticket oluşturulurken hata: {e}")
             return None
 
@@ -233,8 +238,36 @@ class TicketPayloadBuilder:
         else:
             print(f"🆕 [POTANSİYEL] Yeni potansiyel müşteri kaydı oluşturuluyor")
         
-        # Determine ticket type code
-        ticket_type_code = "COMPLAINT" if categorization["ticket_type_id"] == TICKET_TYPE_COMPLAINT else "THANK_YOU"
+        ticket_type_codes = {
+            TICKET_TYPE_COMPLAINT: "COMPLAINT",
+            TICKET_TYPE_THANK_YOU: "TESEKKUR",
+            TICKET_TYPE_INFO_REQUEST: "BILGI_ISTEK",
+        }
+        ticket_type_code = ticket_type_codes.get(categorization["ticket_type_id"], "BILGI_ISTEK")
+        category_codes = {
+            CATEGORY_INVOICE: "FATURA",
+            CATEGORY_THANK_YOU: "TESEKKUR",
+            CATEGORY_AGENCY: "ACENTE",
+        }
+        category_code = category_codes.get(categorization["category_id"], "TESIS")
+        category_uuid = (
+            "0ccfc115-fc6a-4e0b-ae08-857b8cbf994c"
+            if categorization["category_id"] == CATEGORY_INVOICE
+            else "5e9ef86d-90d3-4efc-a8f4-dbd29eb132ea"
+        )
+        subcategory_uuids = {
+            SUB_CATEGORY_GUEST_INVOICE: "d3b400ea-9276-4dd6-aad4-b95b9ddce030",
+            SUB_CATEGORY_INVOICE_MODIFICATION: "565227a6-c991-47f1-b138-c77aaccee869",
+        }
+        subcategory_uuid = subcategory_uuids.get(
+            categorization["sub_category_id"],
+            "a8e13665-8d0c-41bc-b3f7-c2ce489d2458"
+        )
+        ticket_type_uuid = (
+            "6ed921e1-56f3-4743-b8af-c0c616cd0950"
+            if categorization["ticket_type_id"] == TICKET_TYPE_INFO_REQUEST
+            else "a01dabb1-c18d-4781-80ab-ed2bdf841d1f"
+        )
         
         # Build complete payload
         payload = {
@@ -274,19 +307,19 @@ class TicketPayloadBuilder:
                 "shortCode": categorization["sub_category_code"],
                 "name": categorization.get("sub_category_name", "General"),
                 "id": categorization["sub_category_id"],
-                "uuid": "a8e13665-8d0c-41bc-b3f7-c2ce489d2458"
+                "uuid": subcategory_uuid
             },
             "category": {
-                "shortCode": "GENERAL",
-                "name": "General",
+                "shortCode": category_code,
+                "name": categorization.get("category_name", "Genel"),
                 "id": categorization["category_id"],
-                "uuid": "5e9ef86d-90d3-4efc-a8f4-dbd29eb132ea"
+                "uuid": category_uuid
             },
             "ticketType": {
                 "shortCode": ticket_type_code,
                 "name": categorization.get("ticket_type_name", "General"),
                 "id": categorization["ticket_type_id"],
-                "uuid": "a01dabb1-c18d-4781-80ab-ed2bdf841d1f"
+                "uuid": ticket_type_uuid
             },
             "priorityLevel": {
                 "shortCode": "NORMAL",
