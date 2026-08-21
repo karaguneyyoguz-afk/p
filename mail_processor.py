@@ -14,12 +14,48 @@ from config import (
     EMAIL_USER, EMAIL_PASS, IMAP_SERVER,
     SMTP_SERVER, SMTP_PORT, CHANNEL_ID,
     TICKET_TYPE_THANK_YOU, TICKET_TYPE_COMPLAINT,
-    TICKET_TYPE_INFO_REQUEST, CATEGORY_THANK_YOU,
+    TICKET_TYPE_INFO_REQUEST, TICKET_TYPE_RESERVATION,
+    CATEGORY_THANK_YOU,
     CATEGORY_COMPLAINT, CATEGORY_FACILITY, CATEGORY_AGENCY,
+    CATEGORY_ONLINE_OPERATIONS, CATEGORY_TRANSPORT,
     SUB_CATEGORY_THANK_YOU_GENERAL, SUB_CATEGORY_THANK_YOU_GUIDE,
     SUB_CATEGORY_THANK_YOU_CONSULTANT, SUB_CATEGORY_COMPLAINT_INVOICE,
+    SUB_CATEGORY_COMPLAINT_DOCUMENT,
     CATEGORY_INVOICE, SUB_CATEGORY_GUEST_INVOICE, SUB_CATEGORY_INVOICE_MODIFICATION,
     SUB_CATEGORY_FACILITY_CONTACT, SUB_CATEGORY_AGENCY_CONTACT_INFORMATION,
+    SUB_CATEGORY_MEMBERSHIP_PROCESSES, SUB_CATEGORY_TRANSPORT_CHANGE_RIGHTS,
+    SUB_CATEGORY_TRANSPORT_BUS, SUB_CATEGORY_TRANSPORT_TICKET,
+    CATEGORY_PAYMENT, CATEGORY_CONFIRMATION, CATEGORY_CHANGE,
+    CATEGORY_CANCELLATION, CATEGORY_ADDITIONAL_SERVICE,
+    CATEGORY_SHIFT, CATEGORY_OTHER_OPERATIONS,
+    SUB_CATEGORY_PAYMENT_REFLECTION, SUB_CATEGORY_CONFIRMATION,
+    SUB_CATEGORY_CHANGE_PAYMENT_TYPE, SUB_CATEGORY_CHANGE_BIRTH_DATE,
+    SUB_CATEGORY_CHANGE_EXTRA_SERVICES, SUB_CATEGORY_CHANGE_NAME,
+    SUB_CATEGORY_CHANGE_PERSON_ADD_REMOVE, SUB_CATEGORY_CHANGE_NOTE_ADD,
+    SUB_CATEGORY_CHANGE_ROOM, SUB_CATEGORY_CHANGE_ROOM_TYPE,
+    SUB_CATEGORY_CHANGE_HOTEL, SUB_CATEGORY_CHANGE_DATE,
+    SUB_CATEGORY_CHANGE_TOUR, SUB_CATEGORY_CHANGE_TRANSPORT,
+    SUB_CATEGORY_CHANGE_AIRPLANE_TICKET,
+    SUB_CATEGORY_CANCELLATION_ROOM, SUB_CATEGORY_CANCELLATION_REQUEST,
+    SUB_CATEGORY_CANCELLATION_AIRPLANE,
+    SUB_CATEGORY_ADDITIONAL_CANCELLATION_INSURANCE,
+    SUB_CATEGORY_SHIFT_HOTEL_BASED, SUB_CATEGORY_SHIFT_OPERATION_BASED,
+    SUB_CATEGORY_OTHER_OPERATIONS_PAYMENT_COMPLETION,
+    CATEGORY_DOCUMENT, SUB_CATEGORY_DOCUMENT_CONTRACT, SUB_CATEGORY_DOCUMENT_VISA_KIT,
+    SUB_CATEGORY_DOCUMENT_BUS_DRIVER_INFO, SUB_CATEGORY_DOCUMENT_COMPLAINT,
+    CATEGORY_RESERVATION_INFO, SUB_CATEGORY_RESERVATION_CHANGE_INFO,
+    SUB_CATEGORY_RESERVATION_CANCELLATION_INFO, SUB_CATEGORY_RESERVATION_CONFIRMATION_INFO,
+    CATEGORY_PAYMENT_SYSTEMS_INFO, SUB_CATEGORY_REFUND_INFO,
+    CATEGORY_HOTEL, SUB_CATEGORY_HOTEL_OPERATION, SUB_CATEGORY_HOTEL_SERVICES,
+    CATEGORY_AIRPLANE, SUB_CATEGORY_AIRLINE_CHANGE, SUB_CATEGORY_FLIGHT_TIME_CHANGE,
+    SUB_CATEGORY_FLIGHT_CANCELLED,
+    CATEGORY_COMPLAINT_INFO_REQUEST, SUB_CATEGORY_RESERVATION_PROCESS,
+    CATEGORY_SALES_PROCESS, SUB_CATEGORY_CALL_CENTER,
+    CATEGORY_TOUR_AND_GUIDE, SUB_CATEGORY_TOUR_COMPLAINT, SUB_CATEGORY_GUIDE_COMPLAINT,
+    CATEGORY_REFUND, SUB_CATEGORY_REFUND_NOT_MADE,
+    SUB_CATEGORY_REFUND_REQUEST_NOT_OPENED, SUB_CATEGORY_REFUND_NOT_REFLECTED,
+    CATEGORY_PRICING, SUB_CATEGORY_BEST_PRICE_GUARANTEE, SUB_CATEGORY_PRICE_GENERAL,
+    SUB_CATEGORY_PRICE_DROP, SUB_CATEGORY_PAYMENT_OBJECTION,
     MAIL_CHARSET_DEFAULT,
     MAIL_CHARSET_FALLBACK
 )
@@ -27,7 +63,7 @@ from utils import (
     decode_email_header, extract_sender_info, 
     clean_subject_line, normalize_turkish_characters
 )
-from validators import contains_profanity, extract_invoice_attributes
+from validators import contains_profanity, extract_invoice_attributes, extract_payment_attributes
 
 
 class EmailProcessor:
@@ -179,19 +215,294 @@ class EmailCategorizer:
         "geciktiril", "yasal hak", "yasal merci", "tuketici hak"
     ]
 
-    AGENCY_KEYWORDS = ["acente", "acenteye", "acentesi"]
+    AGENCY_KEYWORDS = ["acente", "acenteye", "acentesi", "acenta", "acentaya"]
 
     AGENCY_CONTACT_KEYWORDS = [
         "iletisim", "telefon", "numara", "ula", "ulas",
-        "yanit alam", "geri donus", "erisim"
+        "yanit alam", "geri donus", "erisim", "basvuru", "yonlendir"
+    ]
+
+    ONLINE_PROCESS_KEYWORDS = [
+        "uyelik", "giris yap", "giris yapam", "web sayfa",
+        "uygulama", "mobil uygulama", "rezervasyonlarim",
+        "rezervasyon gorunmuyor", "rezervasyon gorun", "kesin rezervasyon bekliyor"
+    ]
+
+    TRANSPORT_CHANGE_RIGHTS_KEYWORDS = [
+        "transfer", "no show", "noshow", "kendi imkanlariyla",
+        "donus transferi", "transferin yapilmasi", "transfer degisikligi",
+        "otelimizi tercih etmistir", "fiyat ve sartlarindan", "bilet",
+        "otobus", "tarih degisikligi", "saat degisikligi",
+        "degisiklik hakki", "cezai islem", "kesinti uygulan"
+    ]
+
+    TRANSPORT_BUS_KEYWORDS = [
+        "tur otobusu", "otobusun guzergahi", "otobusune bin",
+        "otobusten bin", "otobus sofor", "tur rehberi",
+        "rehberin iletisim", "soforun iletisim"
     ]
     
     GUIDE_KEYWORDS = ["rehber", "tur lideri"]
-    
+
     CONSULTANT_KEYWORDS = [
         "danisman", "temsilci", "cagri merkezi", "telefondaki"
     ]
-    
+
+    # "Tesekkur" ile birlikte gecerse mailin aslinda bir talep/soru oldugunu,
+    # sadece kibarlik amacli "tesekkurler" ile bittigini gosteren ifadeler.
+    REQUEST_INDICATOR_KEYWORDS = [
+        "miyim", "misiniz", "musunuz", "misin", "mısınız", "münüz", "misiniz",
+        "istiyorum", "rica ederim", "alabilir miyim", "ogrenebilir miyim",
+        "yapabilir miyim", "paylasabilir misiniz", "atabilir misiniz"
+    ]
+
+    TRANSPORT_TICKET_TOPIC_KEYWORDS = ["bilet", "e-bilet"]
+    TRANSPORT_TICKET_EVENT_KEYWORDS = [
+        "gelmedi", "dusmedi", "ulasmadi", "gonderilmedi", "numaram"
+    ]
+
+    DOCUMENT_TOPIC_KEYWORDS = ["evrak", "belge"]
+    DOCUMENT_COMPLAINT_EVENT_KEYWORDS = [
+        "eksik", "hatali", "yanlis", "sikinti", "sorun"
+    ]
+
+    # ==========================================
+    # REZERVASYON / BACKOFFICE İŞLEMLERİ ANAHTAR KELİMELERİ
+    # KONU + NIYET ikili listeler halinde: bir mailin bu dala girmesi icin
+    # ilgili KONU listesinden bir kelime VE ilgili NIYET listesinden bir kelime
+    # birlikte gecmeli. Bu, tek bir uzun cumleyle birebir eslesme aramaktan
+    # cok daha esnek ve gercek musteri ifadelerine dayanikli.
+    # ==========================================
+    # Not: bu listeler kok/govde (stem-benzeri) kisa parcalar iceriyor, tam cumle
+    # degil -- boylece "degistirmek", "degistirebilir", "degistirilmesi",
+    # "degisiklik", "degisikligi" gibi tum ceki'mleri tek bir "degistir" /
+    # "degisiklik" kaydiyla yakalar. Python'daki `in` kontrolu alt-dize (substring)
+    # aramasi oldugu icin bu yaklasim calisir.
+    CHANGE_INTENT_KEYWORDS = [
+        "degistir", "degisikli", "gecmek", "gecis yapmak", "cevirmek",
+        "duzelt", "yanlis gir", "yanlis yaz", "hatali yaz", "eklettirmek",
+        "eklemek isti", "ileri almak", "geri almak"
+    ]
+
+    # Not: bilinçli olarak "iptal etmek/ettirmek/edebilir/edelim/ediyoruz" gibi
+    # ILERIYE DONUK talep bicimleriyle sinirli tutuluyor; "iptal ettigimiz",
+    # "iptal ettik" gibi GECMISE DONUK/betimleyici ifadeleri KAPSAMIYOR --
+    # aksi halde "iptal ettigimiz rezervasyonun iadesi ne zaman yapilir" gibi
+    # bilgi-istek mailleri de yanlislikla Backoffice Iptal Talebi'ne dusebilirdi.
+    CANCEL_INTENT_KEYWORDS = [
+        "iptal etmek", "iptal ettirmek", "iptal edebilir", "iptal edelim",
+        "iptal ediyoruz", "iptal talebi"
+    ]
+
+    COMPLAINT_SENTIMENT_KEYWORDS = [
+        "memnun degil", "sikayetci", "kotu", "ilgisiz", "magdur ol", "magduriyet",
+        "sorun yasa", "berbat", "yetersiz", "hayal kirikligi", "kaba", "aksama",
+        "duzensiz", "karisti"
+    ]
+
+    PAYMENT_REFLECTION_TOPIC_KEYWORDS = [
+        "odeme yansimadi", "para cekildi", "hesabimdan cekildi", "kartimdan cekildi",
+        "odeme gozukmuyor", "odeme kayboldu", "rezervasyon olusmadi", "rezervasyon sistemde yok"
+    ]
+
+    CONFIRMATION_TOPIC_KEYWORDS = ["konfirme", "konfirmasyon", "rezervasyon onayi"]
+    CONFIRMATION_ACTIONABLE_EVENT_KEYWORDS = [
+        "gelmedi", "ulasmadi", "hala", "acil laz"
+    ]
+
+    PAYMENT_TYPE_TOPIC_KEYWORDS = [
+        "odeme tipi", "taksit", "tek cekim", "kredi karti", "havale"
+    ]
+
+    BIRTH_DATE_TOPIC_KEYWORDS = ["dogum tarihi"]
+
+    EXTRA_SERVICES_TOPIC_KEYWORDS = [
+        "ek hizmet", "ekstra hizmet", "ekstra yatak", "transfer hizmeti"
+    ]
+
+    NAME_CHANGE_TOPIC_KEYWORDS = [
+        "isim", "ad soyad", "soyadim", "adim yanlis"
+    ]
+
+    PERSON_ADD_REMOVE_TOPIC_KEYWORDS = [
+        "kisi eklemek", "kisi cikarmak", "kisi ekleme", "kisi cikarma",
+        "kisi sayisini", "bir kisi daha", "kisi daha eklemek"
+    ]
+
+    NOTE_ADD_TOPIC_KEYWORDS = ["not"]
+    NOTE_ADD_EVENT_KEYWORDS = [
+        "eklemek", "eklenmesini", "ekleyebilir", "dusurebilir", "dusmek", "ozel not"
+    ]
+
+    ROOM_TYPE_TOPIC_KEYWORDS = [
+        "oda tipi", "suit odaya", "deluxe odaya", "deluxe oda"
+    ]
+
+    ROOM_TOPIC_KEYWORDS = ["oda", "odami", "odamizi", "odamiz"]
+
+    HOTEL_CHANGE_TOPIC_KEYWORDS = [
+        "otel degisikligi", "baska otele", "baska bir otele", "otelimi degistirmek",
+        "yakinindaki baska bir otel"
+    ]
+
+    RESERVATION_DATE_TOPIC_KEYWORDS = [
+        "rezervasyon tarihi", "tatil tarihi", "tatil tarihlerimiz", "giris tarihi",
+        "cikis tarihi", "konaklama tarihi"
+    ]
+
+    TOUR_CHANGE_TOPIC_KEYWORDS = [
+        "tur degisikligi", "baska tura", "baska bir tura", "turu yerine"
+    ]
+
+    TRANSPORT_MODE_CHANGE_TOPIC_KEYWORDS = [
+        "ulasim degisikligi", "ulasim tipimi", "ucakla gitmek yerine", "otobusle gitmek yerine"
+    ]
+
+    AIRPLANE_TICKET_TOPIC_KEYWORDS = [
+        "ucak bileti", "ucak biletim", "ucak biletimiz", "ucak biletimizdeki"
+    ]
+
+    CANCELLATION_INSURANCE_TOPIC_KEYWORDS = [
+        "iptal sigortasi", "seyahat sigortasi"
+    ]
+
+    SHIFT_EVENT_KEYWORDS = [
+        "kaydirdi", "kaydirma", "kaydirildik", "kaydirilmis", "kaydirmis"
+    ]
+    SHIFT_HOTEL_BASED_TOPIC_KEYWORDS = ["otel"]
+    SHIFT_OPERATION_BASED_TOPIC_KEYWORDS = ["operasyon"]
+
+    PAYMENT_COMPLETION_TOPIC_KEYWORDS = [
+        "bakiye", "kalan bakiye", "eksik odeme", "kalan odeme"
+    ]
+
+    PAYMENT_COMPLETION_INTENT_KEYWORDS = [
+        "tamamlamak istiyoruz", "tamamlamak istiyorum", "odemesi yapmak istiyorum",
+        "simdi tamamlamak", "tamamlayabilir miyiz"
+    ]
+
+    # ==========================================
+    # BİLGİ-İSTEK - EVRAK ANAHTAR KELİMELERİ (Taslak)
+    # ==========================================
+    DOCUMENT_CONTRACT_KEYWORDS = [
+        "sozlesme", "sozlesmemi", "sozlesme metni", "sozlesme kopyasi"
+    ]
+
+    DOCUMENT_VISA_KIT_TOPIC_KEYWORDS = ["vize"]
+    DOCUMENT_VISA_KIT_EVENT_KEYWORDS = ["kit", "evrak", "belge"]
+
+    DOCUMENT_BUS_DRIVER_INFO_KEYWORDS = [
+        "otobus soforunun evraklari", "sofor belgeleri", "otobus soforu belgesi"
+    ]
+
+    # ==========================================
+    # BİLGİ-İSTEK - REZERVASYON (bilgi amaçlı) ANAHTAR KELİMELERİ (Taslak)
+    # ==========================================
+    RESERVATION_CHANGE_INFO_KEYWORDS = [
+        "degisiklik yapabilir miyim", "degisiklik yapilabilir mi",
+        "degisiklik hakkinda bilgi almak istiyorum", "nasil degisiklik yapabilirim"
+    ]
+
+    RESERVATION_CANCELLATION_INFO_TOPIC_KEYWORDS = ["iptal"]
+    RESERVATION_CANCELLATION_INFO_EVENT_KEYWORDS = [
+        "nasil", "surec", "kosul", "sart", "ne olur"
+    ]
+
+    RESERVATION_CONFIRMATION_INFO_EVENT_KEYWORDS = [
+        "nedir", "ne zaman", "sure", "ulasir"
+    ]
+
+    # ==========================================
+    # BİLGİ-İSTEK - ÖDEME SİSTEMLERİ KONULARI ANAHTAR KELİMELERİ (Taslak)
+    # ==========================================
+    REFUND_INFO_TOPIC_KEYWORDS = ["iade"]
+    REFUND_INFO_EVENT_KEYWORDS = [
+        "ne zaman", "kac gun", "nasil alinir", "ne kadar", "hesabimiza gecer",
+        "hesabima gecer", "hakkinda bilgi"
+    ]
+
+    # ==========================================
+    # ŞİKAYET AĞACI ANAHTAR KELİMELERİ
+    # Ayni KONU + NIYET/DUYGU mantigi: konu kelimesi VE bir sikayet/olay sinyali
+    # birlikte arandigi icin gercek musteri ifadelerine cok daha dayanikli.
+    # ==========================================
+    HOTEL_OPERATION_TOPIC_KEYWORDS = [
+        "resepsiyon", "check-in", "checkin", "check-out", "checkout", "otelin operasyon"
+    ]
+
+    HOTEL_SERVICES_TOPIC_KEYWORDS = [
+        "oda temizligi", "temizlenmedi", "havuz", "yemek", "otel hizmet"
+    ]
+
+    AIRLINE_CHANGE_TOPIC_KEYWORDS = ["havayolu"]
+    AIRLINE_CHANGE_EVENT_KEYWORDS = [
+        "degisti", "degistirildi", "degisikligi yapildi", "farkli", "baska",
+        "haber verilmeden", "habersiz"
+    ]
+
+    FLIGHT_TIME_TOPIC_KEYWORDS = [
+        "ucus saati", "sefer saati", "kalkis saati", "ucus saatimiz"
+    ]
+    FLIGHT_TIME_EVENT_KEYWORDS = [
+        "degisti", "degistirildi", "habersiz", "erteledi", "one alindi"
+    ]
+
+    FLIGHT_CANCELLED_TOPIC_KEYWORDS = [
+        "seferimiz", "ucusumuz", "ucagimiz", "seferi", "ucusu"
+    ]
+
+    RESERVATION_PROCESS_TOPIC_KEYWORDS = [
+        "rezervasyon islem", "rezervasyon yapilirken", "rezervasyon sirasinda"
+    ]
+    RESERVATION_PROCESS_EVENT_KEYWORDS = [
+        "hata", "yanlis rezervasyon", "yanlis tarih girildi", "hatali yapildi"
+    ]
+
+    CALL_CENTER_TOPIC_KEYWORDS = [
+        "cagri merkezi", "musteri hizmetleri", "temsilci", "danisman hattindan"
+    ]
+
+    TOUR_TOPIC_KEYWORDS = ["tur program", "tur organizasyon"]
+
+    GUIDE_COMPLAINT_TOPIC_KEYWORDS = ["rehber"]
+
+    REFUND_TOPIC_KEYWORDS = ["iade"]
+
+    REFUND_REQUEST_NOT_OPENED_EVENT_KEYWORDS = [
+        "acilmamis", "olusturulmamis", "islenmemis", "isleme alinmamis",
+        "kayit gorunmuyor", "hicbir kayit", "kayit yok"
+    ]
+
+    REFUND_NOT_REFLECTED_EVENT_KEYWORDS = [
+        "yansimadi", "yansima", "ekstre"
+    ]
+
+    REFUND_NOT_MADE_EVENT_KEYWORDS = [
+        "yapilmadi", "edilmedi", "almadim"
+    ]
+
+    BEST_PRICE_GUARANTEE_TOPIC_KEYWORDS = [
+        "fiyat garantisi", "daha ucuz gordum", "baska sitede ucuz"
+    ]
+
+    PRICE_DROP_TOPIC_KEYWORDS = [
+        "fiyat dustu", "fiyati dustu"
+    ]
+
+    PAYMENT_OBJECTION_TOPIC_KEYWORDS = ["odeme", "tutar", "kart"]
+    PAYMENT_OBJECTION_EVENT_KEYWORDS = [
+        "itiraz", "fazla cekildi", "yanlis tutar", "fazla odeme"
+    ]
+
+    PRICE_GENERAL_TOPIC_KEYWORDS = ["fiyat"]
+    PRICE_GENERAL_EVENT_KEYWORDS = [
+        "tutmuyor", "uyusmuyor", "farkli gosteriliyor", "yanlis hesaplanmis", "hatali gosterilmis"
+    ]
+
+    PAYMENT_OBJECTION_KEYWORDS = [
+        "odemeye itiraz ediyorum", "yanlis tutar cekildi", "fazla odeme yapildi", "odeme itirazi"
+    ]
+
     @staticmethod
     def categorize(subject: str, body: str, sender_email: str) -> Dict:
         """
@@ -207,6 +518,124 @@ class EmailCategorizer:
         """
         combined_text = f"{subject} {body}"
         normalized_text = normalize_turkish_characters(combined_text)
+
+        # Not: Uçak bileti değişikliği/iptali kontrolleri kasıtlı olarak fonksiyonun
+        # en başında yapılıyor. TRANSPORT_CHANGE_RIGHTS_KEYWORDS listesinde tek başına
+        # "bilet" kelimesi geçiyor; bu daha genel kontrol aşağıda çalışırsa "uçak
+        # biletimi değiştirmek/iptal etmek istiyorum" gibi somut, eylemsel talepler
+        # hep genel "Ulaşım > Değişiklik Hakkı Sorgulama" bilgi-istek dalına düşerdi.
+        # Somut/eylemsel Backoffice talepleri, genel bilgi-istek kontrolünden önce
+        # değerlendirilmeli.
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.AIRPLANE_TICKET_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CANCELLATION,
+                "category_name": "İptal",
+                "sub_category_id": SUB_CATEGORY_CANCELLATION_AIRPLANE,
+                "sub_category_name": "Uçak Bileti",
+                "sub_category_code": "UCAK_BILETI_IPTALI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.AIRPLANE_TICKET_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_AIRPLANE_TICKET,
+                "sub_category_name": "Uçak Bileti Değişikliği",
+                "sub_category_code": "UCAK_BILETI_DEGISIKLIGI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI"
+            }
+
+        has_bus_reference = "otobus" in normalized_text
+        has_bus_context = any(
+            keyword in normalized_text
+            for keyword in EmailCategorizer.TRANSPORT_BUS_KEYWORDS
+        ) or any(
+            keyword in normalized_text
+            for keyword in ["guzergah", "binerek", "ikamet", "rehber", "sofor", "iletisim bilgileri"]
+        )
+
+        if has_bus_reference and has_bus_context:
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_TRANSPORT,
+                "category_name": "Ulaşım",
+                "sub_category_id": SUB_CATEGORY_TRANSPORT_BUS,
+                "sub_category_name": "Otobüs",
+                "sub_category_code": "OTOBUS",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > ULASIM > OTOBUS"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_TICKET_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_TICKET_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_TRANSPORT,
+                "category_name": "Ulaşım",
+                "sub_category_id": SUB_CATEGORY_TRANSPORT_TICKET,
+                "sub_category_name": "Bilet",
+                "sub_category_code": "BILET",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > ULASIM > BILET"
+            }
+
+        if any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_CHANGE_RIGHTS_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_TRANSPORT,
+                "category_name": "Ulaşım",
+                "sub_category_id": SUB_CATEGORY_TRANSPORT_CHANGE_RIGHTS,
+                "sub_category_name": "Değişiklik Hakkı Sorgulama",
+                "sub_category_code": "DEGISIKLIK_HAKKI_SORGULAMA",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > ULASIM > DEGISIKLIK_HAKKI_SORGULAMA"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.DOCUMENT_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.DOCUMENT_COMPLAINT_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_DOCUMENT,
+                "category_name": "Evrak",
+                "sub_category_id": SUB_CATEGORY_DOCUMENT_COMPLAINT,
+                "sub_category_name": "Evrak",
+                "sub_category_code": "EVRAK",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > EVRAK > EVRAK"
+            }
 
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_KEYWORDS)
@@ -226,7 +655,298 @@ class EmailCategorizer:
                 "missing_fields": missing_fields,
                 "classification": "SIKAYET > FATURA > FATURA_TALEBI_SIKAYETLERI"
             }
-        
+
+        # ============================================================
+        # ŞİKAYET AĞACI (kirilim.md kaynaklı, taslak)
+        # ============================================================
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.HOTEL_OPERATION_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_HOTEL,
+                "category_name": "Otel",
+                "sub_category_id": SUB_CATEGORY_HOTEL_OPERATION,
+                "sub_category_name": "Operasyon",
+                "sub_category_code": "OPERASYON",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > OTEL > OPERASYON"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.HOTEL_SERVICES_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_HOTEL,
+                "category_name": "Otel",
+                "sub_category_id": SUB_CATEGORY_HOTEL_SERVICES,
+                "sub_category_name": "Otel Hizmetleri",
+                "sub_category_code": "OTEL_HIZMETLERI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > OTEL > OTEL_HIZMETLERI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.AIRLINE_CHANGE_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.AIRLINE_CHANGE_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_AIRPLANE,
+                "category_name": "Uçak",
+                "sub_category_id": SUB_CATEGORY_AIRLINE_CHANGE,
+                "sub_category_name": "Havayolu Değişikliği",
+                "sub_category_code": "HAVAYOLU_DEGISIKLIGI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > UCAK > HAVAYOLU_DEGISIKLIGI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.FLIGHT_TIME_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.FLIGHT_TIME_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_AIRPLANE,
+                "category_name": "Uçak",
+                "sub_category_id": SUB_CATEGORY_FLIGHT_TIME_CHANGE,
+                "sub_category_name": "Saat Değişikliği",
+                "sub_category_code": "SAAT_DEGISIKLIGI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > UCAK > SAAT_DEGISIKLIGI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.FLIGHT_CANCELLED_TOPIC_KEYWORDS)
+            and "iptal" in normalized_text
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_AIRPLANE,
+                "category_name": "Uçak",
+                "sub_category_id": SUB_CATEGORY_FLIGHT_CANCELLED,
+                "sub_category_name": "Sefer İptali",
+                "sub_category_code": "SEFER_IPTALI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > UCAK > SEFER_IPTALI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.RESERVATION_PROCESS_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.RESERVATION_PROCESS_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_COMPLAINT_INFO_REQUEST,
+                "category_name": "Bilgi Talebi",
+                "sub_category_id": SUB_CATEGORY_RESERVATION_PROCESS,
+                "sub_category_name": "Rezervasyon İşlemi",
+                "sub_category_code": "REZERVASYON_ISLEMI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > BILGI_TALEBI > REZERVASYON_ISLEMI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.CALL_CENTER_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_SALES_PROCESS,
+                "category_name": "Satış Süreci",
+                "sub_category_id": SUB_CATEGORY_CALL_CENTER,
+                "sub_category_name": "Çağrı Merkezi",
+                "sub_category_code": "CAGRI_MERKEZI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > SATIS_SURECI > CAGRI_MERKEZI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.TOUR_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_TOUR_AND_GUIDE,
+                "category_name": "Tur Organizasyonu ve Rehber",
+                "sub_category_id": SUB_CATEGORY_TOUR_COMPLAINT,
+                "sub_category_name": "Tur",
+                "sub_category_code": "TUR",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > TUR"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.GUIDE_COMPLAINT_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_TOUR_AND_GUIDE,
+                "category_name": "Tur Organizasyonu ve Rehber",
+                "sub_category_id": SUB_CATEGORY_GUIDE_COMPLAINT,
+                "sub_category_name": "Rehber",
+                "sub_category_code": "REHBER",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > REHBER"
+            }
+
+        # Not: FIYATLANDIRMA dallari (spesifik konu kelimeleri: "fiyat garantisi",
+        # "fiyat dustu" vb.) IADE dallarindan ONCE kontrol ediliyor; aksi halde
+        # "fiyat dustu ama iade edilmedi" gibi bir metin, cok daha genel olan
+        # "iade" + "edilmedi" catch-all'ina takilip yanlislikla IADE dalina duserdi.
+        if any(keyword in normalized_text for keyword in EmailCategorizer.BEST_PRICE_GUARANTEE_TOPIC_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_PRICING,
+                "category_name": "Fiyatlandırma",
+                "sub_category_id": SUB_CATEGORY_BEST_PRICE_GUARANTEE,
+                "sub_category_name": "En İyi Fiyat Garantisi",
+                "sub_category_code": "EN_IYI_FIYAT_GARANTISI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > FIYATLANDIRMA > EN_IYI_FIYAT_GARANTISI"
+            }
+
+        if any(keyword in normalized_text for keyword in EmailCategorizer.PRICE_DROP_TOPIC_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_PRICING,
+                "category_name": "Fiyatlandırma",
+                "sub_category_id": SUB_CATEGORY_PRICE_DROP,
+                "sub_category_name": "Ürün Fiyat Düşüşü",
+                "sub_category_code": "FIYAT_DUSUSU",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > FIYATLANDIRMA > FIYAT_DUSUSU"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_OBJECTION_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_OBJECTION_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_PRICING,
+                "category_name": "Fiyatlandırma",
+                "sub_category_id": SUB_CATEGORY_PAYMENT_OBJECTION,
+                "sub_category_name": "Ödeme İtirazı",
+                "sub_category_code": "ODEME_ITIRAZI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > FIYATLANDIRMA > ODEME_ITIRAZI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.PRICE_GENERAL_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.PRICE_GENERAL_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_PRICING,
+                "category_name": "Fiyatlandırma",
+                "sub_category_id": SUB_CATEGORY_PRICE_GENERAL,
+                "sub_category_name": "Fiyat Genel",
+                "sub_category_code": "FIYAT_GENEL",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > FIYATLANDIRMA > FIYAT_GENEL"
+            }
+
+        # Not: en spesifik IADE dallari (talep acilmamis, misafire yansimamasi) genel
+        # "iade yapilmadi" catch-all'inden ONCE kontrol ediliyor.
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.REFUND_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.REFUND_REQUEST_NOT_OPENED_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_REFUND,
+                "category_name": "İade",
+                "sub_category_id": SUB_CATEGORY_REFUND_REQUEST_NOT_OPENED,
+                "sub_category_name": "İade Talebinin Açılmamış Olması",
+                "sub_category_code": "IADE_TALEBININ_ACILMAMIS_OLMASI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > IADE > IADE_TALEBININ_ACILMAMIS_OLMASI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.REFUND_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.REFUND_NOT_REFLECTED_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_REFUND,
+                "category_name": "İade",
+                "sub_category_id": SUB_CATEGORY_REFUND_NOT_REFLECTED,
+                "sub_category_name": "İadenin Misafire Yansımaması",
+                "sub_category_code": "IADENIN_MISAFIRE_YANSIMAMASI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > IADE > IADENIN_MISAFIRE_YANSIMAMASI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.REFUND_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.REFUND_NOT_MADE_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_REFUND,
+                "category_name": "İade",
+                "sub_category_id": SUB_CATEGORY_REFUND_NOT_MADE,
+                "sub_category_name": "İadenin Yapılmaması",
+                "sub_category_code": "IADENIN_YAPILMAMASI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > IADE > IADENIN_YAPILMAMASI"
+            }
+
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_CONTEXT_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_MODIFICATION_KEYWORDS)
@@ -282,6 +1002,504 @@ class EmailCategorizer:
                 "classification": "BILGI_ISTEK > FATURA > MISAFIR_FATURASI"
             }
 
+        # ============================================================
+        # BİLGİ-İSTEK > EVRAK (kirilim.md kaynaklı, taslak)
+        # ============================================================
+        if any(keyword in normalized_text for keyword in EmailCategorizer.DOCUMENT_CONTRACT_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_DOCUMENT,
+                "category_name": "Evrak",
+                "sub_category_id": SUB_CATEGORY_DOCUMENT_CONTRACT,
+                "sub_category_name": "Sözleşme",
+                "sub_category_code": "SOZLESME",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > EVRAK > SOZLESME"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.DOCUMENT_VISA_KIT_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.DOCUMENT_VISA_KIT_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_DOCUMENT,
+                "category_name": "Evrak",
+                "sub_category_id": SUB_CATEGORY_DOCUMENT_VISA_KIT,
+                "sub_category_name": "Vize Kiti",
+                "sub_category_code": "VIZE_KITI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > EVRAK > VIZE_KITI"
+            }
+
+        # Not: Bu kirilim, mevcut ULASIM > OTOBUS kirilimi ile kavramsal olarak
+        # cakisiyor olabilir (ikisi de otobus soforu/iletisim bilgisiyle ilgili).
+        # Hangi durumda hangisinin kullanilmasi gerektigini birlikte netlestirmemiz lazim.
+        if any(keyword in normalized_text for keyword in EmailCategorizer.DOCUMENT_BUS_DRIVER_INFO_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_DOCUMENT,
+                "category_name": "Evrak",
+                "sub_category_id": SUB_CATEGORY_DOCUMENT_BUS_DRIVER_INFO,
+                "sub_category_name": "Tur Otobüs Şoför Bilgileri",
+                "sub_category_code": "TUR_OTOBUS_SOFOR_BILGILERI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > EVRAK > TUR_OTOBUS_SOFOR_BILGILERI"
+            }
+
+        if any(keyword in normalized_text for keyword in EmailCategorizer.ONLINE_PROCESS_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_ONLINE_OPERATIONS,
+                "category_name": "Online İşlemler",
+                "sub_category_id": SUB_CATEGORY_MEMBERSHIP_PROCESSES,
+                "sub_category_name": "Üyelik Süreçleri",
+                "sub_category_code": "UYELIK_SURECLERI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > ONLINE_ISLEMLER > UYELIK_SURECLERI"
+            }
+
+        # ============================================================
+        # REZERVASYON / BACKOFFICE İŞLEMLERİ
+        # (Ödeme, Konfirme, Değişiklik, İptal, Ek Hizmet, Kaydırma, Diğer İşlemler)
+        # ============================================================
+        if any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_REFLECTION_TOPIC_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_PAYMENT,
+                "category_name": "Ödeme Sistemleri",
+                "sub_category_id": SUB_CATEGORY_PAYMENT_REFLECTION,
+                "sub_category_name": "Ödemenin Yansımaması",
+                "sub_category_code": "ODEMENIN_YANSIMAMASI",
+                "attributes": extract_payment_attributes(combined_text),
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > ODEME > ODEMENIN_YANSIMAMASI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.CONFIRMATION_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.CONFIRMATION_ACTIONABLE_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CONFIRMATION,
+                "category_name": "Konfirme",
+                "sub_category_id": SUB_CATEGORY_CONFIRMATION,
+                "sub_category_name": "Konfirme",
+                "sub_category_code": "KONFIRME",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > KONFIRME > KONFIRME"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_TYPE_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_PAYMENT_TYPE,
+                "sub_category_name": "Ödeme Tipi Değişikliği",
+                "sub_category_code": "ODEME_TIPI_DEGISIKLIGI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODEME_TIPI_DEGISIKLIGI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.BIRTH_DATE_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_BIRTH_DATE,
+                "sub_category_name": "Doğum Tarihi Değişikliği",
+                "sub_category_code": "DOGUM_TARIHI_DEGISIKLIGI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DOGUM_TARIHI_DEGISIKLIGI"
+            }
+
+        if any(keyword in normalized_text for keyword in EmailCategorizer.EXTRA_SERVICES_TOPIC_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_EXTRA_SERVICES,
+                "sub_category_name": "Ek Hizmetler",
+                "sub_category_code": "EK_HIZMETLER",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.NAME_CHANGE_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_NAME,
+                "sub_category_name": "İsim Değişikliği",
+                "sub_category_code": "ISIM_DEGISIKLIGI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ISIM_DEGISIKLIGI"
+            }
+
+        if any(keyword in normalized_text for keyword in EmailCategorizer.PERSON_ADD_REMOVE_TOPIC_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_PERSON_ADD_REMOVE,
+                "sub_category_name": "Kişi Ekleme/Çıkarma",
+                "sub_category_code": "KISI_EKLEME_CIKARMA",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > KISI_EKLEME_CIKARMA"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.NOTE_ADD_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.NOTE_ADD_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_NOTE_ADD,
+                "sub_category_name": "Not Ekleme Talebi",
+                "sub_category_code": "NOT_EKLEME_TALEBI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > NOT_EKLEME_TALEBI"
+            }
+
+        # Not: "oda tipi" kontrolü, salt "oda" kontrolünden ÖNCE yapılıyor;
+        # aksi halde "oda tipi değişikliği" metni de ODA dalına düşebilirdi.
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_TYPE_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_ROOM_TYPE,
+                "sub_category_name": "Oda Tipi Değişikliği",
+                "sub_category_code": "ODA_TIPI_DEGISIKLIGI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA_TIPI_DEGISIKLIGI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_ROOM,
+                "sub_category_name": "Oda",
+                "sub_category_code": "ODA",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA"
+            }
+
+        if any(keyword in normalized_text for keyword in EmailCategorizer.HOTEL_CHANGE_TOPIC_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_HOTEL,
+                "sub_category_name": "Otel Değişikliği",
+                "sub_category_code": "OTEL_DEGISIKLIGI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > OTEL_DEGISIKLIGI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.RESERVATION_DATE_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_DATE,
+                "sub_category_name": "Tarih Değişikliği",
+                "sub_category_code": "TARIH_DEGISIKLIGI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > TARIH_DEGISIKLIGI"
+            }
+
+        if any(keyword in normalized_text for keyword in EmailCategorizer.TOUR_CHANGE_TOPIC_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_TOUR,
+                "sub_category_name": "Tur Değişikliği",
+                "sub_category_code": "TUR_DEGISIKLIGI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > TUR_DEGISIKLIGI"
+            }
+
+        if any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_MODE_CHANGE_TOPIC_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_TRANSPORT,
+                "sub_category_name": "Ulaşım",
+                "sub_category_code": "DEGISIKLIK_ULASIM",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_INSURANCE_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_ADDITIONAL_SERVICE,
+                "category_name": "Ek Hizmet Ekleme/Çıkarma",
+                "sub_category_id": SUB_CATEGORY_ADDITIONAL_CANCELLATION_INSURANCE,
+                "sub_category_name": "İptal Sigortası",
+                "sub_category_code": "IPTAL_SIGORTASI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > EK_HIZMET > IPTAL_SIGORTASI"
+            }
+
+        # Not: oda iptali kontrolu, genel "İptal Talebi" kontrolünden ÖNCE yapılıyor;
+        # aksi halde "iptal etmek istiyoruz" gibi genel bir ifade her oda iptalini de
+        # yakalayip yanlis (daha az spesifik) alt kirilima yonlendirebilirdi.
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CANCELLATION,
+                "category_name": "İptal",
+                "sub_category_id": SUB_CATEGORY_CANCELLATION_ROOM,
+                "sub_category_name": "Oda",
+                "sub_category_code": "ODA_IPTALI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > IPTAL > ODA_IPTALI"
+            }
+
+        if any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CANCELLATION,
+                "category_name": "İptal",
+                "sub_category_id": SUB_CATEGORY_CANCELLATION_REQUEST,
+                "sub_category_name": "İptal Talebi",
+                "sub_category_code": "IPTAL_TALEBI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > IPTAL > IPTAL_TALEBI"
+            }
+
+        # Not: "operasyon" konu kelimesi "otel" konu kelimesinden ÖNCE kontrol
+        # ediliyor; kaydirma her zaman bir otele yapildigi icin "otel" kelimesi
+        # OPERASYON_KAYNAKLI mailerde de gecebiliyor ("...bizi otele kaydirdi"),
+        # bu yuzden daha ayirt edici olan "operasyon" sinyali once degerlendirilmeli.
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_OPERATION_BASED_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_SHIFT,
+                "category_name": "Kaydırma",
+                "sub_category_id": SUB_CATEGORY_SHIFT_OPERATION_BASED,
+                "sub_category_name": "Operasyon Kaynaklı",
+                "sub_category_code": "OPERASYON_KAYNAKLI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > KAYDIRMA > OPERASYON_KAYNAKLI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_HOTEL_BASED_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_SHIFT,
+                "category_name": "Kaydırma",
+                "sub_category_id": SUB_CATEGORY_SHIFT_HOTEL_BASED,
+                "sub_category_name": "Otel Kaynaklı",
+                "sub_category_code": "OTEL_KAYNAKLI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > KAYDIRMA > OTEL_KAYNAKLI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_COMPLETION_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_COMPLETION_INTENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_OTHER_OPERATIONS,
+                "category_name": "Diğer İşlemler",
+                "sub_category_id": SUB_CATEGORY_OTHER_OPERATIONS_PAYMENT_COMPLETION,
+                "sub_category_name": "Ödeme Tamamlama",
+                "sub_category_code": "ODEME_TAMAMLAMA",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA"
+            }
+
+        # ============================================================
+        # BİLGİ-İSTEK > REZERVASYON (islem yapmadan, sadece bilgi soran mailler)
+        # Backoffice > Değişiklik/İptal/Konfirme dallarından FARKLI: burada müşteri
+        # somut bir işlem talep etmiyor, süreç hakkında soru soruyor.
+        # ============================================================
+        if any(keyword in normalized_text for keyword in EmailCategorizer.RESERVATION_CHANGE_INFO_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_RESERVATION_INFO,
+                "category_name": "Rezervasyon",
+                "sub_category_id": SUB_CATEGORY_RESERVATION_CHANGE_INFO,
+                "sub_category_name": "Değişiklik Bilgi Talebi",
+                "sub_category_code": "DEGISIKLIK_BILGI_TALEBI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > REZERVASYON > DEGISIKLIK_BILGI_TALEBI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.RESERVATION_CANCELLATION_INFO_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.RESERVATION_CANCELLATION_INFO_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_RESERVATION_INFO,
+                "category_name": "Rezervasyon",
+                "sub_category_id": SUB_CATEGORY_RESERVATION_CANCELLATION_INFO,
+                "sub_category_name": "İptal Süreç Bilgisi",
+                "sub_category_code": "IPTAL_SUREC_BILGISI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > REZERVASYON > IPTAL_SUREC_BILGISI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.CONFIRMATION_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.RESERVATION_CONFIRMATION_INFO_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_RESERVATION_INFO,
+                "category_name": "Rezervasyon",
+                "sub_category_id": SUB_CATEGORY_RESERVATION_CONFIRMATION_INFO,
+                "sub_category_name": "Konfirme",
+                "sub_category_code": "KONFIRME",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > REZERVASYON > KONFIRME"
+            }
+
+        # ============================================================
+        # BİLGİ-İSTEK > ÖDEME SİSTEMLERİ KONULARI
+        # ============================================================
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.REFUND_INFO_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.REFUND_INFO_EVENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_PAYMENT_SYSTEMS_INFO,
+                "category_name": "Ödeme Sistemleri Konuları",
+                "sub_category_id": SUB_CATEGORY_REFUND_INFO,
+                "sub_category_name": "İade Bilgisi",
+                "sub_category_code": "IADE_BILGISI",
+                "attributes": extract_payment_attributes(combined_text),
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > ODEME_SISTEMLERI_KONULARI > IADE_BILGISI"
+            }
+
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.AGENCY_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.AGENCY_CONTACT_KEYWORDS)
@@ -301,7 +1519,13 @@ class EmailCategorizer:
             }
         
         # Check for thank you messages
-        if any(keyword in normalized_text for keyword in EmailCategorizer.THANK_YOU_KEYWORDS):
+        # Not: mail bir talep/soru iceriyorsa (ornegin "...ogrenebilir miyim? Tesekkurler."
+        # gibi kibarlik amacli kapanis ifadesi), bunu gercek bir tesekkur maili SAYMIYORUZ;
+        # mail asil konusuna (ilgili kirilima) siniflandirilmaya devam ediyor.
+        has_request_marker = "?" in combined_text or any(
+            keyword in normalized_text for keyword in EmailCategorizer.REQUEST_INDICATOR_KEYWORDS
+        )
+        if any(keyword in normalized_text for keyword in EmailCategorizer.THANK_YOU_KEYWORDS) and not has_request_marker:
             # Determine sub-category based on keywords
             if any(kw in normalized_text for kw in EmailCategorizer.CONSULTANT_KEYWORDS):
                 sub_category_id = SUB_CATEGORY_THANK_YOU_CONSULTANT

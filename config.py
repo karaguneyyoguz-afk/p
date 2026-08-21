@@ -61,6 +61,8 @@ CATEGORY_THANK_YOU = 100000154
 CATEGORY_COMPLAINT = 100000132
 CATEGORY_FACILITY = 100000171
 CATEGORY_AGENCY = 100000130
+CATEGORY_ONLINE_OPERATIONS = 100000133
+CATEGORY_TRANSPORT = 100000137
 
 # RESERVATION CATEGORIES
 CATEGORY_PAYMENT = 100000134               # Ödeme Sistemleri
@@ -101,6 +103,14 @@ SUB_CATEGORY_FACILITY_CONTACT = 100000702
 # SUB-CATEGORY IDs - AGENCY
 # ==========================================
 SUB_CATEGORY_AGENCY_CONTACT_INFORMATION = 100000516
+SUB_CATEGORY_MEMBERSHIP_PROCESSES = 100000526
+
+# ==========================================
+# SUB-CATEGORY IDs - TRANSPORT
+# ==========================================
+SUB_CATEGORY_TRANSPORT_TICKET = 100000534
+SUB_CATEGORY_TRANSPORT_CHANGE_RIGHTS = 100000535
+SUB_CATEGORY_TRANSPORT_BUS = 100000538
 
 # ==========================================
 # SUB-CATEGORY IDs - RESERVATION (PAYMENT)
@@ -152,6 +162,80 @@ SUB_CATEGORY_SHIFT_OPERATION_BASED = 100000671      # Operasyon Kaynaklı
 # SUB-CATEGORY IDs - RESERVATION (OTHER OPERATIONS)
 # ==========================================
 SUB_CATEGORY_OTHER_OPERATIONS_PAYMENT_COMPLETION = 100000554  # Ödeme Tamamlama
+
+# ==========================================
+# BILGI-İSTEK - EVRAK (kirilim.md kaynaklı)
+# ==========================================
+CATEGORY_DOCUMENT = 100000131                          # Evrak (Bilgi-İstek VE Şikayet ticket tiplerinde ortak kullanılıyor)
+SUB_CATEGORY_DOCUMENT_CONTRACT = 100000519              # Sözleşme
+SUB_CATEGORY_DOCUMENT_VISA_KIT = 100000522              # Vize Kiti
+SUB_CATEGORY_DOCUMENT_BUS_DRIVER_INFO = 100000520       # Tur Otobüs Şoför Bilgileri
+SUB_CATEGORY_DOCUMENT_COMPLAINT = 100000561             # Evrak (Şikayet)
+
+# ==========================================
+# BILGI-İSTEK - REZERVASYON (bilgi amaçlı, Backoffice'ten ayrı)
+# ==========================================
+CATEGORY_RESERVATION_INFO = 100000135                   # Rezervasyon
+SUB_CATEGORY_RESERVATION_CHANGE_INFO = 100000529        # Değişiklik Bilgi Talebi
+SUB_CATEGORY_RESERVATION_CANCELLATION_INFO = 100000530  # İptal Süreç Bilgisi
+SUB_CATEGORY_RESERVATION_CONFIRMATION_INFO = 100000531  # Konfirme (Bilgi-İstek)
+
+# ==========================================
+# BILGI-İSTEK - ÖDEME SİSTEMLERİ KONULARI
+# ==========================================
+CATEGORY_PAYMENT_SYSTEMS_INFO = 100000189               # Ödeme Sistemleri Konuları
+SUB_CATEGORY_REFUND_INFO = 100000733                    # İade Bilgisi
+
+# ==========================================
+# ŞİKAYET - OTEL
+# ==========================================
+CATEGORY_HOTEL = 100000147                              # Otel
+SUB_CATEGORY_HOTEL_OPERATION = 100000720                # Operasyon
+SUB_CATEGORY_HOTEL_SERVICES = 100000721                 # Otel Hizmetleri
+
+# ==========================================
+# ŞİKAYET - UÇAK
+# ==========================================
+CATEGORY_AIRPLANE = 100000151                           # Uçak
+SUB_CATEGORY_AIRLINE_CHANGE = 100000596                 # Havayolu Değişikliği
+SUB_CATEGORY_FLIGHT_TIME_CHANGE = 100000597             # Saat Değişikliği
+SUB_CATEGORY_FLIGHT_CANCELLED = 100000598               # Sefer İptali
+
+# ==========================================
+# ŞİKAYET - BİLGİ TALEBİ
+# ==========================================
+CATEGORY_COMPLAINT_INFO_REQUEST = 100000170             # Bilgi Talebi
+SUB_CATEGORY_RESERVATION_PROCESS = 100000667            # Rezervasyon İşlemi
+
+# ==========================================
+# ŞİKAYET - SATIŞ SÜRECİ
+# ==========================================
+CATEGORY_SALES_PROCESS = 100000174                      # Satış Süreci
+SUB_CATEGORY_CALL_CENTER = 100000712                    # Çağrı Merkezi
+
+# ==========================================
+# ŞİKAYET - TUR ORGANİZASYONU VE REHBER
+# ==========================================
+CATEGORY_TOUR_AND_GUIDE = 100000176                     # Tur Organizasyonu ve Rehber
+SUB_CATEGORY_TOUR_COMPLAINT = 100000722                 # Tur
+SUB_CATEGORY_GUIDE_COMPLAINT = 100000723                # Rehber
+
+# ==========================================
+# ŞİKAYET - İADE
+# ==========================================
+CATEGORY_REFUND = 100000185                             # İade
+SUB_CATEGORY_REFUND_NOT_MADE = 100000728                # İadenin Yapılmaması
+SUB_CATEGORY_REFUND_REQUEST_NOT_OPENED = 100000729      # İade Talebinin Açılmamış Olması
+SUB_CATEGORY_REFUND_NOT_REFLECTED = 100000730           # İadenin Misafire Yansımaması
+
+# ==========================================
+# ŞİKAYET - FİYATLANDIRMA
+# ==========================================
+CATEGORY_PRICING = 100000193                            # Fiyatlandırma
+SUB_CATEGORY_BEST_PRICE_GUARANTEE = 100000582           # En İyi Fiyat Garantisi
+SUB_CATEGORY_PRICE_GENERAL = 100000585                  # Fiyat Genel
+SUB_CATEGORY_PRICE_DROP = 100000584                     # Ürün Fiyat Düşüşü
+SUB_CATEGORY_PAYMENT_OBJECTION = 100000589              # Ödeme İtirazı
 
 # ==========================================
 # ATTRIBUTE IDs

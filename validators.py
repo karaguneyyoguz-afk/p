@@ -140,7 +140,7 @@ def extract_invoice_attributes(
         person_name = person_name_match.group(1).strip()
         attribute_list.append({
             "attribute": {
-                "id": 100000230,
+                "id": 100054902,
                 "shortCode": "SIRKET_ADI_SAHIS_ADI"
             },
             "lovItem": {
@@ -160,11 +160,11 @@ def extract_invoice_attributes(
         company_name = company_name_match.group(1).strip()
         attribute_list.append({
             "attribute": {
-                "id": 100000230,
+                "id": 100054902,
                 "shortCode": "SIRKET_ADI_SAHIS_ADI"
             },
             "lovItem": {
-                "id": 100054902,
+                "id": 100000070,
                 "name": "Şirket Adı",
                 "shortCode": "SIRKET_ADI"
             }
@@ -196,7 +196,7 @@ def extract_invoice_attributes(
         if is_valid_turkish_id(tc_value):
             attribute_list.append({
                 "attribute": {
-                    "id": 100000231,
+                    "id": 100054901,
                     "shortCode": "VERGI_NUMARASI_TC_NUMARASI"
                 },
                 "lovItem": {
@@ -219,11 +219,11 @@ def extract_invoice_attributes(
         if is_valid_tax_id(tax_value):
             attribute_list.append({
                 "attribute": {
-                    "id": 100000231,
+                    "id": 100054901,
                     "shortCode": "VERGI_NUMARASI_TC_NUMARASI"
                 },
                 "lovItem": {
-                    "id": 100054901,
+                    "id": 100000066,
                     "name": "Vergi Kimlik Numarası",
                     "shortCode": "VERGI_KIMLIK_NUMARASI"
                 }
@@ -326,3 +326,90 @@ def extract_invoice_attributes(
         })
     
     return attribute_list, missing_fields
+
+
+def extract_payment_attributes(text: str) -> List[dict]:
+    """
+    Odeme ile ilgili attribute'lari (Islem Tarihi, Kartin Ilk 6/Son 4 Hanesi,
+    Tutar, Siparis No) metinden cikarir. Bu alanlarin hicbiri zorunlu degildir;
+    metinde bulunanlar ticket'a eklenir, bulunmayanlar sessizce atlanir.
+
+    Args:
+        text: E-posta govde metni
+
+    Returns:
+        List[dict]: Bulunan attribute'lerin listesi (bos olabilir)
+    """
+    attribute_list = []
+
+    date_match = re.search(
+        r'(?:işlem\s*tarihi|islem\s*tarihi)[:\s]*\[?(\d{1,2}[./]\d{1,2}[./]\d{2,4})\]?',
+        text,
+        re.IGNORECASE
+    )
+    if date_match:
+        attribute_list.append({
+            "attribute": {
+                "id": 100000037,
+                "shortCode": "ISLEM_TARIHI"
+            },
+            "textValue": date_match.group(1).strip()
+        })
+
+    card_first6_match = re.search(
+        r'(?:kart(?:ı|i)n\s*ilk\s*6(?:\s*hane(?:si)?|\s*rakam(?:ı|i))?)[:\s]*\[?(\d{6})\]?',
+        text,
+        re.IGNORECASE
+    )
+    if card_first6_match:
+        attribute_list.append({
+            "attribute": {
+                "id": 100000189,
+                "shortCode": "KARTIN_ILK_6_RAKAMI"
+            },
+            "textValue": card_first6_match.group(1)
+        })
+
+    card_last4_match = re.search(
+        r'(?:kart(?:ı|i)n\s*son\s*4(?:\s*hane(?:si)?|\s*rakam(?:ı|i))?)[:\s]*\[?(\d{4})\]?',
+        text,
+        re.IGNORECASE
+    )
+    if card_last4_match:
+        attribute_list.append({
+            "attribute": {
+                "id": 100000190,
+                "shortCode": "KARTIN_SON_4_RAKAMI"
+            },
+            "textValue": card_last4_match.group(1)
+        })
+
+    amount_match = re.search(
+        r'(?:tutar)[:\s]*\[?(\d+(?:[.,]\d+)?)\s*(?:tl|₺|try)?\]?',
+        text,
+        re.IGNORECASE
+    )
+    if amount_match:
+        attribute_list.append({
+            "attribute": {
+                "id": 100000192,
+                "shortCode": "TUTAR"
+            },
+            "textValue": amount_match.group(1).strip()
+        })
+
+    order_number_match = re.search(
+        r'(?:sipariş\s*no|siparis\s*no|sipariş\s*numarası|siparis\s*numarasi)[:\s]*\[?([A-Za-z0-9-]+)\]?',
+        text,
+        re.IGNORECASE
+    )
+    if order_number_match:
+        attribute_list.append({
+            "attribute": {
+                "id": 100000194,
+                "shortCode": "SIPARIS_NO"
+            },
+            "textValue": order_number_match.group(1).strip()
+        })
+
+    return attribute_list
