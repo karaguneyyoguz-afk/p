@@ -113,6 +113,12 @@ SUB_CATEGORY_TRANSPORT_CHANGE_RIGHTS = 100000535
 SUB_CATEGORY_TRANSPORT_BUS = 100000538
 
 # ==========================================
+# SUB-CATEGORY IDs - ŞİKAYET (ULAŞIM)
+# ==========================================
+SUB_CATEGORY_TRANSPORT_COMPLAINT_TRANSFER = 100000719               # Transfer
+SUB_CATEGORY_TRANSPORT_COMPLAINT_OTHER = 100000539                  # Diğer
+
+# ==========================================
 # SUB-CATEGORY IDs - RESERVATION (PAYMENT)
 # ==========================================
 SUB_CATEGORY_PAYMENT_REFLECTION = 100000591  # Ödemenin Yansımaması

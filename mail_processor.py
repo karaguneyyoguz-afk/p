@@ -26,6 +26,7 @@ from config import (
     SUB_CATEGORY_FACILITY_CONTACT, SUB_CATEGORY_AGENCY_CONTACT_INFORMATION,
     SUB_CATEGORY_MEMBERSHIP_PROCESSES, SUB_CATEGORY_TRANSPORT_CHANGE_RIGHTS,
     SUB_CATEGORY_TRANSPORT_BUS, SUB_CATEGORY_TRANSPORT_TICKET,
+    SUB_CATEGORY_TRANSPORT_COMPLAINT_TRANSFER, SUB_CATEGORY_TRANSPORT_COMPLAINT_OTHER,
     CATEGORY_PAYMENT, CATEGORY_CONFIRMATION, CATEGORY_CHANGE,
     CATEGORY_CANCELLATION, CATEGORY_ADDITIONAL_SERVICE,
     CATEGORY_SHIFT, CATEGORY_OTHER_OPERATIONS,
@@ -362,11 +363,26 @@ class EmailCategorizer:
         "iptal ediyoruz", "iptal talebi"
     ]
 
+    # Not: "sikayetci" -> "sikayet" ve "aksama" -> "aksa" olarak genisletildi;
+    # eski dar formlar "sikayetimin"/"aksaklik" gibi cok yaygin cekim
+    # varyasyonlarini yakalayamiyordu (canli ortamda gozlemlendi).
     COMPLAINT_SENTIMENT_KEYWORDS = [
-        "memnun degil", "sikayetci", "kotu", "ilgisiz", "magdur ol", "magduriyet",
-        "sorun yasa", "berbat", "yetersiz", "hayal kirikligi", "kaba", "aksama",
-        "duzensiz", "karisti"
+        "memnun degil", "sikayet", "kotu", "ilgisiz", "magdur ol", "magduriyet",
+        "sorun yasa", "berbat", "yetersiz", "hayal kirikligi", "kaba", "aksa",
+        "duzensiz", "karisti", "olumsuzluk"
     ]
+
+    # Şikayet > Ulaşım > Transfer: "transfer" bare kelimesi hem bu dalda hem de
+    # Bilgi-İstek > Ulaşım > Değişiklik Hakkı Sorgulama'da kullanildigi icin,
+    # bu dal DAHA ONCE kontrol edilmeli (musteri onayli).
+    TRANSPORT_COMPLAINT_TRANSFER_TOPIC_KEYWORDS = [
+        "transfer", "havalimani karsilama", "vip arac", "soforun gelmemesi"
+    ]
+
+    # Şikayet > Ulaşım > Diğer: "ulasim" gecen ama transfer/otobus/ucak gibi
+    # spesifik bir alt konu icermeyen genel ulasim sikayetleri icin catch-all.
+    TRANSPORT_COMPLAINT_OTHER_TOPIC_KEYWORDS = ["ulasim"]
+    TRANSPORT_COMPLAINT_SPECIFIC_EXCLUDE_KEYWORDS = ["otobus", "ucak", "transfer"]
 
     # Not: eskiden tam cumle kaliplariydi ("odeme yansimadi" gibi), gercek
     # mailde "tutar sisteminize yansimadi" / "kartimdan odeme cekilmesine
@@ -554,7 +570,9 @@ class EmailCategorizer:
     ]
 
     CALL_CENTER_TOPIC_KEYWORDS = [
-        "cagri merkezi", "musteri hizmetleri", "temsilci", "danisman hattindan"
+        "cagri merkezi", "musteri hizmetleri", "temsilci", "danisman hattindan",
+        "telefon gorusmesi", "telefonda soylenen", "telefonda aktarilan",
+        "hatta bekletil"
     ]
 
     TOUR_TOPIC_KEYWORDS = ["tur program", "tur organizasyon"]
@@ -720,6 +738,49 @@ class EmailCategorizer:
                 "attributes": [],
                 "missing_fields": [],
                 "classification": "BILGI_ISTEK > EVRAK > TUR_OTOBUS_SOFOR_BILGILERI"
+            }
+
+        # Musteri onayli oncelik: "transfer" + acik sikayet tonu (aksaklik,
+        # magduriyet, sikayet vb.) gecen mailler, genel Bilgi-İstek > Ulaşım >
+        # Değişiklik Hakkı Sorgulama kontrolunden ONCE Şikayet > Ulaşım >
+        # Transfer'e yonlenmeli.
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_COMPLAINT_TRANSFER_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_TRANSPORT,
+                "category_name": "Ulaşım",
+                "sub_category_id": SUB_CATEGORY_TRANSPORT_COMPLAINT_TRANSFER,
+                "sub_category_name": "Transfer",
+                "sub_category_code": "TRANSFER",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > ULASIM > TRANSFER"
+            }
+
+        # Şikayet > Ulaşım > Diğer: "ulasim" + sikayet tonu var ama transfer/
+        # otobus/ucak gibi spesifik bir alt konu YOK -- catch-all/yedek dal.
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_COMPLAINT_OTHER_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+            and not any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_COMPLAINT_SPECIFIC_EXCLUDE_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_TRANSPORT,
+                "category_name": "Ulaşım",
+                "sub_category_id": SUB_CATEGORY_TRANSPORT_COMPLAINT_OTHER,
+                "sub_category_name": "Diğer",
+                "sub_category_code": "DIGER",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > ULASIM > DIGER"
             }
 
         # Not: Musteri onayli oncelik sirasi -- DEGISIKLIK_HAKKI_SORGULAMA (ceza/
@@ -905,7 +966,10 @@ class EmailCategorizer:
 
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.RESERVATION_PROCESS_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.RESERVATION_PROCESS_EVENT_KEYWORDS)
+            and (
+                any(keyword in normalized_text for keyword in EmailCategorizer.RESERVATION_PROCESS_EVENT_KEYWORDS)
+                or any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+            )
         ):
             return {
                 "channel_id": CHANNEL_ID,

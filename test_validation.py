@@ -65,6 +65,18 @@ check("Transfer-2: no show + kendi imkanlariyla", r["classification"] == "BILGI_
 r = cat("", "Uçak bileti için tarih değişikliği yapmak istiyorum, cezai işlem uygulanır mı?")
 check("Transfer-3: ucak bileti + tarih degisikligi -> somut Backoffice talebi", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI", r["classification"])
 
+# --- YENI KIRILIM (musteri onayli): SIKAYET > ULASIM > TRANSFER ---
+# "transfer" + acik sikayet tonu (aksaklik/magduriyet/sikayet), genel
+# Bilgi-Istek > Ulasim > Degisiklik Hakki Sorgulama'dan ONCE degerlendirilmeli.
+r = cat("", "Merhaba, tatilimiz için satın aldığımız havalimanı transfer hizmetinde büyük bir aksaklık yaşadık. Transfer aracı, belirtilen saatte havalimanında bizi karşılamaya gelmedi ve uzun süre mağdur olduk. Bu olumsuzlukla ilgili şikayetimin incelenerek tarafıma dönüş yapılmasını rica ederim, iyi çalışmalar.")
+check("Sikayet-Ulasim-Transfer (ONAYLI): transfer araci gelmedi, magduriyet", r["classification"] == "SIKAYET > ULASIM > TRANSFER", r["classification"])
+
+# --- YENI KIRILIM (musteri onayli): SIKAYET > ULASIM > DIGER ---
+# "ulasim" + sikayet tonu var ama transfer/otobus/ucak gibi spesifik bir alt
+# konu YOK -- catch-all/yedek dal.
+r = cat("", "İyi günler, rezervasyonumuz kapsamındaki genel ulaşım ve seyahat organizasyon süreçlerinde yaşanan aksaklıklar nedeniyle tatilimiz olumsuz etkilendi. Ulaşım kalitesiyle ilgili yaşadığımız bu genel memnuniyetsizliğin değerlendirilmesini talep ediyorum.")
+check("Sikayet-Ulasim-Diger (ONAYLI): genel ulasim sikayeti, spesifik alt konu yok", r["classification"] == "SIKAYET > ULASIM > DIGER", r["classification"])
+
 # Precedence testi (musteri onayli, guncellendi): "degisiklik hakki/ceza" gecmeyen
 # bir "otobus" metni artik dogrudan OTOBUS dalina dusuyor (musteri onceligi:
 # DEGISIKLIK_HAKKI_SORGULAMA > OTOBUS > BILET).
@@ -120,6 +132,183 @@ check(
     and sirket_sahis_attr is not None and sirket_sahis_attr["attribute"]["id"] == 100054902
     and tc_secici_attr is not None and tc_secici_attr["attribute"]["id"] == 100054901,
     (r["classification"], r["missing_fields"], r["attributes"]),
+)
+
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# "Şirket Adı - Şahıs Adı (100054902): Şahıs Adı" gibi CIFT SATIRLI, CSM alan
+# adlarini/ID'lerini dogrudan referans alan formatlarda, eski regex ilk
+# satirdaki ETIKET YANKISINI ("Şahıs Adı" kelimesinin kendisini) gercek deger
+# saniyordu. _find_real_match + "(?<!:)\s" ile duzeltildi.
+r = cat(
+    "",
+    "Merhaba,\nTamamladığımız tatil konaklamamız üzerinden haftalar geçmesine "
+    "rağmen faturamız hâlâ tarafımıza kesilmedi ve iletilmedi. Bu gecikme ve "
+    "mağduriyet nedeniyle şikayetçiyim. Şahıs adına kesilmesi gereken "
+    "faturamın bilgileri aşağıdadır:\n\n"
+    "Şirket Adı - Şahıs Adı (100054902): Şahıs Adı\n"
+    f"Şahıs Adı (100054903): Bekir Oğuz Karagüney\n"
+    "Vergi Kimlik Numarası - TC Kimlik Numarası (100054901): TC Kimlik Numarası\n"
+    "TC Kimlik Numarası (100054900): 63718240304\n"
+    "Fatura Adresi (100000233): Nişantaşı, İstanbul\n"
+    "E-Posta (100000234): karaguneyyoguz@gmail.com\n\n"
+    "Faturamın acilen düzenlenip gönderilmesini talep ediyorum.",
+    "gonderen@example.com",
+)
+sahis_deger = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "SAHIS_ADI"), None)
+adres_deger = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "FATURA_ADRESI"), None)
+check(
+    "SikayetFatura-5 (CANLI HATA DUZELTMESI): cift satirli 'etiket yankisi' formati, sahis",
+    r["classification"] == "SIKAYET > FATURA > FATURA_TALEBI_SIKAYETLERI"
+    and not r["missing_fields"]
+    and sahis_deger is not None and sahis_deger.get("textValue") == "Bekir Oğuz Karagüney"
+    and adres_deger is not None and adres_deger.get("textValue") == "Nişantaşı, İstanbul",
+    (r["classification"], r["missing_fields"], r["attributes"]),
+)
+
+# Ayni format, sirket versiyonu -- ayrica "Şirket adına düzenlenecek..." gibi
+# metnin GIRISINDE gecen dogal "adina" ifadesinin yanlislikla etiket
+# sanilmadigini da dogruluyor.
+r = cat(
+    "",
+    "Merhaba,\nKurumsal rezervasyonumuz için faturanın yasal sürede "
+    "kesilmemesi ve taleplerimize rağmen tarafımıza ulaştırılmaması "
+    "sebebiyle mağduriyet yaşıyoruz. Şirket adına düzenlenecek fatura "
+    "bilgilerimiz eksiksiz olarak aşağıdadır:\n\n"
+    "Şirket Adı - Şahıs Adı (100054902): Şirket Adı\n"
+    "Şirket Adı (100000070): Tatilbudur Seyahat Acenteliği ve Turizm A.Ş.\n"
+    "Vergi Kimlik Numarası - TC Kimlik Numarası (100054901): Vergi Kimlik Numarası\n"
+    "Vergi Kimlik Numarası (100000066): 8340123456\n"
+    "Vergi Dairesi (100000232): Zincirlikuyu Vergi Dairesi\n"
+    "Fatura Adresi (100000233): Esentepe Mah. Büyükdere Cad. Şişli/İstanbul\n"
+    "E-Posta (100000234): oguz.karaguney@tatilbudur.com\n\n"
+    "Geciken faturanın acilen kesilerek tarafımıza gönderilmesini talep ediyoruz.",
+    "gonderen@example.com",
+)
+sirket_deger = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "SIRKET_ADI"), None)
+check(
+    "SikayetFatura-6 (CANLI HATA DUZELTMESI): cift satirli 'etiket yankisi' formati, sirket + 'adina' tuzagi",
+    r["classification"] == "SIKAYET > FATURA > FATURA_TALEBI_SIKAYETLERI"
+    and not r["missing_fields"]
+    and sirket_deger is not None and sirket_deger.get("textValue") == "Tatilbudur Seyahat Acenteliği ve Turizm A.Ş.",
+    (r["classification"], r["missing_fields"], r["attributes"]),
+)
+
+# "Bilgileri: Şahıs Adı: Değer" gibi, bir onceki alanin BASLIK kolonundan
+# ("Güncel Fatura Bilgileri:") hemen sonra GERCEK bir yeni etiketin
+# baslamasi -- etiket-yankisi tuzagina karsi eklenen "(?<!:)\s" korumasi bu
+# mesru durumu da yanlislikla engelliyordu, duzeltildi.
+r = cat(
+    "",
+    "Sayın İlgili, Ekte yer alan rezervasyon numaralı tatilimize ait faturanın tarafıma "
+    "yanlış bilgilerle kesildiğini ve bu durumun düzeltilmesi için yaptığım başvuruların "
+    "yanıtsız kaldığını/geciktirildiğini üzülerek müşahede etmekteyim. Yasal haklarım "
+    "çerçevesinde, ekte yer alan fatura ünvanı yanlış olduğu için red veriyoruz. Onaylar "
+    "mısınız? talebimi yineliyor; rezervasyon numaralı tatilin faturasını aşağıda "
+    "belirttiğim şahıs bilgilerime göre acilen revize edip iletmenizi talep ediyorum. "
+    "Aksi takdirde süreci yasal mercilere ve tüketici haklarına taşıyacağımı bilgilerinize "
+    "sunarım. Güncel Fatura Bilgileri: Şahıs Adı: Bekir Oğuz Karagüney, TC Kimlik Numarası: "
+    "63718240304, Fatura Adresi: Nişantaşı, İstanbul, E-Posta: "
+    "karaguneyyoguz@gmail.com<mailto:karaguneyyoguz@gmail.com>. Gereğini rica ederim, iyi çalışmalar.",
+    "gonderen@example.com",
+)
+sahis_deger = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "SAHIS_ADI"), None)
+check(
+    "SikayetFatura-7 (CANLI HATA DUZELTMESI): baslik satirindan hemen sonra gelen gercek 'Şahıs Adı:' etiketi, ':' oncesi metinden dolayi engellenmemeli",
+    r["classification"] == "SIKAYET > FATURA > FATURA_TALEBI_SIKAYETLERI"
+    and not r["missing_fields"]
+    and sahis_deger is not None and sahis_deger.get("textValue") == "Bekir Oğuz Karagüney",
+    (r["classification"], r["missing_fields"], r["attributes"]),
+)
+
+# "ünvanı yanlış olduğu için..." gibi duz cumlede "ünvan" kelimesi etiket
+# degil cumlenin oznesi olarak geciyor; buyuk harfle baslama sarti olmadan
+# regex bir sonraki virgule kadar TUM cumleyi yanlislikla sirket adi
+# saniyordu (SikayetFatura-4 canli hatasi).
+r = cat(
+    "",
+    "Fatura ünvanı yanlış girilmiş, düzeltilmesini rica ederim. Şirket Adı: "
+    "Tatilbudur Seyahat Acenteliği ve Turizm A.Ş., Vergi Kimlik Numarası: "
+    "8340123456, Vergi Dairesi: Zincirlikuyu Vergi Dairesi, Fatura Adresi: "
+    "Esentepe Mah. İstanbul, E-Posta: oguz.karaguney@tatilbudur.com.",
+    "gonderen@example.com",
+)
+sirket_deger2 = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "SIRKET_ADI"), None)
+check(
+    "SikayetFatura-8 (CANLI HATA DUZELTMESI): duz cumlede etiket-degil oznesi olan 'ünvanı' -> asiri genis yakalama olmamali",
+    not r["missing_fields"]
+    and sirket_deger2 is not None and sirket_deger2.get("textValue") == "Tatilbudur Seyahat Acenteliği ve Turizm A.Ş.",
+    (r["missing_fields"], r["attributes"]),
+)
+
+# --- TC/VKN TUR TUTARLILIGI: Sahis -> SADECE TC, Sirket -> SADECE VKN ---
+# Sahis Adi secilmisken metinde (yanlislikla/gereksiz) bir VKN de gecsse,
+# VKN kullanilmamali; TC bulunamadigindan eksik alan olarak isaretlenmeli.
+r = cat(
+    "",
+    f"Şahıs Adı: Bekir Oğuz Karagüney, Vergi Kimlik Numarası: {VALID_VKN}, "
+    "Fatura Adresi: Nişantaşı, İstanbul, E-Posta: oguz.karaguney@tatilbudur.com.",
+    "gonderen@example.com",
+)
+check(
+    "TCVKN-Tutarlilik-1: Sahis secilince VKN yoksayilmali, TC eksik alan olarak gorunmeli",
+    "TC Kimlik Numarası" in r["missing_fields"]
+    and not any(a.get("attribute", {}).get("shortCode") == "VERGI_KIMLIK_NUMARASI" for a in r["attributes"]),
+    (r["missing_fields"], r["attributes"]),
+)
+
+# Sirket Adi secilmisken metinde bir TC de gecsse, TC kullanilmamali; VKN
+# bulunamadigindan eksik alan olarak isaretlenmeli.
+r = cat(
+    "",
+    f"Şirket Adı: Tatilbudur Seyahat Acenteliği ve Turizm A.Ş., TC Kimlik Numarası: {VALID_TC}, "
+    "Fatura Adresi: Nişantaşı, İstanbul, E-Posta: oguz.karaguney@tatilbudur.com.",
+    "gonderen@example.com",
+)
+check(
+    "TCVKN-Tutarlilik-2: Sirket secilince TC yoksayilmali, VKN eksik alan olarak gorunmeli",
+    "Vergi Kimlik Numarası (VKN)" in r["missing_fields"]
+    and not any(a.get("attribute", {}).get("shortCode") == "TC_KIMLIK_NUMARASI" for a in r["attributes"]),
+    (r["missing_fields"], r["attributes"]),
+)
+
+# --- Etiketsiz, serbest cumlede gecen isim/unvan -- "X adına" kalibi ---
+# Turkce klavyesi olmayan gonderenler noktasiz "ı" yerine duz ASCII "i"
+# yazabiliyor ("Oguz Karaguney adina" gibi); her iki yazim da desteklenmeli.
+r = cat(
+    "",
+    "Merhaba, Oguz Karaguney adina fatura kesilmesini rica ederim. TC Kimlik "
+    f"Numaram {VALID_TC}. Adresim Bagdat Caddesi No:45 Kadikoy/Istanbul. Mail "
+    "adresim oguz.karaguney@example.com.",
+    "gonderen@example.com",
+)
+sahis_deger3 = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "SAHIS_ADI"), None)
+check(
+    "AdinaFallback-1: etiketsiz 'X adina' (ASCII i, noktasiz i degil) -> Sahis Adi olarak yakalanmali",
+    not r["missing_fields"]
+    and sahis_deger3 is not None and sahis_deger3.get("textValue") == "Oguz Karaguney",
+    (r["missing_fields"], r["attributes"]),
+)
+
+# Sirket versiyonu, "adına" (dogru noktasiz ı) yazimiyla + adres alaninda
+# ters sirali "X adresine ve Y mail adresine" kalibi bir arada.
+r = cat(
+    "",
+    "İyi günler, kurumsal seyahatimiz için faturamızın hâlâ kesilmemiş olması "
+    "iş süreçlerimizi aksatıyor ve bu durumdan şikayetçiyiz. Tatilbudur Seyahat "
+    "Acenteliği ve Turizm A.Ş. adına, VKN 8340123456, Zincirlikuyu Vergi "
+    "Dairesi, Esentepe Mah. Büyükdere Cad. Şişli/İstanbul adresine ve "
+    "oguz.karaguney@tatilbudur.com mail adresine faturamızın acilen "
+    "kesilmesini rica ederiz.",
+    "gonderen@example.com",
+)
+sirket_deger3 = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "SIRKET_ADI"), None)
+adres_deger3 = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "FATURA_ADRESI"), None)
+check(
+    "AdinaFallback-2 (CANLI HATA DUZELTMESI): etiketsiz sirket 'adına' + ters sirali 'X adresine ve Y mail adresine'",
+    not r["missing_fields"]
+    and sirket_deger3 is not None and sirket_deger3.get("textValue") == "Tatilbudur Seyahat Acenteliği ve Turizm A.Ş."
+    and adres_deger3 is not None and adres_deger3.get("textValue") == "Esentepe Mah. Büyükdere Cad. Şişli/İstanbul",
+    (r["missing_fields"], r["attributes"]),
 )
 
 # ==========================================================
@@ -786,8 +975,16 @@ check("Sikayet-Ucak-SeferIptali", r["classification"] == "SIKAYET > UCAK > SEFER
 r = cat("", "Rezervasyon işlemimde sorun yaşadım, yanlış rezervasyon yapıldı.")
 check("Sikayet-BilgiTalebi-RezervasyonIslemi", r["classification"] == "SIKAYET > BILGI_TALEBI > REZERVASYON_ISLEMI", r["classification"])
 
+# --- Kullanicinin verdigi "nokta atisi" senaryosu (ONAYLI) ---
+r = cat("", "İyi günler, rezervasyon işlemimiz sırasında yapılması gereken bilgilendirmelerin zamanında yapılmaması ve süreçin şeffaf yürütülmemesi nedeniyle ciddi mağduriyet yaşadık. Rezervasyon işlem adımlarında karşılaştığımız bu aksaklıkların ve ilgisizliğin incelenerek tarafıma açıklama yapılmasını talep ediyorum.")
+check("Sikayet-BilgiTalebi-RezervasyonIslemi-2 (ONAYLI): magduriyet/aksaklik/ilgisizlik", r["classification"] == "SIKAYET > BILGI_TALEBI > REZERVASYON_ISLEMI", r["classification"])
+
 r = cat("", "Çağrı merkezinden kötü hizmet aldım, temsilci kaba davrandı.")
 check("Sikayet-SatisSureci-CagriMerkezi", r["classification"] == "SIKAYET > SATIS_SURECI > CAGRI_MERKEZI", r["classification"])
+
+# --- Kullanicinin verdigi "nokta atisi" senaryosu (ONAYLI) ---
+r = cat("", "Merhaba, rezervasyon aşamasında bilgi almak için çağrı merkezinizi aradığımda görüştüğüm müşteri temsilcisinin ilgisiz ve kaba tutumuyla karşılaştım. Ayrıca telefonda bana aktarılan bilgilerin yanlış olması nedeniyle planlamamız aksadı. Çağrı merkezi görüşmelerinin incelenerek ilgili personel hakkında gerekli uyarıların yapılmasını ve tarafıma dönüş sağlanmasını rica ederim.")
+check("Sikayet-SatisSureci-CagriMerkezi-2 (ONAYLI): temsilci ilgisiz/kaba + yanlis bilgilendirme", r["classification"] == "SIKAYET > SATIS_SURECI > CAGRI_MERKEZI", r["classification"])
 
 r = cat("", "Tur organizasyonu kötüydü, tur programında aksama oldu.")
 check("Sikayet-TurRehber-Tur", r["classification"] == "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > TUR", r["classification"])
