@@ -354,19 +354,24 @@ def extract_invoice_attributes(
     return attribute_list, missing_fields
 
 
-def extract_payment_attributes(text: str) -> List[dict]:
+def extract_payment_attributes(text: str, required: bool = False) -> Tuple[List[dict], List[str]]:
     """
     Odeme ile ilgili attribute'lari (Islem Tarihi, Kartin Ilk 6/Son 4 Hanesi,
-    Tutar, Siparis No) metinden cikarir. Bu alanlarin hicbiri zorunlu degildir;
-    metinde bulunanlar ticket'a eklenir, bulunmayanlar sessizce atlanir.
+    Tutar, Siparis No) metinden cikarir.
 
     Args:
         text: E-posta govde metni
+        required: True ise, bulunamayan her alan icin Turkce bir aciklama
+            missing_fields listesine eklenir (ör. Odemenin Yansimamasi ve
+            Iade Bilgisi kirilimlarinda bu 5 alan zorunlu tutuluyor). False
+            ise (varsayilan) alanlar sessizce atlanir, missing_fields her
+            zaman bos doner.
 
     Returns:
-        List[dict]: Bulunan attribute'lerin listesi (bos olabilir)
+        Tuple[List[dict], List[str]]: (bulunan attribute'ler, eksik alanlar)
     """
     attribute_list = []
+    missing_fields = []
 
     date_match = re.search(
         r'(?:işlem\s*tarihi|islem\s*tarihi)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d{1,2}[./]\d{1,2}[./]\d{2,4})\]?',
@@ -384,6 +389,8 @@ def extract_payment_attributes(text: str) -> List[dict]:
             },
             "textValue": date_match.group(1).strip()
         })
+    elif required:
+        missing_fields.append("İşlem Tarihi")
 
     card_first6_match = re.search(
         r'(?:kart(?:ı|i)n\s*ilk\s*6(?:\s*hane(?:si)?|\s*rakam(?:ı|i))?)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d{6})\]?',
@@ -401,6 +408,8 @@ def extract_payment_attributes(text: str) -> List[dict]:
             },
             "textValue": card_first6_match.group(1)
         })
+    elif required:
+        missing_fields.append("Kartın İlk 6 Rakamı")
 
     card_last4_match = re.search(
         r'(?:kart(?:ı|i)n\s*son\s*4(?:\s*hane(?:si)?|\s*rakam(?:ı|i))?)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d{4})\]?',
@@ -418,6 +427,8 @@ def extract_payment_attributes(text: str) -> List[dict]:
             },
             "textValue": card_last4_match.group(1)
         })
+    elif required:
+        missing_fields.append("Kartın Son 4 Rakamı")
 
     amount_match = re.search(
         r'(?:tutar)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d+(?:[.,]\d+)?)\s*(?:tl|₺|try)?\]?',
@@ -437,12 +448,18 @@ def extract_payment_attributes(text: str) -> List[dict]:
             },
             "textValue": amount_match.group(1).strip()
         })
+    elif required:
+        missing_fields.append("Tutar")
 
     order_number_match = re.search(
         r'(?:sipariş\s*no|siparis\s*no|sipariş\s*numara\w*|siparis\s*numara\w*)' + OPTIONAL_LABEL_ANNOTATION + r'(?:\s*ise)?[:\s]*\[?([A-Za-z0-9-]+)\]?',
         text,
         re.IGNORECASE
     )
+    if not order_number_match:
+        # Duz cumle fallback: sayi etiketten ONCE gelebilir, ör.
+        # "358109758 numaralı siparişim için..."
+        order_number_match = re.search(r'([A-Za-z0-9-]+)\s*numaral[iı]\s*sipari[sş]\w*', text, re.IGNORECASE)
     if order_number_match:
         attribute_list.append({
             "attribute": {
@@ -451,5 +468,7 @@ def extract_payment_attributes(text: str) -> List[dict]:
             },
             "textValue": order_number_match.group(1).strip()
         })
+    elif required:
+        missing_fields.append("Sipariş No")
 
-    return attribute_list
+    return attribute_list, missing_fields

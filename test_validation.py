@@ -288,6 +288,51 @@ check("EvrakSikayet-1: belge eksik -> EVRAK kategorisi", r["classification"] == 
 r = cat("", "Ödeme yansımadı, hesabımdan para çekildi.")
 check("Odeme-1: odemenin yansimamasi", r["classification"] == "BACKOFFICE_ISLEMLERI > ODEME > ODEMENIN_YANSIMAMASI", r["classification"])
 
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# "tutar sisteminize yansimadi" / "odeme cekilmesine ragmen" gibi dogal
+# ifadeler eski dar kelime listesiyle hic yakalanamiyordu. Ayrica musteri
+# onayiyla bu kirilimda 5 odeme alani (Islem Tarihi, Kart Ilk 6/Son 4,
+# Tutar, Siparis No) artik ZORUNLU.
+r = cat(
+    "",
+    "Merhaba,\nGerçekleştirdiğim rezervasyon için kartımdan ödeme çekilmesine "
+    "rağmen tutar sisteminize yansımadı ve rezervasyonum onay bekliyor "
+    "durumunda kaldı. İşleme ait detaylar şu şekildedir:\n"
+    "İşlem Tarihi : 22.08.2026\nKartın İlk 6 Rakamı : 454360\n"
+    "Kartın Son 4 Rakamı :1234\nTutar : 12.500 TL\nSipariş No : 358109758\n"
+    "Ödememin kontrol edilerek rezervasyonumun konfirme edilmesini rica "
+    "ederim. İyi çalışmalar.",
+)
+check(
+    "Odeme-2 (CANLI HATA DUZELTMESI): dogal ifade + tum zorunlu alanlar dolu",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > ODEME > ODEMENIN_YANSIMAMASI" and not r["missing_fields"] and len(r["attributes"]) == 5,
+    (r["classification"], r["missing_fields"], r["attributes"]),
+)
+
+r = cat("", "Merhaba, kartımdan ödeme çekilmesine rağmen tutar sisteminize yansımadı. Kontrol eder misiniz?")
+check(
+    "Odeme-3 (ZORUNLU ALAN KONTROLU): detay verilmezse tum alanlar eksik sayilmali",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > ODEME > ODEMENIN_YANSIMAMASI" and len(r["missing_fields"]) == 5,
+    (r["classification"], r["missing_fields"]),
+)
+
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# Siparis numarasi etiketten ONCE de gelebiliyor: "358109758 numaralı
+# siparişim için..." -- eski regex sadece "Siparis No: X" sirasini destekliyordu.
+r = cat(
+    "",
+    "İyi günler, bugün (22.08.2026 tarihinde) 358109758 numaralı siparişim "
+    "için 454360 ile başlayıp 1234 ile biten kartımla 12.500 TL tutarında "
+    "çekim yapmama rağmen bu ödeme sisteminize yansımadı. Dekontum elimde "
+    "mevcut, ödememin kontrol edilerek işlemimin tamamlanması hususunda "
+    "yardımlarınızı rica ederim.",
+)
+check(
+    "Odeme-4 (CANLI HATA DUZELTMESI): 'X numarali siparisim' ters sirali format",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > ODEME > ODEMENIN_YANSIMAMASI" and not r["missing_fields"] and len(r["attributes"]) == 5,
+    (r["classification"], r["missing_fields"], r["attributes"]),
+)
+
 r = cat("", "Konfirme maili hala gelmedi, rezervasyon onayı gelmedi.")
 check("Konfirme-1", r["classification"] == "BACKOFFICE_ISLEMLERI > KONFIRME > KONFIRME", r["classification"])
 

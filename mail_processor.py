@@ -368,9 +368,14 @@ class EmailCategorizer:
         "duzensiz", "karisti"
     ]
 
-    PAYMENT_REFLECTION_TOPIC_KEYWORDS = [
-        "odeme yansimadi", "para cekildi", "hesabimdan cekildi", "kartimdan cekildi",
-        "odeme gozukmuyor", "odeme kayboldu", "rezervasyon olusmadi", "rezervasyon sistemde yok"
+    # Not: eskiden tam cumle kaliplariydi ("odeme yansimadi" gibi), gercek
+    # mailde "tutar sisteminize yansimadi" / "kartimdan odeme cekilmesine
+    # ragmen..." gibi dogal varyasyonlari yakalayamiyordu -- konu+olay ikili
+    # listeye cevrildi (canli ortamda gozlemlendi).
+    PAYMENT_REFLECTION_TOPIC_KEYWORDS = ["odeme", "tutar", "para"]
+    PAYMENT_REFLECTION_EVENT_KEYWORDS = [
+        "yansimadi", "cekilmesine ragmen", "gozukmuyor", "kayboldu",
+        "sisteme yansimadi", "hesaba yansimadi", "olusmadi", "sistemde yok"
     ]
 
     CONFIRMATION_TOPIC_KEYWORDS = ["konfirme", "konfirmasyon", "rezervasyon onayi"]
@@ -1202,7 +1207,13 @@ class EmailCategorizer:
         # REZERVASYON / BACKOFFICE İŞLEMLERİ
         # (Ödeme, Konfirme, Değişiklik, İptal, Ek Hizmet, Kaydırma, Diğer İşlemler)
         # ============================================================
-        if any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_REFLECTION_TOPIC_KEYWORDS):
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_REFLECTION_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_REFLECTION_EVENT_KEYWORDS)
+        ):
+            # Not: musteri onayiyla, Islem Tarihi/Kartin Ilk 6-Son 4 Rakami/
+            # Tutar/Siparis No bu kirilimda ZORUNLU tutuluyor (once opsiyoneldi).
+            payment_attributes, payment_missing_fields = extract_payment_attributes(combined_text, required=True)
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_RESERVATION,
@@ -1212,8 +1223,8 @@ class EmailCategorizer:
                 "sub_category_id": SUB_CATEGORY_PAYMENT_REFLECTION,
                 "sub_category_name": "Ödemenin Yansımaması",
                 "sub_category_code": "ODEMENIN_YANSIMAMASI",
-                "attributes": extract_payment_attributes(combined_text),
-                "missing_fields": [],
+                "attributes": payment_attributes,
+                "missing_fields": payment_missing_fields,
                 "classification": "BACKOFFICE_ISLEMLERI > ODEME > ODEMENIN_YANSIMAMASI"
             }
 
@@ -1613,6 +1624,9 @@ class EmailCategorizer:
             any(keyword in normalized_text for keyword in EmailCategorizer.REFUND_INFO_TOPIC_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.REFUND_INFO_EVENT_KEYWORDS)
         ):
+            # Not: musteri onayiyla, Islem Tarihi/Kartin Ilk 6-Son 4 Rakami/
+            # Tutar/Siparis No bu kirilimda ZORUNLU tutuluyor (once opsiyoneldi).
+            payment_attributes, payment_missing_fields = extract_payment_attributes(combined_text, required=True)
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
@@ -1622,8 +1636,8 @@ class EmailCategorizer:
                 "sub_category_id": SUB_CATEGORY_REFUND_INFO,
                 "sub_category_name": "İade Bilgisi",
                 "sub_category_code": "IADE_BILGISI",
-                "attributes": extract_payment_attributes(combined_text),
-                "missing_fields": [],
+                "attributes": payment_attributes,
+                "missing_fields": payment_missing_fields,
                 "classification": "BILGI_ISTEK > ODEME_SISTEMLERI_KONULARI > IADE_BILGISI"
             }
 
