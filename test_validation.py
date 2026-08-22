@@ -365,6 +365,22 @@ check("Degisiklik-EkHizmetler", r["classification"] == "BACKOFFICE_ISLEMLERI > D
 r = cat("", "İsim değişikliği yapmak istiyorum.")
 check("Degisiklik-Isim", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ISIM_DEGISIKLIGI", r["classification"])
 
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# "adında harf hatası" / "adının güncellenmesi" ifadeleri "isim" kelimesini
+# hic kullanmiyor, eski konu listesi bunu yakalayamiyordu.
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuzda yolcu olarak kayıtlı "
+    "bulunan misafirin adında harf hatası yapıldığını fark ettik. İlgili "
+    "kişinin adının doğru şekilde güncellenerek düzeltilmesini rica eder, "
+    "iyi çalışmalar dilerim.",
+)
+check(
+    "Degisiklik-Isim-2 (CANLI HATA DUZELTMESI): 'adinda harf hatasi'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ISIM_DEGISIKLIGI",
+    r["classification"],
+)
+
 r = cat("", "Kişi eklemek istiyorum rezervasyona.")
 check("Degisiklik-KisiEkleCikar", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > KISI_EKLEME_CIKARMA", r["classification"])
 

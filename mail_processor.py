@@ -393,8 +393,12 @@ class EmailCategorizer:
         "ek hizmet", "ekstra hizmet", "ekstra yatak", "transfer hizmeti"
     ]
 
+    # Not: "adinda"/"adinin"/"isminde"/"isminin" gibi cekimli formlar da
+    # eklendi (ör. "misafirin adında harf hatası", "adının güncellenmesi") --
+    # bunlar "adres"/"adet" gibi kelimelerle CAKISMIYOR (ozel ek gerektiriyor).
     NAME_CHANGE_TOPIC_KEYWORDS = [
-        "isim", "ad soyad", "soyadim", "adim yanlis"
+        "isim", "ad soyad", "soyadim", "adim yanlis",
+        "adinda", "adinin", "isminde", "isminin"
     ]
 
     PERSON_ADD_REMOVE_TOPIC_KEYWORDS = [
