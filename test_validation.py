@@ -65,13 +65,13 @@ check("Transfer-2: no show + kendi imkanlariyla", r["classification"] == "BILGI_
 r = cat("", "Uçak bileti için tarih değişikliği yapmak istiyorum, cezai işlem uygulanır mı?")
 check("Transfer-3: ucak bileti + tarih degisikligi -> somut Backoffice talebi", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI", r["classification"])
 
-# Precedence testi: sadece "otobus" gecen ama bus-context kelimesi olmayan metin
-# TRANSPORT_CHANGE_RIGHTS_KEYWORDS listesinde de "otobus" var; bus-context kosulu
-# saglanmadigi icin bu OTOBUS dalina degil, DEGISIKLIK_HAKKI_SORGULAMA dalina dusmeli.
+# Precedence testi (musteri onayli, guncellendi): "degisiklik hakki/ceza" gecmeyen
+# bir "otobus" metni artik dogrudan OTOBUS dalina dusuyor (musteri onceligi:
+# DEGISIKLIK_HAKKI_SORGULAMA > OTOBUS > BILET).
 r = cat("", "Otobüs bileti fiyatını öğrenmek istiyorum.")
 check(
-    "Precedence-1: sadece 'otobus' -> DEGISIKLIK_HAKKI_SORGULAMA (OTOBUS dalina degil)",
-    r["classification"] == "BILGI_ISTEK > ULASIM > DEGISIKLIK_HAKKI_SORGULAMA",
+    "Precedence-1 (ONAYLI): sadece 'otobus' -> OTOBUS dalina dusmeli",
+    r["classification"] == "BILGI_ISTEK > ULASIM > OTOBUS",
     r["classification"],
 )
 
@@ -253,6 +253,16 @@ check("Bilet-4 (ONAYLI): ucak bileti detay talebi", r["classification"] == "BILG
 
 r = cat("", "Merhaba, Biletler rezervasyona manuel eklenmiştir, kontrolünüz ricadır.")
 check("Bilet-5 (ONAYLI): bilet manuel eklendi bildirimi", r["classification"] == "BILGI_ISTEK > ULASIM > BILET", r["classification"])
+
+# --- Kullanicinin verdigi "nokta atisi" oncelik senaryolari (ONAYLI) ---
+r = cat("", "Merhaba, geçtiğimiz günlerde satın aldığım ulaşım biletine ait e-bilet PDF dosyasını ve PNR detaylarını sistemde bulamıyorum. Bilet bilgilerimin mail adresime tekrar gönderilmesini rica ediyorum, iyi çalışmalar.")
+check("Bilet-6 (ONAYLI): e-bilet PDF + PNR detaylari", r["classification"] == "BILGI_ISTEK > ULASIM > BILET", r["classification"])
+
+r = cat("", "İyi günler, elimdeki rezervasyon/bilet için ileri bir tarihe değişiklik yapma hakkımın olup olmadığını öğrenmek istiyorum. Eğer varsa yansıyacak ceza veya fiyat farkı tutarları hakkında bilgi talep ediyorum.")
+check("DegisiklikHakki-4 (ONAYLI): degisiklik hakki + ceza", r["classification"] == "BILGI_ISTEK > ULASIM > DEGISIKLIK_HAKKI_SORGULAMA", r["classification"])
+
+r = cat("", "Merhaba, satın almış olduğum otobüs ulaşım hizmeti için kalkış peronu numarasını ve koltuk detaylarımı öğrenmek istiyorum. Otobüs seferi saatinde bir değişiklik var mı acaba? Bilgi rica ederim.")
+check("Otobus-4 (ONAYLI): peron + koltuk + otobus seferi", r["classification"] == "BILGI_ISTEK > ULASIM > OTOBUS", r["classification"])
 
 # --- COZULMEMIS: "ucus dahil tur bilgilendirmesi" tarzi duyuru mailleri (bilet/ucus
 # kelimesi gecmiyor, "Ucakli ... Turu" gibi dolayli ifade var) henuz yakalanmiyor.

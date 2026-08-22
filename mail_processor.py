@@ -279,15 +279,24 @@ class EmailCategorizer:
         "rezervasyon gorunmuyor", "rezervasyon gorun", "kesin rezervasyon bekliyor"
     ]
 
-    # Not: bare "bilet" kelimesi bu listeden kasitli olarak CIKARILDI -- bilet ile
-    # ilgili tum bilgilendirme/teyit/guncelleme talepleri artik ULASIM > BILET
-    # kirilimina ait (asagida TRANSPORT_TICKET_* listeleri).
+    # Not: bare "bilet" ve "otobus" kelimeleri bu listeden kasitli olarak
+    # CIKARILDI -- "otobus" artik dogrudan ULASIM > OTOBUS kirilimina, bilet
+    # bilgilendirme/teyit/guncelleme talepleri de ULASIM > BILET kirilimina ait
+    # (asagida OTOBUS_TOPIC_KEYWORDS / TRANSPORT_TICKET_* listeleri). Kirilim
+    # onceligi (musteri onayli): DEGISIKLIK_HAKKI_SORGULAMA > OTOBUS > BILET.
     TRANSPORT_CHANGE_RIGHTS_KEYWORDS = [
         "transfer", "no show", "noshow", "kendi imkanlariyla",
         "donus transferi", "transferin yapilmasi", "transfer degisikligi",
         "otelimizi tercih etmistir", "fiyat ve sartlarindan",
-        "otobus", "tarih degisikligi", "saat degisikligi",
-        "degisiklik hakki", "cezai islem", "kesinti uygulan"
+        "tarih degisikligi", "saat degisikligi",
+        "degisiklik hakki", "ceza", "kesinti uygulan",
+        "bilet iptal sartlari", "bilet degisim sartlari", "degisim sartlari",
+        "tarih degistirebilir miyim", "kupon iade"
+    ]
+
+    OTOBUS_TOPIC_KEYWORDS = [
+        "otobus", "peron", "koltuk", "otobus firmasi", "otobus seferi",
+        "hareket saati", "otobus bileti"
     ]
 
     TRANSPORT_BUS_KEYWORDS = [
@@ -295,7 +304,7 @@ class EmailCategorizer:
         "otobusten bin", "otobus sofor", "tur rehberi",
         "rehberin iletisim", "soforun iletisim"
     ]
-    
+
     GUIDE_KEYWORDS = ["rehber", "tur lideri"]
 
     CONSULTANT_KEYWORDS = [
@@ -312,11 +321,12 @@ class EmailCategorizer:
 
     # kirilim.md kaynakli gercek mail ornekleri uzerinden genisletildi (bilet
     # ulasmama sikayeti + uctan uca bilet bilgilendirme/teyit/guncelleme).
-    TRANSPORT_TICKET_TOPIC_KEYWORDS = ["bilet", "e-bilet", "ucus"]
+    TRANSPORT_TICKET_TOPIC_KEYWORDS = ["bilet", "e-bilet", "ucus", "pnr"]
     TRANSPORT_TICKET_EVENT_KEYWORDS = [
         "gelmedi", "dusmedi", "ulasmadi", "gonderilmedi", "numaram",
         "teyi", "kod", "guncelle", "detay", "eklen",
-        "bilgilendirme", "ricadir", "rica ederiz", "kontrolunuz"
+        "bilgilendirme", "ricadir", "rica ederiz", "kontrolunuz",
+        "aciga alin", "pdf"
     ]
 
     DOCUMENT_TOPIC_KEYWORDS = ["evrak", "belge"]
@@ -658,16 +668,25 @@ class EmailCategorizer:
                 "classification": f"TESEKKUR > TESEKKUR > {sub_category_code}"
             }
 
-        has_bus_reference = "otobus" in normalized_text
-        has_bus_context = any(
-            keyword in normalized_text
-            for keyword in EmailCategorizer.TRANSPORT_BUS_KEYWORDS
-        ) or any(
-            keyword in normalized_text
-            for keyword in ["guzergah", "binerek", "ikamet", "rehber", "sofor", "iletisim bilgileri"]
-        )
+        # Not: Musteri onayli oncelik sirasi -- DEGISIKLIK_HAKKI_SORGULAMA (ceza/
+        # degisiklik hakki gecen mailler) > OTOBUS (otobus/peron/koltuk gecen
+        # mailler) > BILET (genel bilet/PNR/e-bilet bilgilendirme talepleri).
+        if any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_CHANGE_RIGHTS_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_TRANSPORT,
+                "category_name": "Ulaşım",
+                "sub_category_id": SUB_CATEGORY_TRANSPORT_CHANGE_RIGHTS,
+                "sub_category_name": "Değişiklik Hakkı Sorgulama",
+                "sub_category_code": "DEGISIKLIK_HAKKI_SORGULAMA",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > ULASIM > DEGISIKLIK_HAKKI_SORGULAMA"
+            }
 
-        if has_bus_reference and has_bus_context:
+        if any(keyword in normalized_text for keyword in EmailCategorizer.OTOBUS_TOPIC_KEYWORDS):
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
@@ -698,21 +717,6 @@ class EmailCategorizer:
                 "attributes": [],
                 "missing_fields": [],
                 "classification": "BILGI_ISTEK > ULASIM > BILET"
-            }
-
-        if any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_CHANGE_RIGHTS_KEYWORDS):
-            return {
-                "channel_id": CHANNEL_ID,
-                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
-                "ticket_type_name": "Bilgi-İstek",
-                "category_id": CATEGORY_TRANSPORT,
-                "category_name": "Ulaşım",
-                "sub_category_id": SUB_CATEGORY_TRANSPORT_CHANGE_RIGHTS,
-                "sub_category_name": "Değişiklik Hakkı Sorgulama",
-                "sub_category_code": "DEGISIKLIK_HAKKI_SORGULAMA",
-                "attributes": [],
-                "missing_fields": [],
-                "classification": "BILGI_ISTEK > ULASIM > DEGISIKLIK_HAKKI_SORGULAMA"
             }
 
         if (
