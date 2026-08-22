@@ -373,6 +373,9 @@ def extract_payment_attributes(text: str) -> List[dict]:
         text,
         re.IGNORECASE
     )
+    if not date_match:
+        # Duz cumle fallback: "15.08.2026 tarihinde" gibi etiketsiz ifadeler
+        date_match = re.search(r'(\d{1,2}[./]\d{1,2}[./]\d{4})\s*tarihinde', text, re.IGNORECASE)
     if date_match:
         attribute_list.append({
             "attribute": {
@@ -387,6 +390,9 @@ def extract_payment_attributes(text: str) -> List[dict]:
         text,
         re.IGNORECASE
     )
+    if not card_first6_match:
+        # Duz cumle fallback: "454360 ile başlayan ... kartımla" gibi ifadeler
+        card_first6_match = re.search(r'(\d{6})\s+ile\s+ba[sş]la', text, re.IGNORECASE)
     if card_first6_match:
         attribute_list.append({
             "attribute": {
@@ -401,6 +407,9 @@ def extract_payment_attributes(text: str) -> List[dict]:
         text,
         re.IGNORECASE
     )
+    if not card_last4_match:
+        # Duz cumle fallback: "... 1234 ile biten kartımla" gibi ifadeler
+        card_last4_match = re.search(r'(\d{4})\s+ile\s+bit', text, re.IGNORECASE)
     if card_last4_match:
         attribute_list.append({
             "attribute": {
@@ -415,6 +424,11 @@ def extract_payment_attributes(text: str) -> List[dict]:
         text,
         re.IGNORECASE
     )
+    if not amount_match:
+        # Duz cumle fallback: "12.500 TL tutarında bir ödeme" gibi ifadeler
+        # (para birimi zorunlu -- aksi halde herhangi bir sayi yanlislikla
+        # tutar sanilabilir).
+        amount_match = re.search(r'(\d+(?:[.,]\d+)?)\s*(?:tl|₺|try)\b', text, re.IGNORECASE)
     if amount_match:
         attribute_list.append({
             "attribute": {
@@ -425,7 +439,7 @@ def extract_payment_attributes(text: str) -> List[dict]:
         })
 
     order_number_match = re.search(
-        r'(?:sipariş\s*no|siparis\s*no|sipariş\s*numarası|siparis\s*numarasi)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?([A-Za-z0-9-]+)\]?',
+        r'(?:sipariş\s*no|siparis\s*no|sipariş\s*numara\w*|siparis\s*numara\w*)' + OPTIONAL_LABEL_ANNOTATION + r'(?:\s*ise)?[:\s]*\[?([A-Za-z0-9-]+)\]?',
         text,
         re.IGNORECASE
     )

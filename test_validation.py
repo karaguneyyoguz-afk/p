@@ -653,6 +653,43 @@ check("Rezervasyon-BI-IptalSurecBilgi", r["classification"] == "BILGI_ISTEK > RE
 r = cat("", "İade ne zaman yapılır, iade süresi ne kadar.")
 check("OdemeSistemleri-BI-IadeBilgisi", r["classification"] == "BILGI_ISTEK > ODEME_SISTEMLERI_KONULARI > IADE_BILGISI", r["classification"])
 
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# "yansima" bare kelimesi ve "iptal"+"surec" gevsek eslesmesi, notr bir iade-
+# bilgisi talebini yanlislikla SIKAYET > IADE ve REZERVASYON > IPTAL_SUREC_BILGISI
+# dallarina cekiyordu (gercek CSM ticket'inda gozlemlendi).
+r = cat(
+    "",
+    "Merhaba, Daha önce iptal ettiğim rezervasyonuma ait iade tutarının kartıma "
+    "yansıma durumu hakkında bilgi talep ediyorum. İşleme ait detaylar aşağıda "
+    "yer almaktadır:\nİşlem Tarihi: 15.08.2026\nKartın İlk 6 Rakamı: 454360\n"
+    "Kartın Son 4 Rakamı: 1234\nTutar: 12.500 TL\nSipariş No: 358109758\n"
+    "İade sürecimin kontrol edilerek tarafıma bilgi verilmesini rica ederim. "
+    "İyi çalışmalar.",
+)
+check(
+    "OdemeSistemleri-BI-IadeBilgisi-2 (CANLI HATA DUZELTMESI): notr iade sorgusu, sikayet degil",
+    r["classification"] == "BILGI_ISTEK > ODEME_SISTEMLERI_KONULARI > IADE_BILGISI" and len(r["attributes"]) == 5,
+    (r["classification"], r["attributes"]),
+)
+
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# Ayni senaryo, hic etiket kullanilmayan duz cumle formatinda ("454360 ile
+# baslayan ve 1234 ile biten kartimla", "sipariş numaram ise X'dir" gibi).
+r = cat(
+    "",
+    "İyi günler, geçtiğimiz günlerde iptalini gerçekleştirdiğim tatil "
+    "rezervasyonum için ödediğim tutarın hesabıma iadesi konusunda bilgi almak "
+    "istiyorum. İşlemle ilgili olarak 15.08.2026 tarihinde, 454360 ile "
+    "başlayan ve 1234 ile biten kartımla 12.500 TL tutarında bir ödeme "
+    "yapmıştım, sipariş numaram ise 358109758'dir. İade sürecimin ne "
+    "aşamada olduğunu öğrenebilir miyim? Teşekkürler, iyi çalışmalar.",
+)
+check(
+    "OdemeSistemleri-BI-IadeBilgisi-3 (CANLI HATA DUZELTMESI): duz cumle, etiketsiz odeme bilgileri",
+    r["classification"] == "BILGI_ISTEK > ODEME_SISTEMLERI_KONULARI > IADE_BILGISI" and len(r["attributes"]) == 5,
+    (r["classification"], r["attributes"]),
+)
+
 r = cat("", "Otelin operasyonundan şikayetçiyim, resepsiyon ilgisizdi.")
 check("Sikayet-Otel-Operasyon", r["classification"] == "SIKAYET > OTEL > OPERASYON", r["classification"])
 

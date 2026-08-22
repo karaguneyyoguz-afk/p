@@ -485,8 +485,12 @@ class EmailCategorizer:
     ]
 
     RESERVATION_CANCELLATION_INFO_TOPIC_KEYWORDS = ["iptal"]
+    # Not: bare "surec" kasitli olarak CIKARILDI -- "surec" cok genel bir kelime
+    # oldugu icin, metnin baska bir yerinde alakasiz sekilde "iptal" gecen
+    # mailler de (ör. "iade surecimin kontrolu" + ayrica bahsi gecen "daha once
+    # iptal ettigim rezervasyon") yanlislikla bu dala takiliyordu.
     RESERVATION_CANCELLATION_INFO_EVENT_KEYWORDS = [
-        "nasil", "surec", "kosul", "sart", "ne olur"
+        "nasil", "kosul", "sart", "ne olur", "iptal sureci"
     ]
 
     RESERVATION_CONFIRMATION_INFO_EVENT_KEYWORDS = [
@@ -499,7 +503,8 @@ class EmailCategorizer:
     REFUND_INFO_TOPIC_KEYWORDS = ["iade"]
     REFUND_INFO_EVENT_KEYWORDS = [
         "ne zaman", "kac gun", "nasil alinir", "ne kadar", "hesabimiza gecer",
-        "hesabima gecer", "hakkinda bilgi"
+        "hesabima gecer", "hakkinda bilgi", "konusunda bilgi", "ne asamada",
+        "bilgi almak istiyorum", "bilgi talep ediyorum"
     ]
 
     # ==========================================
@@ -554,8 +559,12 @@ class EmailCategorizer:
         "kayit gorunmuyor", "hicbir kayit", "kayit yok"
     ]
 
+    # Not: bare "yansima" kasitli olarak CIKARILDI -- "yansima durumu hakkinda
+    # bilgi talep ediyorum" gibi notr bir bilgi talebiyle "hala yansimadi" gibi
+    # gercek bir sikayeti ayirt edemiyordu (canli ortamda gozlemlendi). Sadece
+    # acikca olumsuz/sikayet tonlu ifadeler birakildi.
     REFUND_NOT_REFLECTED_EVENT_KEYWORDS = [
-        "yansimadi", "yansima", "ekstre"
+        "yansimadi", "yansimiyor", "yansima goremiyorum", "yansima yok", "gorunmuyor"
     ]
 
     REFUND_NOT_MADE_EVENT_KEYWORDS = [
