@@ -634,6 +634,16 @@ check("Evrak-BI-Sozlesme", r["classification"] == "BILGI_ISTEK > EVRAK > SOZLESM
 r = cat("", "Vize kiti evraklarını ne zaman gönderiyorsunuz.")
 check("Evrak-BI-VizeKiti", r["classification"] == "BILGI_ISTEK > EVRAK > VIZE_KITI", r["classification"])
 
+# --- Kullanicinin verdigi "nokta atisi" senaryolari (ONAYLI) ---
+r = cat("", "Merhaba, gerçekleştirdiğimiz rezervasyona ait mesafeli satış sözleşmesinin ve tur sözleşmesi kopyasının tarafıma e-posta yoluyla iletilmesini rica ediyorum. İyi çalışmalar.")
+check("Evrak-Sozlesme-2 (ONAYLI): mesafeli satis sozlesmesi", r["classification"] == "BILGI_ISTEK > EVRAK > SOZLESME", r["classification"])
+
+r = cat("", "İyi günler, satın aldığımız yurtdışı turu için gerekli olan vize kiti evrak listesini ve konsolosluk başvuru formlarını öğrenmek istiyorum. Vize evrakları hakkında bilgilendirme rica ederim.")
+check("Evrak-VizeKiti-2 (ONAYLI): vize kiti + konsolosluk basvuru formu", r["classification"] == "BILGI_ISTEK > EVRAK > VIZE_KITI", r["classification"])
+
+r = cat("", "Merhaba, önümüzdeki günlerde hareket edecek olan turumuz için görevli otobüs şoförünün adını, telefon numarasını ve araç plaka bilgilerini öğrenebilir miyim? Teşekkürler.")
+check("Evrak-SoforBilgileri-2 (ONAYLI): sofor adi + plaka", r["classification"] == "BILGI_ISTEK > EVRAK > TUR_OTOBUS_SOFOR_BILGILERI", r["classification"])
+
 r = cat("", "Rezervasyonumda değişiklik yapabilir miyim.")
 check("Rezervasyon-BI-DegisiklikBilgi", r["classification"] == "BILGI_ISTEK > REZERVASYON > DEGISIKLIK_BILGI_TALEBI", r["classification"])
 
@@ -691,15 +701,14 @@ check("Sikayet-Fiyat-OdemeItirazi", r["classification"] == "SIKAYET > FIYATLANDI
 r = cat("", "Fiyat ile ilgili şikayetim var, fiyat hatalı gösterilmiş.")
 check("Sikayet-Fiyat-Genel", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_GENEL", r["classification"])
 
-# --- YENI BILINEN CAKISMALAR (kirilim.md sonrasi tespit edildi) ---
-# "Tur Otobüs Şoför Bilgileri" (Bilgi-İstek > Evrak) ile mevcut ULASIM > OTOBUS
-# kavramsal olarak neredeyse ayni konuyu (sofor iletisim bilgisi) kapsiyor.
-# ULASIM > OTOBUS kontrolu kod akisinda cok daha erken oldugu icin bu yeni dala
-# hicbir zaman ulasilamiyor.
+# --- COZULDU (musteri onayli ayrim kurali): "sofor" bare kelimesi tek basina
+# EVRAK'a gitmez; "plaka"/"kaptan" veya "sofor" + isim talebi (adini/ismini)
+# gerekir. Sadece "sofor" + "evrak/belge" gecen bu metin dogru sekilde
+# ULASIM > OTOBUS'ta kaliyor (plaka/kaptan/isim talebi yok).
 r = cat("", "Otobüs şoförünün evraklarını paylaşır mısınız.")
 check(
-    "COLLISION-4: 'sofor evraklari' -> beklenen EVRAK>TUR_OTOBUS_SOFOR_BILGILERI ama ULASIM>OTOBUS dalina dusuyor",
-    r["classification"] == "BILGI_ISTEK > EVRAK > TUR_OTOBUS_SOFOR_BILGILERI",
+    "Otobus-5 (COZULDU): 'sofor evraklari' (plaka/isim yok) -> OTOBUS'ta kalmali",
+    r["classification"] == "BILGI_ISTEK > ULASIM > OTOBUS",
     r["classification"],
 )
 
@@ -724,7 +733,7 @@ check(
 # hala basarisiz -- bu, otobus/transfer icerigi ayrica konusulup karara
 # baglanana kadar boyle kalacak.
 # ==========================================================
-KNOWN_ISSUE_SCENARIOS = {14, 15, 23, 32}
+KNOWN_ISSUE_SCENARIOS = {15, 23, 32}
 
 REALISTIC_SCENARIOS = [
     (9, "BILGI_ISTEK > ULASIM > BILET", "Merhaba, yarınki uçuşumuza ait e-biletimiz hala mail kutumuza düşmedi, tekrar gönderebilir misiniz?"),
@@ -737,7 +746,7 @@ REALISTIC_SCENARIOS = [
     (12, "BILGI_ISTEK > EVRAK > SOZLESME", "İmzaladığımız sözleşmenin PDF halini rica ediyorum."),
     (13, "BILGI_ISTEK > EVRAK > VIZE_KITI", "Vizemiz için gereken evrak kitini ne zaman elimize ulaştıracaksınız?"),
     (13, "BILGI_ISTEK > EVRAK > VIZE_KITI", "Vize başvurusu için kit hala gelmedi, kargoya verildi mi?"),
-    (14, "BILGI_ISTEK > EVRAK > TUR_OTOBUS_SOFOR_BILGILERI", "Turumuzda kullanılacak otobüsün şoförüne ait belgeleri paylaşabilir misiniz?"),
+    (14, "BILGI_ISTEK > ULASIM > OTOBUS", "Turumuzda kullanılacak otobüsün şoförüne ait belgeleri paylaşabilir misiniz?"),
     (15, "BILGI_ISTEK > REZERVASYON > DEGISIKLIK_BILGI_TALEBI", "Rezervasyonumda oda tipini değiştirebilir miyim, önce bir bilgi almak istiyorum."),
     (16, "BILGI_ISTEK > REZERVASYON > IPTAL_SUREC_BILGISI", "Rezervasyonumu iptal edersem nasıl bir süreç işliyor, ücret iadesi oluyor mu?"),
     (17, "BILGI_ISTEK > REZERVASYON > KONFIRME", "Konfirme belgemiz ne zaman elimize ulaşır acaba, süreç ne kadar sürüyor?"),

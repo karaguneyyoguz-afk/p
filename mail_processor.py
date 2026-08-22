@@ -453,14 +453,27 @@ class EmailCategorizer:
     # BİLGİ-İSTEK - EVRAK ANAHTAR KELİMELERİ (Taslak)
     # ==========================================
     DOCUMENT_CONTRACT_KEYWORDS = [
-        "sozlesme", "sozlesmemi", "sozlesme metni", "sozlesme kopyasi"
+        "sozlesme", "sozlesmemi", "sozlesme metni", "sozlesme kopyasi",
+        "mesafeli satis sozlesmesi", "tur sozlesmesi", "islak imzali sozlesme",
+        "iptal sartlari sozlesmesi", "satis sartlari"
     ]
 
-    DOCUMENT_VISA_KIT_TOPIC_KEYWORDS = ["vize"]
-    DOCUMENT_VISA_KIT_EVENT_KEYWORDS = ["kit", "evrak", "belge"]
+    DOCUMENT_VISA_KIT_TOPIC_KEYWORDS = ["vize", "konsolosluk"]
+    DOCUMENT_VISA_KIT_EVENT_KEYWORDS = [
+        "kit", "evrak", "belge", "basvuru formu", "pasaport teslim"
+    ]
 
-    DOCUMENT_BUS_DRIVER_INFO_KEYWORDS = [
-        "otobus soforunun evraklari", "sofor belgeleri", "otobus soforu belgesi"
+    # Musteri onayli oncelik: bu dal ULASIM > OTOBUS kontrolunden ONCE
+    # degerlendirilmeli, ama "sofor" bare kelimesi tek basina yeterli DEGIL --
+    # onaylanan iki ornek ("Soforumuzun telefon numarasini iletir misiniz,
+    # otobuse nereden binecegiz?" -> OTOBUS, ama "...soforun adini, telefon
+    # numarasini ve plaka bilgilerini ogrenebilir miyim?" -> EVRAK) birbirinden
+    # su sekilde ayriliyor: "plaka"/"kaptan" tek basina güçlü bir sinyal; "sofor"
+    # ise ancak ISIM/AD talebiyle birlikte gecerse (sadece telefon/iletisim
+    # sorulmasi degil) bu dala giriyor.
+    DOCUMENT_BUS_DRIVER_INFO_STRONG_KEYWORDS = ["plaka", "kaptan"]
+    DOCUMENT_BUS_DRIVER_INFO_NAME_REQUEST_KEYWORDS = [
+        "adini", "ismini", "adi ve", "ismi ve", "kim oldugunu", "kimdir"
     ]
 
     # ==========================================
@@ -666,6 +679,29 @@ class EmailCategorizer:
                 "attributes": [],
                 "missing_fields": [],
                 "classification": f"TESEKKUR > TESEKKUR > {sub_category_code}"
+            }
+
+        # Not: Musteri onayli oncelik -- "sofor/plaka/kaptan" gecen mailler,
+        # genel ULASIM > OTOBUS kontrolunden ONCE bu dala yonlenmeli.
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.DOCUMENT_BUS_DRIVER_INFO_STRONG_KEYWORDS)
+            or (
+                "sofor" in normalized_text
+                and any(keyword in normalized_text for keyword in EmailCategorizer.DOCUMENT_BUS_DRIVER_INFO_NAME_REQUEST_KEYWORDS)
+            )
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
+                "ticket_type_name": "Bilgi-İstek",
+                "category_id": CATEGORY_DOCUMENT,
+                "category_name": "Evrak",
+                "sub_category_id": SUB_CATEGORY_DOCUMENT_BUS_DRIVER_INFO,
+                "sub_category_name": "Tur Otobüs Şoför Bilgileri",
+                "sub_category_code": "TUR_OTOBUS_SOFOR_BILGILERI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BILGI_ISTEK > EVRAK > TUR_OTOBUS_SOFOR_BILGILERI"
             }
 
         # Not: Musteri onayli oncelik sirasi -- DEGISIKLIK_HAKKI_SORGULAMA (ceza/
@@ -1136,24 +1172,6 @@ class EmailCategorizer:
                 "attributes": [],
                 "missing_fields": [],
                 "classification": "BILGI_ISTEK > EVRAK > VIZE_KITI"
-            }
-
-        # Not: Bu kirilim, mevcut ULASIM > OTOBUS kirilimi ile kavramsal olarak
-        # cakisiyor olabilir (ikisi de otobus soforu/iletisim bilgisiyle ilgili).
-        # Hangi durumda hangisinin kullanilmasi gerektigini birlikte netlestirmemiz lazim.
-        if any(keyword in normalized_text for keyword in EmailCategorizer.DOCUMENT_BUS_DRIVER_INFO_KEYWORDS):
-            return {
-                "channel_id": CHANNEL_ID,
-                "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
-                "ticket_type_name": "Bilgi-İstek",
-                "category_id": CATEGORY_DOCUMENT,
-                "category_name": "Evrak",
-                "sub_category_id": SUB_CATEGORY_DOCUMENT_BUS_DRIVER_INFO,
-                "sub_category_name": "Tur Otobüs Şoför Bilgileri",
-                "sub_category_code": "TUR_OTOBUS_SOFOR_BILGILERI",
-                "attributes": [],
-                "missing_fields": [],
-                "classification": "BILGI_ISTEK > EVRAK > TUR_OTOBUS_SOFOR_BILGILERI"
             }
 
         if any(keyword in normalized_text for keyword in EmailCategorizer.ONLINE_PROCESS_KEYWORDS):
