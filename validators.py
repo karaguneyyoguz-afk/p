@@ -11,6 +11,13 @@ from config import PROFANITY_WORDS
 from utils import normalize_turkish_characters
 
 
+# Bazi mailler etiketin hemen ardindan parantez icinde ek not/ID biraktir
+# (ör. "Ad Soyad (Şahıs Adı - 100054903): Bekir Oğuz"). Bu segmenti tum alan
+# etiketlerinden sonra, ":" beklenmeden once opsiyonel olarak kabul ediyoruz;
+# aksi halde etiket ile deger arasindaki parantez eslesmeyi kirar.
+OPTIONAL_LABEL_ANNOTATION = r'(?:\s*\([^)]*\))?'
+
+
 def _is_placeholder_value(value: str) -> bool:
     normalized_value = normalize_turkish_characters(value).strip()
     return "buraya" in normalized_value or normalized_value in {"yaz", "girilmedi", "belirtilmedi"}
@@ -122,15 +129,15 @@ def extract_invoice_attributes(
     text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
     attribute_list = []
     missing_fields = []
-    
+
     person_name_match = re.search(
-        r'(?:^\s*(?:[-*]\s+)?|\s)(?:şahıs\s*adı|sahis\s*adi|ad\s*soyad|isim|mükellef)\s*:\s*'
+        r'(?:^\s*(?:[-*]\s+)?|\s)(?:şahıs\s*adı|sahis\s*adi|ad\s*soyad(?:ı|i)?|isim(?:i)?|mükellef)' + OPTIONAL_LABEL_ANNOTATION + r'\s*:\s*'
         r'\[?([a-zA-ZğüşıöçĞÜŞİÖÇ\s]+?)\]?(?=\s*(?:,\s*)?(?:vergi\s*kimlik|vkn|tc\s*kimlik|fatura\s*adresi|e-?posta)|\r?\n|$)',
         text,
         re.IGNORECASE | re.MULTILINE
     )
     company_name_match = re.search(
-        r'(?:^\s*(?:[-*]\s+)?|\s)(?:şirket\s*adı|sirket\s*adi|firma|ünvan|unvan)\s*:\s*'
+        r'(?:^\s*(?:[-*]\s+)?|\s)(?:şirket\s*adı|sirket\s*adi|firma(?:sı|si)?|ünvan(?:ı|i)?|unvan(?:ı|i)?)' + OPTIONAL_LABEL_ANNOTATION + r'\s*:\s*'
         r'\[?([^\r\n\],]+)\]?(?=\s*(?:,\s*)?(?:vergi\s*kimlik|vkn|tc\s*kimlik|fatura\s*adresi|e-?posta)|\r?\n|$)',
         text,
         re.IGNORECASE | re.MULTILINE
@@ -181,12 +188,12 @@ def extract_invoice_attributes(
     
     # Extract Turkish ID or Tax ID
     tc_match = re.search(
-        r'(?:tc|tckn|tc\s*no|tc\s*kimlik\s*numarası|tc\s*kimlik\s*numarasi|kimlik\s*no)[:\s]*\[?(\d+)\]?',
+        r'(?:tc|tckn|tc\s*no|tc\s*kimlik\s*numarası|tc\s*kimlik\s*numarasi|kimlik\s*no)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d+)\]?',
         text,
         re.IGNORECASE
     )
     tax_match = re.search(
-        r'(?:vkn|vergi\s*no|vergi\s*kimlik(?:\s*numarası|\s*numarasi)?)[:\s]*\[?(\d+)\]?',
+        r'(?:vkn|vergi\s*no|vergi\s*kimlik(?:\s*numarası|\s*numarasi)?)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d+)\]?',
         text,
         re.IGNORECASE
     )
@@ -242,7 +249,7 @@ def extract_invoice_attributes(
 
     if tax_match:
         tax_office_match = re.search(
-            r'(?:vergi\s*dairesi|vergi\s*daire)\s*:\s*\[?([^\r\n\],]+)\]?(?=\s*(?:,\s*)?(?:fatura\s*adresi|e-?posta)|\r?\n|$)',
+            r'(?:vergi\s*dairesi|vergi\s*daire)' + OPTIONAL_LABEL_ANNOTATION + r'\s*:\s*\[?([^\r\n\],]+)\]?(?=\s*(?:,\s*)?(?:fatura\s*adresi|e-?posta)|\r?\n|$)',
             text,
             re.IGNORECASE
         )
@@ -262,24 +269,24 @@ def extract_invoice_attributes(
     
     # Try pattern 1: "Fatura Adresi:" followed by content until next field or line break
     address_match = re.search(
-        r'(?:fatura\s*adresi|adres)[:\s]*'
+        r'(?:fatura\s*adresi|adres)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*'
         r'([a-zA-ZğüşıöçĞÜŞİÖÇ0-9\s/.,:-]+?)(?=\s*(?:,\s*)?(?:fatura\s*mail|fatura\s*e-posta|mail|e-posta)|\r?\n\s*(?:fatura\s*mail|fatura\s*e-posta|mail|e-posta|iyi|saygılarla|$)|$)',
         text,
         re.IGNORECASE | re.MULTILINE
     )
-    
+
     # Try pattern 2: Simple "Fatura Adresi:" with end of line
     if not address_match:
         address_match = re.search(
-            r'(?:fatura\s*adresi|adres)[:\s]*([^\n]+)',
+            r'(?:fatura\s*adresi|adres)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*([^\n]+)',
             text,
             re.IGNORECASE
         )
-    
+
     # Try pattern 3: Capture multi-line address (handle line breaks)
     if not address_match:
         address_match = re.search(
-            r'(?:fatura\s*adresi|adres)[:\s]*\n\s*(.+?)(?:\n\s*\n|\n\s*(?:fatura|mail|e-posta|tc|vkn))',
+            r'(?:fatura\s*adresi|adres)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\n\s*(.+?)(?:\n\s*\n|\n\s*(?:fatura|mail|e-posta|tc|vkn))',
             text,
             re.IGNORECASE | re.DOTALL
         )
@@ -309,7 +316,7 @@ def extract_invoice_attributes(
     
     # Extract email address
     email_match = re.search(
-        r'(?:fatura\s*e-?posta|fatura\s*mail|e-?posta|mail)[:\s]*\[?'
+        r'(?:fatura\s*e-?posta|fatura\s*mail|e-?posta|mail)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?'
         r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\]?',
         text,
         re.IGNORECASE
@@ -343,7 +350,7 @@ def extract_payment_attributes(text: str) -> List[dict]:
     attribute_list = []
 
     date_match = re.search(
-        r'(?:işlem\s*tarihi|islem\s*tarihi)[:\s]*\[?(\d{1,2}[./]\d{1,2}[./]\d{2,4})\]?',
+        r'(?:işlem\s*tarihi|islem\s*tarihi)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d{1,2}[./]\d{1,2}[./]\d{2,4})\]?',
         text,
         re.IGNORECASE
     )
@@ -357,7 +364,7 @@ def extract_payment_attributes(text: str) -> List[dict]:
         })
 
     card_first6_match = re.search(
-        r'(?:kart(?:ı|i)n\s*ilk\s*6(?:\s*hane(?:si)?|\s*rakam(?:ı|i))?)[:\s]*\[?(\d{6})\]?',
+        r'(?:kart(?:ı|i)n\s*ilk\s*6(?:\s*hane(?:si)?|\s*rakam(?:ı|i))?)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d{6})\]?',
         text,
         re.IGNORECASE
     )
@@ -371,7 +378,7 @@ def extract_payment_attributes(text: str) -> List[dict]:
         })
 
     card_last4_match = re.search(
-        r'(?:kart(?:ı|i)n\s*son\s*4(?:\s*hane(?:si)?|\s*rakam(?:ı|i))?)[:\s]*\[?(\d{4})\]?',
+        r'(?:kart(?:ı|i)n\s*son\s*4(?:\s*hane(?:si)?|\s*rakam(?:ı|i))?)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d{4})\]?',
         text,
         re.IGNORECASE
     )
@@ -385,7 +392,7 @@ def extract_payment_attributes(text: str) -> List[dict]:
         })
 
     amount_match = re.search(
-        r'(?:tutar)[:\s]*\[?(\d+(?:[.,]\d+)?)\s*(?:tl|₺|try)?\]?',
+        r'(?:tutar)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d+(?:[.,]\d+)?)\s*(?:tl|₺|try)?\]?',
         text,
         re.IGNORECASE
     )
@@ -399,7 +406,7 @@ def extract_payment_attributes(text: str) -> List[dict]:
         })
 
     order_number_match = re.search(
-        r'(?:sipariş\s*no|siparis\s*no|sipariş\s*numarası|siparis\s*numarasi)[:\s]*\[?([A-Za-z0-9-]+)\]?',
+        r'(?:sipariş\s*no|siparis\s*no|sipariş\s*numarası|siparis\s*numarasi)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?([A-Za-z0-9-]+)\]?',
         text,
         re.IGNORECASE
     )

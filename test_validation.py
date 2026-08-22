@@ -241,6 +241,28 @@ check("Online-4 (ONAYLI): mobil uygulama SMS dogrulama sorunu", r["classificatio
 r = cat("", "Biletim gelmedi, e-bilet ulaşmadı bana.")
 check("Bilet-1: biletim gelmedi + e-bilet ulasmadi", r["classification"] == "BILGI_ISTEK > ULASIM > BILET", r["classification"])
 
+# --- Kullanicinin onayladigi gercek CSM ornekleri (kirilim.md gozden gecirme sureci) ---
+r = cat("", "Belirttiğim misafirlerimizin uçuş kodu ve saatlerinin teyidini rica ederiz.")
+check("Bilet-2 (ONAYLI): ucus kodu/saat teyidi", r["classification"] == "BILGI_ISTEK > ULASIM > BILET", r["classification"])
+
+r = cat("", "Ayrıca eğer Buse Sekmen olarak güncelleme yapılmışsa sorun yok demektir. Qatar hava yolları geliş biletimizi güncelledi. Ama dönüş hakkımda bilgi sahibi değiliz.")
+check("Bilet-3 (ONAYLI): havayolu bilet guncellemesi", r["classification"] == "BILGI_ISTEK > ULASIM > BILET", r["classification"])
+
+r = cat("", "Önümüzdeki hafta için tur fiyatlandırması ve uçak bileti detaylarını öğrenebilir miyim?")
+check("Bilet-4 (ONAYLI): ucak bileti detay talebi", r["classification"] == "BILGI_ISTEK > ULASIM > BILET", r["classification"])
+
+r = cat("", "Merhaba, Biletler rezervasyona manuel eklenmiştir, kontrolünüz ricadır.")
+check("Bilet-5 (ONAYLI): bilet manuel eklendi bildirimi", r["classification"] == "BILGI_ISTEK > ULASIM > BILET", r["classification"])
+
+# --- COZULMEMIS: "ucus dahil tur bilgilendirmesi" tarzi duyuru mailleri (bilet/ucus
+# kelimesi gecmiyor, "Ucakli ... Turu" gibi dolayli ifade var) henuz yakalanmiyor.
+r = cat("", "23.01.2026 Hareketli Sömestir Özel İzmir Çıkışlı Uçaklı Mardin Urfa Göbeklitepe Gaziantep Turu / 2 Gece Otel Konaklaması Tur Bilgilendirmesi bilginize sunulmuştur. Misafirlerin bilgilendirilmesini rica ederim.")
+check(
+    "COLLISION-6 (KNOWN ISSUE): 'Ucakli ... Tur Bilgilendirmesi' -> beklenen BILET ama TESIS_ILETISIM'e dusuyor",
+    r["classification"] == "BILGI_ISTEK > ULASIM > BILET",
+    r["classification"],
+)
+
 # ==========================================================
 # 6c) SIKAYET > EVRAK > EVRAK
 # kirilim.md ile dogrulandiktan sonra düzeltildi: bu kirilim FATURA kategorisi
@@ -389,6 +411,24 @@ check("Tesekkur-7 (ONAYLI): danismana tesekkur", r["classification"] == "TESEKKU
 r = cat("", "Danışman Ayşe'ye teşekkür ederim.")
 check("Tesekkur-8 (ONAYLI): isimli danismana tesekkur, isme takilmamali", r["classification"] == "TESEKKUR > TESEKKUR > DANISMAN_TESEKKUR", r["classification"])
 
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# "transfer surecinden memnun kaldik" ifadesindeki "transfer" kelimesi,
+# TRANSPORT_CHANGE_RIGHTS_KEYWORDS listesinde oldugu icin bu SAF TESEKKUR maili
+# yanlislikla ULASIM > DEGISIKLIK_HAKKI_SORGULAMA dalina dusuyordu (gercek CSM
+# ticket'ında gozlemlendi). Tesekkur kontrolu fonksiyonun basina alinarak duzeltildi.
+r = cat(
+    "",
+    "Merhaba TatilBudur ailesi, 15-20 Ağustos tarihleri arasında gerçekleştirdiğimiz "
+    "tatilimiz başından sonuna kadar kusursuz geçti. Şirketinizin sunduğu organizasyondan, "
+    "transfer süreçlerinden ve genel hizmet kalitenizden son derece memnun kaldık. Bize bu "
+    "güzel tatili yaşattığınız için ekibinize çok teşekkür ederim. İyi çalışmalar dilerim.",
+)
+check(
+    "Tesekkur-9 (CANLI HATA DUZELTMESI): 'transfer surecinden memnun kaldik' iceren tesekkur maili",
+    r["classification"] == "TESEKKUR > TESEKKUR > GENEL_TESEKKUR",
+    r["classification"],
+)
+
 # ==========================================================
 # 9) VARSAYILAN (TESIS > TESIS ILETISIM)
 # ==========================================================
@@ -486,6 +526,41 @@ check(
     "InvoiceAttr-6: fatura maili belirtilmemis -> gonderen email fallback",
     email_attr is not None and email_attr.get("textValue") == "gonderen@example.com",
     email_attr,
+)
+
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# Etiketin hemen ardindan parantez icinde ek not/ID gecerse (ör. "Ad Soyad
+# (Şahıs Adı - 100054903): ..."), eski regex'ler etiket ile ":" arasinda baska
+# bir sey beklemedigi icin hicbir alani yakalayamiyordu (gercek CSM ticket'inda
+# "eksik bilgi" red maili gonderildigi gozlemlendi).
+attrs, missing = extract_invoice_attributes(
+    "Fatura Unvanı / Ad Soyad (Şahıs Adı - 100054903): Bekir Oğuz Karagüney\n"
+    f"TC Kimlik Numarası (100054900): {VALID_TC}\n"
+    "Fatura Adresi (100000233): Nişantaşı, İstanbul\n"
+    "E-Posta (100000234): karaguneyyoguz@gmail.com\n",
+    "gonderen@example.com",
+)
+check(
+    "InvoiceAttr-7 (CANLI HATA DUZELTMESI): etiket sonrasi parantezli ID notu",
+    not missing,
+    missing,
+)
+
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# "Fatura Unvanı" etiketindeki iyelik eki ("unvan" + "ı") regex'te yoktu, bu
+# yuzden sirket adi hep eksik sayiliyordu (gercek CSM ticket'inda gozlemlendi).
+attrs, missing = extract_invoice_attributes(
+    "Fatura Unvanı (Şirket Adı - 100000070): Tatilbudur Seyahat Acenteliği ve Turizm A.Ş.\n"
+    f"Vergi Kimlik Numarası (100000066 / 100054901): {VALID_VKN}\n"
+    "Vergi Dairesi (100000232): Zincirlikuyu Vergi Dairesi\n"
+    "Fatura Adresi (100000233): Esentepe Mah. Büyükdere Cad. Şişli/İstanbul\n"
+    "E-Posta (100000234): oguz.karaguney@tatilbudur.com\n",
+    "gonderen@example.com",
+)
+check(
+    "InvoiceAttr-8 (CANLI HATA DUZELTMESI): 'Fatura Unvani' iyelik eki + sirket adi",
+    not missing,
+    missing,
 )
 
 # ==========================================================

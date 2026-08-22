@@ -123,5 +123,39 @@ def clean_subject_line(subject: str) -> str:
         subject.strip(),
         flags=re.IGNORECASE
     )
-    
+
     return cleaned
+
+
+def clean_mailto_artifacts(text: str) -> str:
+    """
+    Outlook gibi mail istemcilerinin duz metne cevirdigi e-posta baglantilarinda
+    biraktigi "<mailto:...>" (bazen ic ice / URL-encoded) artiklarini temizler.
+
+    Args:
+        text: Ham e-posta govde metni
+
+    Returns:
+        str: mailto: artiklarindan arindirilmis metin
+    """
+    import re
+
+    if not text:
+        return text
+
+    cleaned = text
+    cleaned = cleaned.replace("%3c", "<").replace("%3C", "<")
+    cleaned = cleaned.replace("%3e", ">").replace("%3E", ">")
+    cleaned = cleaned.replace("&lt;", "<").replace("&gt;", ">")
+
+    # Sadece DENGELI "<mailto:...>" ciftlerini kaldiriyoruz (ic ice olsa bile,
+    # dongu ile en ictekinden disariya dogru temizlenir). Kapanan ">" bulunamayan
+    # (dengesiz) durumlar KASITLI OLARAK dokunulmadan birakiliyor; aksi halde
+    # mailin geri kalan gercek icerigi (ör. "Gereğini rica ederim...") de
+    # yanlislikla silinebilir.
+    previous = None
+    while previous != cleaned:
+        previous = cleaned
+        cleaned = re.sub(r'<\s*mailto:[^<>]*>', '', cleaned, flags=re.IGNORECASE)
+
+    return cleaned.strip()

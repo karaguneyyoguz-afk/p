@@ -228,10 +228,13 @@ class EmailCategorizer:
         "rezervasyon gorunmuyor", "rezervasyon gorun", "kesin rezervasyon bekliyor"
     ]
 
+    # Not: bare "bilet" kelimesi bu listeden kasitli olarak CIKARILDI -- bilet ile
+    # ilgili tum bilgilendirme/teyit/guncelleme talepleri artik ULASIM > BILET
+    # kirilimina ait (asagida TRANSPORT_TICKET_* listeleri).
     TRANSPORT_CHANGE_RIGHTS_KEYWORDS = [
         "transfer", "no show", "noshow", "kendi imkanlariyla",
         "donus transferi", "transferin yapilmasi", "transfer degisikligi",
-        "otelimizi tercih etmistir", "fiyat ve sartlarindan", "bilet",
+        "otelimizi tercih etmistir", "fiyat ve sartlarindan",
         "otobus", "tarih degisikligi", "saat degisikligi",
         "degisiklik hakki", "cezai islem", "kesinti uygulan"
     ]
@@ -256,9 +259,13 @@ class EmailCategorizer:
         "yapabilir miyim", "paylasabilir misiniz", "atabilir misiniz"
     ]
 
-    TRANSPORT_TICKET_TOPIC_KEYWORDS = ["bilet", "e-bilet"]
+    # kirilim.md kaynakli gercek mail ornekleri uzerinden genisletildi (bilet
+    # ulasmama sikayeti + uctan uca bilet bilgilendirme/teyit/guncelleme).
+    TRANSPORT_TICKET_TOPIC_KEYWORDS = ["bilet", "e-bilet", "ucus"]
     TRANSPORT_TICKET_EVENT_KEYWORDS = [
-        "gelmedi", "dusmedi", "ulasmadi", "gonderilmedi", "numaram"
+        "gelmedi", "dusmedi", "ulasmadi", "gonderilmedi", "numaram",
+        "teyi", "kod", "guncelle", "detay", "eklen",
+        "bilgilendirme", "ricadir", "rica ederiz", "kontrolunuz"
     ]
 
     DOCUMENT_TOPIC_KEYWORDS = ["evrak", "belge"]
@@ -560,6 +567,44 @@ class EmailCategorizer:
                 "attributes": [],
                 "missing_fields": [],
                 "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI"
+            }
+
+        # Not: Teşekkür tespiti KASITLI OLARAK burada, fonksiyonun çok başında
+        # yapılıyor. Aşağıdaki Ulaşım kontrolünde "transfer"/"otobus" gibi genel
+        # kelimeler var; bu yüzden "...transfer süreçlerinden çok memnun kaldık,
+        # teşekkür ederim" gibi saf bir teşekkür maili, Teşekkür kontrolü sona
+        # birakilirsa hep yanlislikla Ulasim dalina dusuyordu (canli ortamda
+        # gozlemlendi). Talep/soru iceren mailler (has_request_marker) yine de
+        # Teşekkür sayılmıyor, kendi asil kirilimina gidiyor.
+        has_request_marker = "?" in combined_text or any(
+            keyword in normalized_text for keyword in EmailCategorizer.REQUEST_INDICATOR_KEYWORDS
+        )
+        if any(keyword in normalized_text for keyword in EmailCategorizer.THANK_YOU_KEYWORDS) and not has_request_marker:
+            if any(kw in normalized_text for kw in EmailCategorizer.CONSULTANT_KEYWORDS):
+                sub_category_id = SUB_CATEGORY_THANK_YOU_CONSULTANT
+                sub_category_name = "Danışman Teşekkür"
+                sub_category_code = "DANISMAN_TESEKKUR"
+            elif any(kw in normalized_text for kw in EmailCategorizer.GUIDE_KEYWORDS):
+                sub_category_id = SUB_CATEGORY_THANK_YOU_GUIDE
+                sub_category_name = "Rehber Teşekkür"
+                sub_category_code = "REHBER_TESEKKUR"
+            else:
+                sub_category_id = SUB_CATEGORY_THANK_YOU_GENERAL
+                sub_category_name = "Genel Teşekkür"
+                sub_category_code = "GENEL_TESEKKUR"
+
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_THANK_YOU,
+                "ticket_type_name": "Teşekkür",
+                "category_id": CATEGORY_THANK_YOU,
+                "category_name": "Teşekkür",
+                "sub_category_id": sub_category_id,
+                "sub_category_name": sub_category_name,
+                "sub_category_code": sub_category_code,
+                "attributes": [],
+                "missing_fields": [],
+                "classification": f"TESEKKUR > TESEKKUR > {sub_category_code}"
             }
 
         has_bus_reference = "otobus" in normalized_text
@@ -1517,43 +1562,7 @@ class EmailCategorizer:
                 "missing_fields": [],
                 "classification": "BILGI_ISTEK > ACENTE > ILETISIM_BILGILERI"
             }
-        
-        # Check for thank you messages
-        # Not: mail bir talep/soru iceriyorsa (ornegin "...ogrenebilir miyim? Tesekkurler."
-        # gibi kibarlik amacli kapanis ifadesi), bunu gercek bir tesekkur maili SAYMIYORUZ;
-        # mail asil konusuna (ilgili kirilima) siniflandirilmaya devam ediyor.
-        has_request_marker = "?" in combined_text or any(
-            keyword in normalized_text for keyword in EmailCategorizer.REQUEST_INDICATOR_KEYWORDS
-        )
-        if any(keyword in normalized_text for keyword in EmailCategorizer.THANK_YOU_KEYWORDS) and not has_request_marker:
-            # Determine sub-category based on keywords
-            if any(kw in normalized_text for kw in EmailCategorizer.CONSULTANT_KEYWORDS):
-                sub_category_id = SUB_CATEGORY_THANK_YOU_CONSULTANT
-                sub_category_name = "Danışman Teşekkür"
-                sub_category_code = "DANISMAN_TESEKKUR"
-            elif any(kw in normalized_text for kw in EmailCategorizer.GUIDE_KEYWORDS):
-                sub_category_id = SUB_CATEGORY_THANK_YOU_GUIDE
-                sub_category_name = "Rehber Teşekkür"
-                sub_category_code = "REHBER_TESEKKUR"
-            else:
-                sub_category_id = SUB_CATEGORY_THANK_YOU_GENERAL
-                sub_category_name = "Genel Teşekkür"
-                sub_category_code = "GENEL_TESEKKUR"
-            
-            return {
-                "channel_id": CHANNEL_ID,
-                "ticket_type_id": TICKET_TYPE_THANK_YOU,
-                "ticket_type_name": "Teşekkür",
-                "category_id": CATEGORY_THANK_YOU,
-                "category_name": "Teşekkür",
-                "sub_category_id": sub_category_id,
-                "sub_category_name": sub_category_name,
-                "sub_category_code": sub_category_code,
-                "attributes": [],
-                "missing_fields": [],
-                "classification": f"TESEKKUR > TESEKKUR > {sub_category_code}"
-            }
-        
+
         # Default: General information request
         return {
             "channel_id": CHANNEL_ID,

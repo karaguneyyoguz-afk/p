@@ -12,7 +12,7 @@ from mail_processor import (
 )
 from validators import contains_profanity
 from csm_api import CSMAPIClient, TicketPayloadBuilder
-from utils import clean_subject_line
+from utils import clean_subject_line, clean_mailto_artifacts
 from logging_utils import record_mail_event
 
 
@@ -33,7 +33,8 @@ def process_email(
     """
     # Extract email content
     subject, sender_email, sender_name, body = processor.extract_email_content(email_message)
-    
+    body = clean_mailto_artifacts(body)
+
     print("-" * 50)
     print(f"Gönderen: {sender_email} ({sender_name})")
     print(f"Konu: {subject}")
