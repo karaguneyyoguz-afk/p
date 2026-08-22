@@ -342,6 +342,23 @@ check("Degisiklik-OdemeTipi", r["classification"] == "BACKOFFICE_ISLEMLERI > DEG
 r = cat("", "Doğum tarihi değişikliği yapmam gerekiyor.")
 check("Degisiklik-DogumTarihi", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DOGUM_TARIHI_DEGISIKLIGI", r["classification"])
 
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# "guncellenmesini rica eder" ifadesi CHANGE_INTENT_KEYWORDS listesinde yoktu
+# (sadece "duzelt"/"degistir" vardi), bu yuzden bu mail varsayilan Tesis
+# Iletisim'e dusuyordu (gercek CSM ticket'inda gozlemlendi).
+r = cat(
+    "",
+    "İyi günler, 358109758 nolu rezervasyonumuzda yolcu olarak bulunan Bekir "
+    "Oğuz Karagüney isimli misafirin doğum tarihi sistemde hatalı (19.06.1993) "
+    "görünmektedir. Doğru doğum tarihinin 19.06.1994 olarak güncellenmesini "
+    "rica eder, iyi çalışmalar dilerim.",
+)
+check(
+    "Degisiklik-DogumTarihi-2 (CANLI HATA DUZELTMESI): 'guncellenmesini rica eder'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DOGUM_TARIHI_DEGISIKLIGI",
+    r["classification"],
+)
+
 r = cat("", "Ek hizmet eklemek istiyorum rezervasyonuma.")
 check("Degisiklik-EkHizmetler", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER", r["classification"])
 

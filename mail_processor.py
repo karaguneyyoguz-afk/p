@@ -348,8 +348,8 @@ class EmailCategorizer:
     # aramasi oldugu icin bu yaklasim calisir.
     CHANGE_INTENT_KEYWORDS = [
         "degistir", "degisikli", "gecmek", "gecis yapmak", "cevirmek",
-        "duzelt", "yanlis gir", "yanlis yaz", "hatali yaz", "eklettirmek",
-        "eklemek isti", "ileri almak", "geri almak"
+        "duzelt", "guncelle", "yanlis gir", "yanlis yaz", "hatali yaz",
+        "eklettirmek", "eklemek isti", "ileri almak", "geri almak"
     ]
 
     # Not: bilinçli olarak "iptal etmek/ettirmek/edebilir/edelim/ediyoruz" gibi
