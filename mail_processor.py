@@ -6,6 +6,7 @@ Handles email retrieval, parsing, and categorization for ticket routing.
 
 import imaplib
 import email
+import re
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -64,6 +65,56 @@ from utils import (
     clean_subject_line, normalize_turkish_characters
 )
 from validators import contains_profanity, extract_invoice_attributes, extract_payment_attributes
+
+
+def _levenshtein_distance(a: str, b: str) -> int:
+    """Iki metin arasindaki duzenleme (Levenshtein) mesafesini hesaplar."""
+    if a == b:
+        return 0
+    if len(a) < len(b):
+        a, b = b, a
+    previous_row = list(range(len(b) + 1))
+    for i, char_a in enumerate(a, 1):
+        current_row = [i] + [0] * len(b)
+        for j, char_b in enumerate(b, 1):
+            current_row[j] = min(
+                previous_row[j] + 1,
+                current_row[j - 1] + 1,
+                previous_row[j - 1] + (char_a != char_b),
+            )
+        previous_row = current_row
+    return previous_row[-1]
+
+
+def _compress_repeated_chars(word: str) -> str:
+    """"teşekkürrrr" gibi uzatilmis kelimelerde art arda 3+ tekrar eden
+    karakterleri 2'ye indirir (mesela "kk" gibi gercek cift harfleri bozmadan)."""
+    compressed = []
+    for char in word:
+        if len(compressed) >= 2 and compressed[-1] == char and compressed[-2] == char:
+            continue
+        compressed.append(char)
+    return "".join(compressed)
+
+
+def contains_thank_you_word(normalized_text: str) -> bool:
+    """
+    "Teşekkür" kelimesinin yazim hatali/uzatilmis varyasyonlarini (ör.
+    "teşeğğküüüü", "teşkut") da yakalar. Once THANK_YOU_KEYWORDS listesindeki
+    kesin ifadelere bakar; hicbiri eslesmezse metindeki her kelimeyi "tesekkur"
+    koküne olan duzenleme mesafesine gore kontrol eder.
+    """
+    if any(keyword in normalized_text for keyword in EmailCategorizer.THANK_YOU_KEYWORDS):
+        return True
+
+    for word in re.findall(r"[a-zğüşıöç]+", normalized_text):
+        if len(word) < 6:
+            continue
+        compressed = _compress_repeated_chars(word)
+        if _levenshtein_distance(compressed, "tesekkur") <= 3:
+            return True
+
+    return False
 
 
 class EmailProcessor:
@@ -193,7 +244,7 @@ class EmailCategorizer:
     
     THANK_YOU_KEYWORDS = [
         "tesekkur", "tesekkurler", "tesekkur ederim", "sagol",
-        "tsk", "tks", "tessskur", "tesegkur"
+        "tsk", "tks", "tessskur", "tesegkur", "teskut", "tesegkurr"
     ]
     
     INVOICE_KEYWORDS = ["fatura", "efatura", "e-fatura"]
@@ -579,7 +630,7 @@ class EmailCategorizer:
         has_request_marker = "?" in combined_text or any(
             keyword in normalized_text for keyword in EmailCategorizer.REQUEST_INDICATOR_KEYWORDS
         )
-        if any(keyword in normalized_text for keyword in EmailCategorizer.THANK_YOU_KEYWORDS) and not has_request_marker:
+        if contains_thank_you_word(normalized_text) and not has_request_marker:
             if any(kw in normalized_text for kw in EmailCategorizer.CONSULTANT_KEYWORDS):
                 sub_category_id = SUB_CATEGORY_THANK_YOU_CONSULTANT
                 sub_category_name = "Danışman Teşekkür"

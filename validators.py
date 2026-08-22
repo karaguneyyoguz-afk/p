@@ -136,9 +136,13 @@ def extract_invoice_attributes(
         text,
         re.IGNORECASE | re.MULTILINE
     )
+    # Not: "\s*:\s*" yerine "(?:\s*:\s*|\s+)" kullaniliyor -- boylece ":" olmadan,
+    # duz cumle ("Şirket unvanımız Tatilbudur ... A.Ş., vergi kimlik...") formatinda
+    # yazilmis mailler de yakalanabiliyor. Etiket koklerine "\w{0,4}" ile iyelik
+    # eki toleransi eklendi (unvanı, unvanımız, firması gibi).
     company_name_match = re.search(
-        r'(?:^\s*(?:[-*]\s+)?|\s)(?:şirket\s*adı|sirket\s*adi|firma(?:sı|si)?|ünvan(?:ı|i)?|unvan(?:ı|i)?)' + OPTIONAL_LABEL_ANNOTATION + r'\s*:\s*'
-        r'\[?([^\r\n\],]+)\]?(?=\s*(?:,\s*)?(?:vergi\s*kimlik|vkn|tc\s*kimlik|fatura\s*adresi|e-?posta)|\r?\n|$)',
+        r'(?:^\s*(?:[-*]\s+)?|\s)(?:şirket\s*adı\w{0,4}|sirket\s*adi\w{0,4}|firma\w{0,4}|ünvan\w{0,4}|unvan\w{0,4})' + OPTIONAL_LABEL_ANNOTATION + r'(?:\s*:\s*|\s+)'
+        r'\[?([^\r\n\],]+?)\]?(?=\s*,|\s+ve\s+(?:mail|e-?posta)|\s*(?:vergi\s*kimlik|vkn|tc\s*kimlik|fatura\s*adresi|e-?posta)|\r?\n|$)',
         text,
         re.IGNORECASE | re.MULTILINE
     )
@@ -187,13 +191,16 @@ def extract_invoice_attributes(
         missing_fields.append("Şirket Adı veya Şahıs Adı")
     
     # Extract Turkish ID or Tax ID
+    # Not: "numara\w*" ile "numaram", "numaramız", "numarası" gibi tum iyelik
+    # eki varyasyonlari tek seferde kapsanıyor (":" olmadan duz cumle formatinda
+    # bile "[:\s]*" zaten bosluk-tolerensli oldugu icin ek degisiklik gerekmedi).
     tc_match = re.search(
-        r'(?:tc|tckn|tc\s*no|tc\s*kimlik\s*numarası|tc\s*kimlik\s*numarasi|kimlik\s*no)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d+)\]?',
+        r'(?:tc|tckn|tc\s*no|tc\s*kimlik(?:\s*numara\w*)?|kimlik\s*no)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d+)\]?',
         text,
         re.IGNORECASE
     )
     tax_match = re.search(
-        r'(?:vkn|vergi\s*no|vergi\s*kimlik(?:\s*numarası|\s*numarasi)?)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d+)\]?',
+        r'(?:vkn|vergi\s*no|vergi\s*kimlik(?:\s*numara\w*)?)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d+)\]?',
         text,
         re.IGNORECASE
     )
@@ -249,7 +256,7 @@ def extract_invoice_attributes(
 
     if tax_match:
         tax_office_match = re.search(
-            r'(?:vergi\s*dairesi|vergi\s*daire)' + OPTIONAL_LABEL_ANNOTATION + r'\s*:\s*\[?([^\r\n\],]+)\]?(?=\s*(?:,\s*)?(?:fatura\s*adresi|e-?posta)|\r?\n|$)',
+            r'(?:vergi\s*dairesi|vergi\s*daire\w{0,4})' + OPTIONAL_LABEL_ANNOTATION + r'(?:\s*:\s*|\s+)\[?([^\r\n\],]+?)\]?(?=\s*,|\s*(?:fatura\s*adresi|e-?posta)|\r?\n|$)',
             text,
             re.IGNORECASE
         )
@@ -268,9 +275,11 @@ def extract_invoice_attributes(
     address_match = None
     
     # Try pattern 1: "Fatura Adresi:" followed by content until next field or line break
+    # Not: "ve mail/e-posta ..." baglaci da (duz cumle formatinda son alan
+    # genelde "ve" ile baglaniyor) durdurma noktasi olarak ekleniyor.
     address_match = re.search(
-        r'(?:fatura\s*adresi|adres)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*'
-        r'([a-zA-ZğüşıöçĞÜŞİÖÇ0-9\s/.,:-]+?)(?=\s*(?:,\s*)?(?:fatura\s*mail|fatura\s*e-posta|mail|e-posta)|\r?\n\s*(?:fatura\s*mail|fatura\s*e-posta|mail|e-posta|iyi|saygılarla|$)|$)',
+        r'(?:fatura\s*adresi\w{0,4}|adres\w{0,4})' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*'
+        r'([a-zA-ZğüşıöçĞÜŞİÖÇ0-9\s/.,:-]+?)(?=\s*,|\s+ve\s+(?:fatura\s*mail|fatura\s*e-posta|mail|e-posta)|\s*(?:fatura\s*mail|fatura\s*e-posta|mail|e-posta)|\r?\n\s*(?:fatura\s*mail|fatura\s*e-posta|mail|e-posta|iyi|saygılarla|$)|$)',
         text,
         re.IGNORECASE | re.MULTILINE
     )
@@ -278,7 +287,7 @@ def extract_invoice_attributes(
     # Try pattern 2: Simple "Fatura Adresi:" with end of line
     if not address_match:
         address_match = re.search(
-            r'(?:fatura\s*adresi|adres)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*([^\n]+)',
+            r'(?:fatura\s*adresi\w{0,4}|adres\w{0,4})' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*([^\n]+)',
             text,
             re.IGNORECASE
         )
@@ -286,7 +295,7 @@ def extract_invoice_attributes(
     # Try pattern 3: Capture multi-line address (handle line breaks)
     if not address_match:
         address_match = re.search(
-            r'(?:fatura\s*adresi|adres)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\n\s*(.+?)(?:\n\s*\n|\n\s*(?:fatura|mail|e-posta|tc|vkn))',
+            r'(?:fatura\s*adresi\w{0,4}|adres\w{0,4})' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\n\s*(.+?)(?:\n\s*\n|\n\s*(?:fatura|mail|e-posta|tc|vkn))',
             text,
             re.IGNORECASE | re.DOTALL
         )
@@ -295,7 +304,7 @@ def extract_invoice_attributes(
         invoice_address = address_match.group(1).strip()
         # Remove email patterns that might be attached
         invoice_address = re.split(
-            r'\s*(?:fatura\s*mail|fatura\s*e-posta|mail|e-posta).*',
+            r'\s*(?:ve\s+)?(?:fatura\s*mail|fatura\s*e-posta|mail|e-posta).*',
             invoice_address,
             flags=re.IGNORECASE
         )[0].strip()
@@ -315,12 +324,22 @@ def extract_invoice_attributes(
         missing_fields.append("Fatura Adresi")
     
     # Extract email address
+    # Not: "mail adresim", "e-posta adresimiz" gibi etiket ile deger arasina
+    # giren ek kelimeyi de tolere ediyor -- degeri zaten "@" iceren gecerli bir
+    # e-posta deseni belirledigi icin araya giren kelime riskli degil.
     email_match = re.search(
-        r'(?:fatura\s*e-?posta|fatura\s*mail|e-?posta|mail)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?'
+        r'(?:fatura\s*e-?posta|fatura\s*mail|e-?posta|mail)(?:\s*adres\w*)?' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?'
         r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\]?',
         text,
         re.IGNORECASE
     )
+    if not email_match:
+        # Genel fallback: metinde herhangi bir yerde gecerli bir e-posta adresi
+        # varsa (etiket eslesmese bile) onu yakala.
+        email_match = re.search(
+            r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+            text
+        )
     
     invoice_email = email_match.group(1) if email_match else sender_email
     if invoice_email:

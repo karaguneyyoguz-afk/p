@@ -429,6 +429,24 @@ check(
     r["classification"],
 )
 
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# Asiri uzatilmis/yazim hatali tesekkur ifadeleri (ornegin gercek bir CSM
+# ticket'inda gorulen "teşeğğküüüü") sabit kelime listesiyle hic yakalanamiyordu.
+# contains_thank_you_word() artik "tesekkur" kokune duzenleme mesafesi (fuzzy)
+# ile de bakiyor.
+r = cat("", "Tatilbudur ailesine teşeğğküüüü")
+check("Tesekkur-10 (CANLI HATA DUZELTMESI): asiri uzatilmis/yazim hatali 'tesekkur'", r["classification"] == "TESEKKUR > TESEKKUR > GENEL_TESEKKUR", r["classification"])
+
+r = cat("", "teşküt ederim")
+check("Tesekkur-11 (ONAYLI): 'teskut' yazim hatasi", r["classification"] == "TESEKKUR > TESEKKUR > GENEL_TESEKKUR", r["classification"])
+
+r = cat("", "teşeğkürr ediyoruz")
+check("Tesekkur-12 (ONAYLI): 'tesegkurr' yazim hatasi", r["classification"] == "TESEKKUR > TESEKKUR > GENEL_TESEKKUR", r["classification"])
+
+# Fuzzy kontrolun alakasiz kelimelere yanlislikla tepki vermedigini dogrula
+r = cat("", "Bu otelin adresini öğrenmek istiyorum, oda değişikliği de yapmak istiyorum.")
+check("Tesekkur-13 (guvenlik): alakasiz metin fuzzy'e takilmamali", r["classification"] != "TESEKKUR > TESEKKUR > GENEL_TESEKKUR", r["classification"])
+
 # ==========================================================
 # 9) VARSAYILAN (TESIS > TESIS ILETISIM)
 # ==========================================================
@@ -559,6 +577,36 @@ attrs, missing = extract_invoice_attributes(
 )
 check(
     "InvoiceAttr-8 (CANLI HATA DUZELTMESI): 'Fatura Unvani' iyelik eki + sirket adi",
+    not missing,
+    missing,
+)
+
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# Duz cumle formati (":" hic yok, "Fatura unvanı X, vergi kimlik numaram Y, ...
+# ve mail adresim Z şeklindedir" tarzi) eskiden hic yakalanamiyordu.
+attrs, missing = extract_invoice_attributes(
+    "Yeni bilgilerim şu şekildedir: Fatura unvanı Tatilbudur Seyahat Acenteliği ve "
+    "Turizm A.Ş., vergi kimlik numaram 8340123456, vergi dairem Zincirlikuyu, "
+    "adresim Esentepe Mah. Büyükdere Cad. Şişli/İstanbul ve mail adresim "
+    "oguz.karaguney@tatilbudur.com şeklindedir.",
+    "gonderen@example.com",
+)
+check(
+    "InvoiceAttr-9 (CANLI HATA DUZELTMESI): duz cumle formati, ':' hic yok",
+    not missing,
+    missing,
+)
+
+attrs, missing = extract_invoice_attributes(
+    "Fatura bilgilerimiz şu şekildedir: Şirket unvanımız Tatilbudur Seyahat "
+    "Acenteliği ve Turizm A.Ş., vergi kimlik numaramız 8340123456, vergi "
+    "dairemiz Zincirlikuyu, fatura adresimiz Esentepe Mah. Büyükdere Cad. "
+    "Şişli/İstanbul ve e-posta adresimiz oguz.karaguney@tatilbudur.com olarak "
+    "belirlenmiştir.",
+    "gonderen@example.com",
+)
+check(
+    "InvoiceAttr-10 (CANLI HATA DUZELTMESI): duz cumle formati, coğul iyelik ekleri",
     not missing,
     missing,
 )
