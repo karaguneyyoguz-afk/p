@@ -841,6 +841,54 @@ check("Iptal-Oda-4: 'tek oda iptal talebi'", r["classification"] == "BACKOFFICE_
 r = cat("", "İptal sigortası iptal etmek istiyorum.")
 check("EkHizmet-IptalSigortasi", r["classification"] == "BACKOFFICE_ISLEMLERI > EK_HIZMET > IPTAL_SIGORTASI", r["classification"])
 
+# --- CANLI HATA DUZELTMESI: EXTRA_SERVICES_TOPIC_KEYWORDS ("ek hizmet") tek
+# basina (eslestirmeden) tetiklendigi icin, somut bir sigorta iptali talebi
+# ("iptal sigortası ek hizmetinin kaldırılması") daha spesifik EK_HIZMET >
+# IPTAL_SIGORTASI dalindan ONCE genel Degisiklik > Ek Hizmetler'e dusuyordu.
+# is_insurance_cancellation koruma degiskeni eklendi (kullanici tarafindan
+# bildirildi).
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuzdaki iptal sigortası ek "
+    "hizmetinin kaldırılması/iptal edilmesi hususunda işlemlerin "
+    "yapılmasını rica ederim.",
+)
+check(
+    "EkHizmet-IptalSigortasi-2 (ONAYLI): somut sigorta iptali, genel Ek Hizmetler dalina dusmemeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > EK_HIZMET > IPTAL_SIGORTASI",
+    r["classification"],
+)
+
+r = cat("", "Sigorta ek hizmetini çıkarmak istiyoruz.")
+check(
+    "EkHizmet-IptalSigortasi-3: 'sigorta ek hizmetini çıkarma' (cikar = iptal esdegeri fiil)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > EK_HIZMET > IPTAL_SIGORTASI",
+    r["classification"],
+)
+
+r = cat("", "Seyahat sigortası iptali için işlem rica ederiz.")
+check(
+    "EkHizmet-IptalSigortasi-4: bare 'iptali' + 'rica ederiz'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > EK_HIZMET > IPTAL_SIGORTASI",
+    r["classification"],
+)
+
+r = cat("", "Sigorta poliçesi iptal talebimiz var.")
+check(
+    "EkHizmet-IptalSigortasi-5: bare 'sigorta poliçesi' + 'iptal talebi'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > EK_HIZMET > IPTAL_SIGORTASI",
+    r["classification"],
+)
+
+# Koruma: sigorta/iptal ile ilgisi olmayan genel bir ek hizmet talebi hala
+# dogru sekilde genel Ek Hizmetler dalina dusmeli.
+r = cat("", "Rezervasyonumuza ekstra yatak eklemek istiyoruz.")
+check(
+    "EkHizmet-Koruma: sigorta/iptal disi genel ek hizmet talebi Degisiklik>EkHizmetler'de kalmali",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER",
+    r["classification"],
+)
+
 r = cat("", "Rezervasyonumu iptal etmek istiyorum, genel iptal talebi oluşturuyorum.")
 check("Iptal-Talebi", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > IPTAL_TALEBI", r["classification"])
 
@@ -1399,6 +1447,38 @@ check(
     and opsiyon_deger2 is not None and opsiyon_deger2.get("textValue") == "11:40"
     and r.get("priority_level") == "OPSIYONLU",
     (r["classification"], r.get("attributes"), r.get("priority_level")),
+)
+
+# --- CANLI HATA DUZELTMESI: iki ayri sorun bir arada bulundu ---
+# 1) SHIFT_EVENT_KEYWORDS eski hali "kaydirildi" (PASIF, "rezervasyonumuz
+#    kaydırıldı") icermiyordu, sadece "kaydirildik" (biz+pasif) vardi.
+# 2) TRANSPORT_TICKET (Bilgi-Istek > Ulasim > Bilet, "ucus"+"bilgilendirme")
+#    ve OTOBUS dallari, somut bir Kaydirma talebiyle cakistiginda geri
+#    cekilmiyordu -- is_shift_related korumasi eklendi.
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuz için operasyon "
+    "biriminiz tarafından iletilen bilgilendirmede, iç hat uçuş "
+    "planlamalarındaki değişiklikler nedeniyle rezervasyonumuzun operasyon "
+    "kaynaklı olarak başka bir tarihe kaydırılması talep edilmiştir. Bu "
+    "değişiklik için tanınan opsiyon süresi bugün saat 18:40 itibarıyla "
+    "sona erecektir. Süre aşılmadan gerekli backoffice kaydırma "
+    "işlemlerinin ivedilikle yapılmasını rica eder, iyi çalışmalar dilerim.",
+)
+opsiyon_deger3 = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "OPSIYON_SURESI"), None)
+check(
+    "Kaydirma-OperasyonKaynakli-2 (ONAYLI): 'operasyon birimi bilgilendirmesi' + 'uçuş' -> BILET bilgi-istegine degil OPERASYON_KAYNAKLI'ya dusmeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > KAYDIRMA > OPERASYON_KAYNAKLI"
+    and opsiyon_deger3 is not None and opsiyon_deger3.get("textValue") == "18:40"
+    and r.get("priority_level") == "OPSIYONLU",
+    (r["classification"], r.get("attributes"), r.get("priority_level")),
+)
+
+r = cat("", "Acente operasyon birimi yönlendirmesiyle rezervasyonumuz kaydırıldı, bilgi rica ederiz.")
+check(
+    "Kaydirma-OperasyonKaynakli-3 (CANLI HATA DUZELTMESI): pasif 'kaydırıldı' (SHIFT_EVENT_KEYWORDS'e eklendi)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > KAYDIRMA > OPERASYON_KAYNAKLI",
+    r["classification"],
 )
 
 # Koruma: opsiyon suresi gecmiyorsa priority_level set edilmemeli (varsayilan

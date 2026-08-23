@@ -570,13 +570,22 @@ class EmailCategorizer:
         re.IGNORECASE
     )
 
+    # Not: bare "sigorta" da eklendi -- "sigorta poliçesi iptal talebi" gibi
+    # ifadeler "iptal sigortasi"/"seyahat sigortasi" kaliplarina uymuyor
+    # (kullanici tarafindan bildirildi). Bare "sigorta" burada guvenli --
+    # bu liste HER ZAMAN CANCEL_INTENT_KEYWORDS/CANCEL_REQUEST_NOUN_PATTERN
+    # ile ESLESTIRILEREK kullaniliyor.
     CANCELLATION_INSURANCE_TOPIC_KEYWORDS = [
-        "iptal sigortasi", "seyahat sigortasi"
+        "iptal sigortasi", "seyahat sigortasi", "sigorta"
     ]
 
+    # Not: "kaydirildi" (PASIF, "rezervasyonumuz kaydırıldı") eksikti -- eski
+    # liste sadece "kaydirildik" (biz+pasif) kapsiyordu, "kaydirdi" (aktif,
+    # "farkli koku") "kaydirildi"yi (araya giren "il" pasif eki yuzunden)
+    # KAPSAMIYOR (kullanici tarafindan bildirilen ornekte gozlemlendi).
     SHIFT_EVENT_KEYWORDS = [
-        "kaydirdi", "kaydirma", "kaydirildik", "kaydirilmis", "kaydirmis",
-        "overbooking"
+        "kaydirdi", "kaydirildi", "kaydirma", "kaydirildik", "kaydirilmis",
+        "kaydirmis", "overbooking"
     ]
     SHIFT_HOTEL_BASED_TOPIC_KEYWORDS = ["otel"]
     SHIFT_OPERATION_BASED_TOPIC_KEYWORDS = ["operasyon"]
@@ -952,9 +961,22 @@ class EmailCategorizer:
                 )
             )
         )
+        # Not: somut bir Backoffice > Kaydırma > Operasyon/Otel Kaynaklı
+        # talebiyle (asagida, SHIFT_OPERATION_BASED_TOPIC_KEYWORDS/SHIFT_HOTEL_BASED_TOPIC_KEYWORDS
+        # + SHIFT_EVENT_KEYWORDS) CAKISIRSA bu bilgi-istek dallari da GERI
+        # CEKILIR -- aksi halde "iç hat uçuş planlamalarındaki değişiklikler
+        # ... operasyon biriminiz tarafından iletilen bilgilendirmede ..."
+        # gibi bir mail, bare "ucus"+"bilgilendirme" kombinasyonu yuzunden
+        # yanlislikla BILGI_ISTEK > ULASIM > BILET'e dusuyordu (kullanici
+        # tarafindan bildirildi).
+        is_shift_related = (
+            any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_OPERATION_BASED_TOPIC_KEYWORDS)
+            or any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_HOTEL_BASED_TOPIC_KEYWORDS)
+        ) and any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_EVENT_KEYWORDS)
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.OTOBUS_TOPIC_KEYWORDS)
             and not is_actionable_transport_change
+            and not is_shift_related
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -979,6 +1001,7 @@ class EmailCategorizer:
             any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_TICKET_TOPIC_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_TICKET_EVENT_KEYWORDS)
             and not is_actionable_transport_change
+            and not is_shift_related
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -1619,7 +1642,28 @@ class EmailCategorizer:
                 "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DOGUM_TARIHI_DEGISIKLIGI"
             }
 
-        if any(keyword in normalized_text for keyword in EmailCategorizer.EXTRA_SERVICES_TOPIC_KEYWORDS):
+        # Not: somut bir sigorta IPTALI talebiyle (asagida, CANCELLATION_INSURANCE_TOPIC_KEYWORDS
+        # + CANCEL_INTENT_KEYWORDS/CANCEL_REQUEST_NOUN_PATTERN) CAKISIRSA bu
+        # genel "Ek Hizmetler" dali GERI CEKILIR -- aksi halde "iptal sigortası
+        # ek hizmetinin kaldırılması" gibi somut bir talep, bare "ek hizmet"
+        # kelimesi yuzunden yanlislikla genel Degisiklik>Ek Hizmetler'e
+        # dusuyordu (kullanici tarafindan bildirildi).
+        is_insurance_cancellation = (
+            any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_INSURANCE_TOPIC_KEYWORDS)
+            and (
+                any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+                or EmailCategorizer.CANCEL_REQUEST_NOUN_PATTERN.search(normalized_text)
+                # Not: "sigorta ek hizmetini ÇIKARMAK istiyoruz" -- "cikar"
+                # (cikarmak) ek hizmet BAGLAMINDA "kaldirma/iptal" ile esdeger
+                # bir fiil, ama CANCEL_INTENT_KEYWORDS'te "iptal" koku
+                # gerektigi icin kapsanmiyordu (kullanici tarafindan bildirildi).
+                or "cikar" in normalized_text
+            )
+        )
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.EXTRA_SERVICES_TOPIC_KEYWORDS)
+            and not is_insurance_cancellation
+        ):
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_RESERVATION,
@@ -1811,10 +1855,10 @@ class EmailCategorizer:
                 "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM"
             }
 
-        if (
-            any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_INSURANCE_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
-        ):
+        # Not: is_insurance_cancellation yukarida (Ek Hizmetler dalinin geri
+        # cekilme kosulu olarak) zaten hesaplandi; ayni degisken tekrar
+        # kullanilarak iki kontrolun birbirinden sapmasi (drift) engelleniyor.
+        if is_insurance_cancellation:
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_RESERVATION,
