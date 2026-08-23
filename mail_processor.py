@@ -456,8 +456,15 @@ class EmailCategorizer:
 
     BIRTH_DATE_TOPIC_KEYWORDS = ["dogum tarihi"]
 
+    # Not: bare "balayi" KASITLI OLARAK YOK -- "rezervasyonumuza balayı notu
+    # düşürebilir misiniz?" gibi aslinda Not Ekleme Talebi'ne ait bir mail de
+    # "balayi" iceriyor, bare haliyle bu Ek Hizmetler dalina yanlislikla
+    # dusuyordu (Gercekci-26 testinde yakalandi). "balayi konsepti" gibi
+    # gercekten SERVIS/PAKET degisikligi ifade eden compound kalip kullanildi.
     EXTRA_SERVICES_TOPIC_KEYWORDS = [
-        "ek hizmet", "ekstra hizmet", "ekstra yatak", "transfer hizmeti"
+        "ek hizmet", "ekstra hizmet", "ekstra yatak", "transfer hizmeti",
+        "balayi konsepti", "balayi paketi", "arac kirala", "transfer ekleme",
+        "transfer cikarma", "transferi ekle", "transferi cikar"
     ]
 
     # Not: "adinda"/"adinin"/"isminde"/"isminin" gibi cekimli formlar da
@@ -477,12 +484,23 @@ class EmailCategorizer:
 
     PERSON_ADD_REMOVE_TOPIC_KEYWORDS = [
         "kisi eklemek", "kisi cikarmak", "kisi ekleme", "kisi cikarma",
-        "kisi sayisini", "bir kisi daha", "kisi daha eklemek"
+        "kisi sayisini", "bir kisi daha", "kisi daha eklemek",
+        "misafir cikarma", "misafir ekleme", "yolcu ilavesi", "yolcu ekle",
+        "yolcu cikar", "kisi sayisi guncelle", "kisi dahil edilmesi"
     ]
 
     NOTE_ADD_TOPIC_KEYWORDS = ["not"]
+    # Not: bare "guncelle" KASITLI OLARAK burada YOK -- "not" (topic) cok
+    # genel oldugu icin, alakasiz bir mailde "Ödeme bilgilerimi güncellememi
+    # rica ederim, lütfen not edin." gibi ("not edin" = "lutfen dikkate
+    # alin" deyimi, rezervasyon notu degil) cumleler yanlislikla yakalaniyordu
+    # (denendi, canliya gitmeden yakalandi). "notu güncelleme"/"not
+    # güncellemesi" GIBI, "not" kelimesiyle DOGRUDAN BAGLANTILI compound
+    # ifadeler kullaniliyor.
     NOTE_ADD_EVENT_KEYWORDS = [
-        "eklemek", "eklenmesini", "ekleyebilir", "dusurebilir", "dusmek", "ozel not"
+        "eklemek", "eklenmesini", "ekleyebilir", "dusurebilir", "dusmek",
+        "ozel not", "ekleme", "dusul", "not guncelle", "notu guncelle",
+        "notunun guncellenmesi"
     ]
 
     ROOM_TYPE_TOPIC_KEYWORDS = [
@@ -490,6 +508,26 @@ class EmailCategorizer:
     ]
 
     ROOM_TOPIC_KEYWORDS = ["oda", "odami", "odamizi", "odamiz"]
+    # Genis oda konfigurasyonu sinyalleri -- "oda tipi" kelimesi bunlarla
+    # BIRLIKTE geciyorsa (yani talep sadece tip degil, kisi dagilimi/yatak
+    # tercihi/konfigurasyon gibi BASKA oda unsurlarini da kapsiyorsa), dar
+    # "Oda Tipi Değişikliği" (546) yerine genis "Oda" (545) dalina
+    # yonlendirilmesi gerekiyor (kullanici tarafindan revize edildi).
+    ROOM_CONFIG_TOPIC_KEYWORDS = [
+        "konfigurasyon", "kisi dagilim", "yatak tercihi", "yatak tipi",
+        "misafir dagilim", "kisi sayisi"
+    ]
+    # Not: ROOM_CONFIG_TOPIC_KEYWORDS'un TAMAMI, "Oda" (545) dalinin TOPIC
+    # KAPISI olarak (bare "oda" kelimesi HIC gecmese bile) kullanilamaz --
+    # "kisi dagilim"/"kisi sayisi"/"misafir dagilim" tek basina genellikle
+    # Kişi Ekleme/Çıkarma kırılımına ait ("Kişi sayısı güncellemesi" gibi,
+    # kullanici tarafindan bildirildi). Sadece GERCEKTEN oda-spesifik olan
+    # ("yatak tercihi"/"yatak tipi"/"oda konfigurasyon") bare "oda" olmadan
+    # da yeterli sayilir; digerleri SADECE bare "oda" ile BIRLIKTE (is_broad_room_config
+    # + ROOM_TOPIC_KEYWORDS ikisi birden) veya 546-geri-cekilme kontrolunde kullanilir.
+    ROOM_CONFIG_STANDALONE_TOPIC_KEYWORDS = [
+        "yatak tercihi", "yatak tipi", "konfigurasyon"
+    ]
 
     HOTEL_CHANGE_TOPIC_KEYWORDS = [
         "otel degisikligi", "baska otele", "baska bir otele", "otelimi degistirmek",
@@ -929,7 +967,19 @@ class EmailCategorizer:
         # Not: Musteri onayli oncelik sirasi -- DEGISIKLIK_HAKKI_SORGULAMA (ceza/
         # degisiklik hakki gecen mailler) > OTOBUS (otobus/peron/koltuk gecen
         # mailler) > BILET (genel bilet/PNR/e-bilet bilgilendirme talepleri).
-        if any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_CHANGE_RIGHTS_KEYWORDS):
+        # Not: bare "transfer" (TRANSPORT_CHANGE_RIGHTS_KEYWORDS) somut bir Ek
+        # Hizmet (transfer/balayi/arac kiralama) talebiyle CAKISIRSA geri
+        # cekilir -- aksi halde "daha önce eklenen transfer hizmetinin saat ve
+        # detaylarında değişiklik yapılması" gibi bir talep, bare "transfer"
+        # kelimesi yuzunden yanlislikla bu bilgi-istek dalina dusuyordu
+        # (kullanici tarafindan bildirildi).
+        is_extra_service_change = any(
+            keyword in normalized_text for keyword in EmailCategorizer.EXTRA_SERVICES_TOPIC_KEYWORDS
+        )
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_CHANGE_RIGHTS_KEYWORDS)
+            and not is_extra_service_change
+        ):
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
@@ -1734,9 +1784,18 @@ class EmailCategorizer:
 
         # Not: "oda tipi" kontrolü, salt "oda" kontrolünden ÖNCE yapılıyor;
         # aksi halde "oda tipi değişikliği" metni de ODA dalına düşebilirdi.
+        # ANCAK: mail SADECE tip degil, ROOM_CONFIG_TOPIC_KEYWORDS ile ifade
+        # edilen BASKA oda unsurlarini da (kisi dagilimi, yatak tercihi,
+        # konfigurasyon vb.) kapsiyorsa, dar "Oda Tipi Değişikliği" yerine
+        # genis "Oda" (545) dalina birakiliyor -- "sadece 'oda tipi'
+        # kelimesine takılıp kalmayacak" (kullanici tarafindan revize edildi).
+        is_broad_room_config = any(
+            keyword in normalized_text for keyword in EmailCategorizer.ROOM_CONFIG_TOPIC_KEYWORDS
+        )
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_TYPE_TOPIC_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+            and not is_broad_room_config
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -1753,8 +1812,20 @@ class EmailCategorizer:
             }
 
         if (
-            any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+            (
+                any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_TOPIC_KEYWORDS)
+                or any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_CONFIG_STANDALONE_TOPIC_KEYWORDS)
+            )
+            and (
+                any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+                # Not: "oda yükseltme (upgrade)" -- "yukselt" CHANGE_INTENT_KEYWORDS'te
+                # yok (baska hicbir Degisiklik dalinda kullanilmadigi icin
+                # sadece burada, dar kapsamda eklendi), kullanici tarafindan
+                # bildirildi.
+                or "yukselt" in normalized_text
+                or "degisim" in normalized_text
+                or EmailCategorizer.CHANGE_REQUEST_NOUN_PATTERN.search(normalized_text)
+            )
         ):
             return {
                 "channel_id": CHANNEL_ID,

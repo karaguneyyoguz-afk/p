@@ -624,11 +624,149 @@ check("Degisiklik-KisiEkleCikar", r["classification"] == "BACKOFFICE_ISLEMLERI >
 r = cat("", "Rezervasyonuma not eklemek istiyorum.")
 check("Degisiklik-NotEkleme", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > NOT_EKLEME_TALEBI", r["classification"])
 
+# --- EK HIZMETLER (541) genisletme: bare "transfer" (TRANSPORT_CHANGE_RIGHTS_KEYWORDS)
+# somut bir Ek Hizmet talebini engelliyordu (kullanici tarafindan bildirildi).
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuz kapsamında daha önce "
+    "eklenen transfer hizmetinin saat ve detaylarında değişiklik yapılması "
+    "hususunda işlemlerin gerçekleştirilmesini rica ederim.",
+)
+check(
+    "Degisiklik-EkHizmetler-2 (ONAYLI): 'transfer hizmetinin ... değişiklik' -> bare 'transfer' engeli asilmali",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER",
+    r["classification"],
+)
+
+r = cat("", "Transfer ekleme/çıkarma talebimiz var.")
+check("Degisiklik-EkHizmetler-3: 'transfer ekleme/çıkarma'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER", r["classification"])
+
+r = cat("", "Balayı konsepti güncellemesi yapılmasını rica ederiz.")
+check("Degisiklik-EkHizmetler-4: 'balayı konsepti güncellemesi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER", r["classification"])
+
+r = cat("", "Araç kiralama revizyonu yapılmasını rica ederiz.")
+check("Degisiklik-EkHizmetler-5: 'araç kiralama revizyonu'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER", r["classification"])
+
+# Koruma: bare "balayi" (Not Ekleme Talebi'ne ait "balayı notu" gibi) hala
+# yanlislikla EK_HIZMETLER'e dusmemeli (Gercekci-26'da yakalandi).
+r = cat("", "Otel tarafına iletilmek üzere rezervasyonumuza balayı notu düşürebilir misiniz?")
+check(
+    "Degisiklik-EkHizmetler-Koruma: 'balayı notu' (Not Ekleme'ye ait) EK_HIZMETLER'e dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER",
+    r["classification"],
+)
+
+# --- KISI EKLEME/CIKARMA (543) genisletme ---
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuza ek olarak 1 yetişkin "
+    "misafirin daha dahil edilmesi (kişi ekleme) hususunda backoffice "
+    "işlemlerinin yapılmasını rica ederim.",
+)
+check(
+    "Degisiklik-KisiEkleCikar-2 (ONAYLI): '1 yetişkin misafirin dahil edilmesi (kişi ekleme)'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > KISI_EKLEME_CIKARMA",
+    r["classification"],
+)
+
+r = cat("", "Misafir çıkarma talebimiz var.")
+check("Degisiklik-KisiEkleCikar-3: 'misafir çıkarma'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > KISI_EKLEME_CIKARMA", r["classification"])
+
+r = cat("", "Yolcu ilavesi yapılmasını rica ederiz.")
+check("Degisiklik-KisiEkleCikar-4: 'yolcu ilavesi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > KISI_EKLEME_CIKARMA", r["classification"])
+
+r = cat("", "Kişi sayısı güncellemesi yapılmasını rica ederiz.")
+check("Degisiklik-KisiEkleCikar-5: 'kişi sayısı güncellemesi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > KISI_EKLEME_CIKARMA", r["classification"])
+
+# --- NOT EKLEME TALEBI (544) genisletme ---
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzun detaylarına otel için "
+    "geçerli olmak üzere 'yüksek kat ve sessiz oda' tercihine dair not "
+    "ekleme talebimizin işleme alınmasını rica ederim.",
+)
+check(
+    "Degisiklik-NotEkleme-2 (ONAYLI): 'yüksek kat ve sessiz oda tercihine dair not ekleme'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > NOT_EKLEME_TALEBI",
+    r["classification"],
+)
+
+r = cat("", "Otel için bilgilendirme notu düşülmesini rica ederiz.")
+check("Degisiklik-NotEkleme-3: 'bilgilendirme notu düşülmesi' (pasif 'dusul')", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > NOT_EKLEME_TALEBI", r["classification"])
+
+r = cat("", "Konaklama notu güncellemesi yapılmasını rica ederiz.")
+check("Degisiklik-NotEkleme-4: 'konaklama notu güncellemesi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > NOT_EKLEME_TALEBI", r["classification"])
+
+# Koruma: bare "guncelle" (not ile ilgisiz) NOT_EKLEME_TALEBI'ne dusmemeli --
+# "not edin" (= "lütfen dikkate alın" deyimi) rezervasyon notu talebi degil.
+r = cat("", "Ödeme bilgilerimi güncellememi rica ederim, lütfen not edin.")
+check(
+    "Degisiklik-NotEkleme-Koruma: 'not edin' deyimi (odeme guncellemesi ile ilgisiz) NOT_EKLEME_TALEBI'ne dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > NOT_EKLEME_TALEBI",
+    r["classification"],
+)
+
 r = cat("", "Oda tipi değişikliği yapmak istiyorum.")
 check("Degisiklik-OdaTipi", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA_TIPI_DEGISIKLIGI", r["classification"])
 
 r = cat("", "Oda değişikliği istiyorum, farklı bir oda istiyorum.")
 check("Degisiklik-Oda", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+# Not: "oda tipi" gecen mailler KASITLI OLARAK bu genel "Oda" (545) dalina
+# degil, ayri/daha spesifik "Oda Tipi Değişikliği" (546) dalina gidiyor --
+# kullanici ile netlestirildi, mevcut davranis (546) korunuyor. "Oda" (545)
+# dalı, tip DISINDAKI genel oda degisikliklerini (sayi/ozellik/upgrade) kapsar.
+r = cat("", "İyi günler, 553044193 numaralı rezervasyonumuzdaki oda tipinin değiştirilmesi hususunda işlemlerin yapılmasını rica ederim.")
+check(
+    "Degisiklik-Oda-Koruma: 'oda tipinin değiştirilmesi' Oda Tipi Değişikliği'nde (546) kalmali, 'Oda'ya (545) dusmemeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA_TIPI_DEGISIKLIGI",
+    r["classification"],
+)
+
+r = cat("", "Standart odadan süite geçiş yapmak istiyoruz.")
+check("Degisiklik-Oda-2: 'standart odadan süite geçiş'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+r = cat("", "Oda yükseltme (upgrade) talep ediyoruz.")
+check("Degisiklik-Oda-3: 'oda yükseltme (upgrade)' (yeni 'yukselt' sinyali)", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+r = cat("", "Rezervasyondaki odayı güncellemek istiyoruz.")
+check("Degisiklik-Oda-4: 'rezervasyondaki odayı güncelleme'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+# --- REVIZE KURAL: "oda tipi" ARTIK TEK BASINA yeterli degil dar 546'ya
+# gitmek icin -- eger ROOM_CONFIG_TOPIC_KEYWORDS (konfigurasyon/kisi
+# dagilimi/yatak tercihi vb.) ile BIRLIKTE geciyorsa, genis "Oda" (545)
+# dalina birakiliyor (kullanici tarafindan revize edildi: "sadece 'oda tipi'
+# kelimesine takılıp kalmayacak").
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzdaki oda konfigürasyonu, "
+    "oda tipi ve odada konaklayacak misafir/kişi dağılımı ile ilgili "
+    "değişikliklerin yapılması hususunda işlemlerin gerçekleştirilmesini "
+    "rica ederim.",
+)
+check(
+    "Degisiklik-Oda-5 (ONAYLI): 'oda tipi' + 'konfigürasyon' + 'kişi dağılımı' birlikte -> genis Oda (545)'ye gitmeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA",
+    r["classification"],
+)
+
+r = cat("", "Odadaki kişi sayısı değişimi yapılmasını rica ederiz.")
+check("Degisiklik-Oda-6: 'odadaki kişi sayısı değişimi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+r = cat("", "Yatak tercihi güncellemesi yapılmasını rica ederiz.")
+check("Degisiklik-Oda-7: 'yatak tercihi güncellemesi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+r = cat("", "Oda konfigürasyonu ile ilgili değişiklik yapılmasını rica ederiz.")
+check("Degisiklik-Oda-8: bare 'oda konfigürasyonu'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+# Koruma: SAF/dar "oda tipi" (baska hicbir konfigurasyon unsuru olmadan) hala
+# dogru sekilde 546'da (Oda Tipi Değişikliği) kalmali.
+r = cat("", "Oda tipini değiştirmek istiyoruz.")
+check(
+    "Degisiklik-Oda-Koruma-2: saf/dar 'oda tipi' (baska unsur yok) hala ODA_TIPI_DEGISIKLIGI'nde (546) kalmali",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA_TIPI_DEGISIKLIGI",
+    r["classification"],
+)
 
 r = cat("", "Otel değişikliği istiyorum, başka otele geçmek istiyorum.")
 check("Degisiklik-Otel", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > OTEL_DEGISIKLIGI", r["classification"])
@@ -1670,7 +1808,7 @@ check(
 # hala basarisiz -- bu, otobus/transfer icerigi ayrica konusulup karara
 # baglanana kadar boyle kalacak.
 # ==========================================================
-KNOWN_ISSUE_SCENARIOS = {15, 23}
+KNOWN_ISSUE_SCENARIOS = {15}
 
 REALISTIC_SCENARIOS = [
     (9, "BILGI_ISTEK > ULASIM > BILET", "Merhaba, yarınki uçuşumuza ait e-biletimiz hala mail kutumuza düşmedi, tekrar gönderebilir misiniz?"),
