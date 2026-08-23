@@ -16,11 +16,14 @@ if sys.stderr.encoding and sys.stderr.encoding.lower() != "utf-8":
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from mail_processor import (
-    EmailProcessor, EmailCategorizer, send_notification_email, 
-    send_ticket_confirmation_email, send_rejection_email, 
-    send_missing_fields_email
+    EmailProcessor, EmailCategorizer, send_notification_email,
+    send_ticket_confirmation_email, send_rejection_email,
+    send_missing_fields_email, send_vendor_redirect_email
 )
-from validators import contains_profanity, extract_reservation_number, detect_priority_level
+from validators import (
+    contains_profanity, extract_reservation_number, detect_priority_level,
+    is_vendor_finance_correspondence
+)
 from csm_api import CSMAPIClient, TicketPayloadBuilder
 from utils import clean_subject_line, clean_mailto_artifacts
 from logging_utils import record_mail_event
@@ -71,7 +74,28 @@ def process_email(
         return
     
     print("✅ SONUÇ: İçerik temiz.")
-    
+
+    # Otel/tedarikci muhasebe birimlerinin gonderdigi ekstre/mutabakat/cari
+    # hesap yazismalari -- bu kutunun ilgilenmedigi bir konu, ticket
+    # OLUSTURULMAZ, sadece dogru adreslere yonlendirme maili gonderilir
+    # (kullanici tarafindan bildirildi).
+    if is_vendor_finance_correspondence(f"{clean_subject} {body}"):
+        print("↪️ SONUÇ: B2B muhasebe yazışması (ekstre/mutabakat/cari hesap) tespit edildi.")
+        print("↪️ Ticket oluşturulmadı, yönlendirme maili gönderiliyor.")
+
+        send_vendor_redirect_email(sender_email, subject, sender_name)
+        record_mail_event(
+            event="email_processed",
+            status="redirected",
+            sender_email=sender_email,
+            subject=subject,
+            reason="B2B muhasebe yazışması (ekstre/mutabakat/cari hesap) -- ticket oluşturulmadı",
+            classification="vendor_finance_redirect",
+            mail_body=body,
+        )
+        print("-" * 50 + "\n")
+        return
+
     # Categorize email
     categorization = categorizer.categorize(clean_subject, body, sender_email)
     print(f"📌 Sınıflandırma: {categorization['classification']}")

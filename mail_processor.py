@@ -62,6 +62,10 @@ from config import (
     SUB_CATEGORY_PAYMENT_COMPLAINT_BANK_OBJECTION, SUB_CATEGORY_PAYMENT_COMPLAINT_OVERCHARGE,
     SUB_CATEGORY_PAYMENT_COMPLAINT_CAMPAIGN, SUB_CATEGORY_PAYMENT_COMPLAINT_REFLECTION,
     SUB_CATEGORY_PAYMENT_COMPLAINT_PROVISION,
+    SUB_CATEGORY_ONLINE_OPERATIONS_COMPLAINT, SUB_CATEGORY_MOBILE_APP_COMPLAINT,
+    SUB_CATEGORY_WEBSITE_COMPLAINT,
+    SUB_CATEGORY_CANCELLATION_HEALTH_ISSUE, SUB_CATEGORY_CANCELLATION_SPECIAL_REASON,
+    SUB_CATEGORY_CANCELLATION_FORCE_MAJEURE, SUB_CATEGORY_CANCELLATION_HOTEL_REVIEWS,
     MAIL_CHARSET_DEFAULT,
     MAIL_CHARSET_FALLBACK
 )
@@ -459,26 +463,51 @@ class EmailCategorizer:
 
     BIRTH_DATE_TOPIC_KEYWORDS = ["dogum tarihi"]
 
+    # Not: bare "balayi" KASITLI OLARAK YOK -- "rezervasyonumuza balayı notu
+    # düşürebilir misiniz?" gibi aslinda Not Ekleme Talebi'ne ait bir mail de
+    # "balayi" iceriyor, bare haliyle bu Ek Hizmetler dalina yanlislikla
+    # dusuyordu (Gercekci-26 testinde yakalandi). "balayi konsepti" gibi
+    # gercekten SERVIS/PAKET degisikligi ifade eden compound kalip kullanildi.
     EXTRA_SERVICES_TOPIC_KEYWORDS = [
-        "ek hizmet", "ekstra hizmet", "ekstra yatak", "transfer hizmeti"
+        "ek hizmet", "ekstra hizmet", "ekstra yatak", "transfer hizmeti",
+        "balayi konsepti", "balayi paketi", "arac kirala", "transfer ekleme",
+        "transfer cikarma", "transferi ekle", "transferi cikar"
     ]
 
     # Not: "adinda"/"adinin"/"isminde"/"isminin" gibi cekimli formlar da
     # eklendi (ör. "misafirin adında harf hatası", "adının güncellenmesi") --
     # bunlar "adres"/"adet" gibi kelimelerle CAKISMIYOR (ozel ek gerektiriyor).
+    # Not: bare "isim" kasitli olarak buradan CIKARILDI -- "değişim"/"değişimi"
+    # kelimesinin normalize hali ("degisim") tesadufen "isim" alt dizesini
+    # icerdigi icin ("deg-ISIM-i"), CHANGE_INTENT_KEYWORDS'e "degisim" eklenince
+    # "ulaşım firması değişimi" gibi alakasiz mailler yanlislikla ISIM_DEGISIKLIGI'ne
+    # dusuyordu (canli ortamda gozlemlendi). Asagida NAME_CHANGE_BARE_ISIM_PATTERN
+    # ile kelime siniri (\b) sarti eklenerek ayri kontrol ediliyor.
     NAME_CHANGE_TOPIC_KEYWORDS = [
-        "isim", "ad soyad", "soyadim", "adim yanlis",
+        "ad soyad", "soyadim", "adim yanlis",
         "adinda", "adinin", "isminde", "isminin"
     ]
+    NAME_CHANGE_BARE_ISIM_PATTERN = re.compile(r'\bisim\b', re.IGNORECASE)
 
     PERSON_ADD_REMOVE_TOPIC_KEYWORDS = [
         "kisi eklemek", "kisi cikarmak", "kisi ekleme", "kisi cikarma",
-        "kisi sayisini", "bir kisi daha", "kisi daha eklemek"
+        "kisi sayisini", "bir kisi daha", "kisi daha eklemek",
+        "misafir cikarma", "misafir ekleme", "yolcu ilavesi", "yolcu ekle",
+        "yolcu cikar", "kisi sayisi guncelle", "kisi dahil edilmesi"
     ]
 
     NOTE_ADD_TOPIC_KEYWORDS = ["not"]
+    # Not: bare "guncelle" KASITLI OLARAK burada YOK -- "not" (topic) cok
+    # genel oldugu icin, alakasiz bir mailde "Ödeme bilgilerimi güncellememi
+    # rica ederim, lütfen not edin." gibi ("not edin" = "lutfen dikkate
+    # alin" deyimi, rezervasyon notu degil) cumleler yanlislikla yakalaniyordu
+    # (denendi, canliya gitmeden yakalandi). "notu güncelleme"/"not
+    # güncellemesi" GIBI, "not" kelimesiyle DOGRUDAN BAGLANTILI compound
+    # ifadeler kullaniliyor.
     NOTE_ADD_EVENT_KEYWORDS = [
-        "eklemek", "eklenmesini", "ekleyebilir", "dusurebilir", "dusmek", "ozel not"
+        "eklemek", "eklenmesini", "ekleyebilir", "dusurebilir", "dusmek",
+        "ozel not", "ekleme", "dusul", "not guncelle", "notu guncelle",
+        "notunun guncellenmesi"
     ]
 
     ROOM_TYPE_TOPIC_KEYWORDS = [
@@ -486,6 +515,26 @@ class EmailCategorizer:
     ]
 
     ROOM_TOPIC_KEYWORDS = ["oda", "odami", "odamizi", "odamiz"]
+    # Genis oda konfigurasyonu sinyalleri -- "oda tipi" kelimesi bunlarla
+    # BIRLIKTE geciyorsa (yani talep sadece tip degil, kisi dagilimi/yatak
+    # tercihi/konfigurasyon gibi BASKA oda unsurlarini da kapsiyorsa), dar
+    # "Oda Tipi Değişikliği" (546) yerine genis "Oda" (545) dalina
+    # yonlendirilmesi gerekiyor (kullanici tarafindan revize edildi).
+    ROOM_CONFIG_TOPIC_KEYWORDS = [
+        "konfigurasyon", "kisi dagilim", "yatak tercihi", "yatak tipi",
+        "misafir dagilim", "kisi sayisi"
+    ]
+    # Not: ROOM_CONFIG_TOPIC_KEYWORDS'un TAMAMI, "Oda" (545) dalinin TOPIC
+    # KAPISI olarak (bare "oda" kelimesi HIC gecmese bile) kullanilamaz --
+    # "kisi dagilim"/"kisi sayisi"/"misafir dagilim" tek basina genellikle
+    # Kişi Ekleme/Çıkarma kırılımına ait ("Kişi sayısı güncellemesi" gibi,
+    # kullanici tarafindan bildirildi). Sadece GERCEKTEN oda-spesifik olan
+    # ("yatak tercihi"/"yatak tipi"/"oda konfigurasyon") bare "oda" olmadan
+    # da yeterli sayilir; digerleri SADECE bare "oda" ile BIRLIKTE (is_broad_room_config
+    # + ROOM_TOPIC_KEYWORDS ikisi birden) veya 546-geri-cekilme kontrolunde kullanilir.
+    ROOM_CONFIG_STANDALONE_TOPIC_KEYWORDS = [
+        "yatak tercihi", "yatak tipi", "konfigurasyon"
+    ]
 
     HOTEL_CHANGE_TOPIC_KEYWORDS = [
         "otel degisikligi", "baska otele", "baska bir otele", "otelimi degistirmek",
@@ -513,29 +562,102 @@ class EmailCategorizer:
     TRANSPORT_MODE_CHANGE_TOPIC_KEYWORDS = [
         "ulasim degisikligi", "ulasim tipimi", "ucakla gitmek yerine", "otobusle gitmek yerine"
     ]
+    # "ulasim"/"ucak bileti"/"otobus bileti" gibi genel bir nesne tek basina COK
+    # GENEL (bilgi-istek Otobus/Bilet dallariyla cakisir), bu yuzden
+    # CHANGE_INTENT_KEYWORDS ile ESLESTIRILEREK kullanilir, tek basina
+    # tetiklenmez.
+    TRANSPORT_MODE_TOPIC_KEYWORDS_PAIRED = [
+        "ulasim", "ucak bileti", "otobus bileti", "sefer saati",
+        "ulasim firmasi", "ucak saat"
+    ]
+    # Not: bare "degisikli" (CHANGE_INTENT_KEYWORDS icinde) kasitli olarak
+    # BURADA kullanilmiyor -- "Otobüs seferi saatinde bir değişiklik var mı
+    # acaba?" gibi SAF SORU cumleleri de "degisiklik" NOUN'unu icerdigi icin,
+    # tam CHANGE_INTENT_KEYWORDS ile eslesince somut bir talep sanilip
+    # Otobus-4 (ONAYLI) gibi mevcut bilgi-istek senaryolarini bozuyordu (canli
+    # denemede yakalandi). Sadece daha guclu, eylem-fiili agirlikli sinyaller
+    # kullanilir; hedeflenen 5 senaryonun hepsi zaten bunlardan birini iceriyor.
+    TRANSPORT_MODE_STRONG_INTENT_KEYWORDS = [
+        "degistir", "guncelle", "revizyon", "revize", "duzenle"
+    ]
 
+    # Not: "ucak bileti\w*" yerine sadece "ucak bilet" koku kullanildi -- eski
+    # liste sadece tekil iyelik eklerini ("biletim","biletimiz") kapsiyordu,
+    # "uçak biletlerimizin" gibi COGUL formlar ("bilet"+"ler"+"imiz"+"in")
+    # kacyordu (kullanici tarafindan bildirildi). "ucus"/"pnr"/"havayolu"/
+    # "ucak seferi" de eklendi.
     AIRPLANE_TICKET_TOPIC_KEYWORDS = [
-        "ucak bileti", "ucak biletim", "ucak biletimiz", "ucak biletimizdeki"
+        "ucak bilet", "ucus", "pnr", "havayolu", "ucak seferi"
     ]
+    # "degisikli" (CHANGE_INTENT_KEYWORDS'teki NOUN stemi) tek basina cok
+    # belirsiz -- "değişiklik hakkımız VAR MI" (soru) ile "değişikliği
+    # İSTİYORUM"/"değişikliği için ... yapılmasını RİCA ederim" (somut talep)
+    # ayni koku paylasiyor. Ayirt edici sinyal: "degisikli" kelimesinden
+    # sonra, ayni cumle icinde (nokta/unlem/soru isaretine kadar, en fazla
+    # ~45 karakter icinde) "isti" (istiyorum/istiyoruz) veya "rica"
+    # (rica ederim/ederiz) gecmesi -- sorularda "isti" cok daha UZAKTA
+    # ("hakkımız var mı ... öğrenmek istiyorum" gibi araya giren baska bir
+    # cumlecikte) gecmeye egilimli (canli ortamda olcduk: 40 vs 69 karakter).
+    CHANGE_REQUEST_NOUN_PATTERN = re.compile(r'degisikli\w*[^.!?]{0,45}(?:isti|rica)', re.IGNORECASE)
+    # Aynı mantik "iptal"/"iade" NOUN'lari icin: "iptal EDİLMESİ hususunda ...
+    # RİCA ederim" veya "bilet iadesi için ... RİCA ederiz" gibi CANCEL_INTENT_KEYWORDS'un
+    # (iptal etmek/edebilir/ediyoruz/talebi vb.) kapsamadigi cekimler
+    # (kullanici tarafindan bildirildi). "yapar mı(sınız)"/"eder mi(siniz)"
+    # de -- Turkce'de cok yaygin bir KIBAR TALEP sorusu formu ("X yapar
+    # mısınız?" = "lutfen X yapin") -- gercek bir soru degil, talep sayilir.
+    # Her kullanildigi yerde SADECE ilgili konu listesiyle (AIRPLANE_TICKET_TOPIC_KEYWORDS,
+    # ROOM_TOPIC_KEYWORDS, vb.) ESLESTIRILEREK kullanilir, boylece "İptal
+    # ettiğim rezervasyonun iadesi ne zaman yapılır" gibi GECMISE DONUK
+    # bilgi-istek metinleriyle cakismiyor (topic + 50 karakterlik dar pencere
+    # zaten yeterince ayirt ediyor).
+    CANCEL_REQUEST_NOUN_PATTERN = re.compile(
+        r'(?:iptal|iade)\w*[^.!?]{0,50}(?:isti|rica|yapar\s*m[iı]s|eder\s*m[iı]s)',
+        re.IGNORECASE
+    )
 
+    # Not: bare "sigorta" da eklendi -- "sigorta poliçesi iptal talebi" gibi
+    # ifadeler "iptal sigortasi"/"seyahat sigortasi" kaliplarina uymuyor
+    # (kullanici tarafindan bildirildi). Bare "sigorta" burada guvenli --
+    # bu liste HER ZAMAN CANCEL_INTENT_KEYWORDS/CANCEL_REQUEST_NOUN_PATTERN
+    # ile ESLESTIRILEREK kullaniliyor.
     CANCELLATION_INSURANCE_TOPIC_KEYWORDS = [
-        "iptal sigortasi", "seyahat sigortasi"
+        "iptal sigortasi", "seyahat sigortasi", "sigorta"
     ]
 
+    # Not: "kaydirildi" (PASIF, "rezervasyonumuz kaydırıldı") eksikti -- eski
+    # liste sadece "kaydirildik" (biz+pasif) kapsiyordu, "kaydirdi" (aktif,
+    # "farkli koku") "kaydirildi"yi (araya giren "il" pasif eki yuzunden)
+    # KAPSAMIYOR (kullanici tarafindan bildirilen ornekte gozlemlendi).
     SHIFT_EVENT_KEYWORDS = [
-        "kaydirdi", "kaydirma", "kaydirildik", "kaydirilmis", "kaydirmis",
-        "overbooking"
+        "kaydirdi", "kaydirildi", "kaydirma", "kaydirildik", "kaydirilmis",
+        "kaydirmis", "overbooking"
     ]
     SHIFT_HOTEL_BASED_TOPIC_KEYWORDS = ["otel"]
     SHIFT_OPERATION_BASED_TOPIC_KEYWORDS = ["operasyon"]
 
+    # Not: "kalan tutar"/"borc"/"odeme link" eklendi -- eski liste sadece
+    # "bakiye" iceren ifadeleri kapsiyordu, "kalan tutarı tahsil etme"/
+    # "rezervasyon borcunu ödeme"/"kalan ödeme linki" gibi ifadeler kacyordu
+    # (kullanici tarafindan bildirildi).
     PAYMENT_COMPLETION_TOPIC_KEYWORDS = [
-        "bakiye", "kalan bakiye", "eksik odeme", "kalan odeme"
+        "bakiye", "kalan bakiye", "eksik odeme", "kalan odeme", "kalan tutar",
+        "borc", "odeme link"
     ]
+    # "Ödemeyi tamamlamak istiyoruz" gibi, bare "odeme" ile "tamamla" fiilinin
+    # BIRLIKTE (ama farkli ek/cekimlerle) gectigi durumlar icin -- bare
+    # "odeme" tek basina TOPIC listesine eklenemez (cok genel, diger
+    # onlarca dalla cakisir), bu yuzden "tamamla" fiiliyle YAKINLIK sarti
+    # tasiyan bu regex kendi kendine yeterli (self-sufficient) sayilir.
+    PAYMENT_COMPLETION_PATTERN = re.compile(r'odeme\w*\s+tamamla', re.IGNORECASE)
 
+    # Not: eski liste tamamen SABIT/UZUN kaliplardan olustugu icin ("tamamlamak
+    # istiyoruz" gibi) gercek musteri mailerindeki dogal varyasyonlarin
+    # (ör. "tamamlamak ve ... rica ederim", "kapatmak istiyoruz", "tahsil
+    # etmenizi rica ederiz") HICBIRINI yakalamiyordu. Stem'lere cevrildi --
+    # PAYMENT_COMPLETION_TOPIC_KEYWORDS ile ESLESTIRILEREK kullanildigi icin
+    # bare "isti"/"rica" burada guvenli (topic zaten yeterince spesifik).
     PAYMENT_COMPLETION_INTENT_KEYWORDS = [
-        "tamamlamak istiyoruz", "tamamlamak istiyorum", "odemesi yapmak istiyorum",
-        "simdi tamamlamak", "tamamlayabilir miyiz"
+        "tamamla", "kapat", "tahsil", "isti", "rica"
     ]
 
     # ==========================================
@@ -570,7 +692,8 @@ class EmailCategorizer:
     # ==========================================
     RESERVATION_CHANGE_INFO_KEYWORDS = [
         "degisiklik yapabilir miyim", "degisiklik yapilabilir mi",
-        "degisiklik hakkinda bilgi almak istiyorum", "nasil degisiklik yapabilirim"
+        "degisiklik hakkinda bilgi almak istiyorum", "nasil degisiklik yapabilirim",
+        "degisiklik sartlari", "degisiklik ucreti"
     ]
 
     RESERVATION_CANCELLATION_INFO_TOPIC_KEYWORDS = ["iptal"]
@@ -583,7 +706,8 @@ class EmailCategorizer:
     ]
 
     RESERVATION_CONFIRMATION_INFO_EVENT_KEYWORDS = [
-        "nedir", "ne zaman", "sure", "ulasir"
+        "nedir", "ne zaman", "sure", "ulasir", "ogrenmek", "onayladi mi",
+        "onaylanip", "onay bilgisi"
     ]
 
     # ==========================================
@@ -602,7 +726,9 @@ class EmailCategorizer:
     # birlikte arandigi icin gercek musteri ifadelerine cok daha dayanikli.
     # ==========================================
     HOTEL_OPERATION_TOPIC_KEYWORDS = [
-        "resepsiyon", "check-in", "checkin", "check-out", "checkout", "otelin operasyon"
+        "resepsiyon", "check-in", "checkin", "check-out", "checkout",
+        "otelin operasyon", "otel operasyon", "personel ilgisiz",
+        "otel yonetim", "kotu karsilama"
     ]
 
     HOTEL_SERVICES_TOPIC_KEYWORDS = [
@@ -615,8 +741,13 @@ class EmailCategorizer:
         "haber verilmeden", "habersiz"
     ]
 
+    # Not: "ucus saat" (sonundaki "i" olmadan) eklendi -- eski liste sadece
+    # tekil iyelik eklerini ("saati","saatimiz") kapsiyordu, "uçuş
+    # saatlerinin" gibi COGUL formlar kaciyordu (kullanici tarafindan
+    # bildirilen ticket #101939947'de gozlemlendi). "saatlerin birbirine
+    # uymamasi" da eklendi.
     FLIGHT_TIME_TOPIC_KEYWORDS = [
-        "ucus saati", "sefer saati", "kalkis saati", "ucus saatimiz"
+        "ucus saat", "sefer saat", "kalkis saat", "saatlerin birbirine"
     ]
     FLIGHT_TIME_EVENT_KEYWORDS = [
         "degisti", "degistirildi", "habersiz", "erteledi", "one alindi"
@@ -639,7 +770,16 @@ class EmailCategorizer:
         "hatta bekletil"
     ]
 
-    TOUR_TOPIC_KEYWORDS = ["tur program", "tur organizasyon"]
+    # Not: "rota"/"vaat edilen yer"/"tur hizmet" eklendi -- eski liste sadece
+    # bare "tur" kelimesiyle baslayan iki kalibi ("tur program"/"tur
+    # organizasyon") kapsiyordu, "Vaat edilen yerler gezilmedi"/"Rota
+    # değiştirildi"/"Tur hizmetinden şikayetçiyiz" gibi ifadeler "tur"
+    # kelimesini hic icermeyebiliyor veya farkli bir kalip kullaniyordu
+    # (kullanici tarafindan bildirildi).
+    TOUR_TOPIC_KEYWORDS = [
+        "tur program", "tur organizasyon", "tur hizmet", "rota",
+        "vaat edilen yer", "planlanan yer"
+    ]
 
     GUIDE_COMPLAINT_TOPIC_KEYWORDS = ["rehber"]
 
@@ -663,22 +803,61 @@ class EmailCategorizer:
     ]
 
     BEST_PRICE_GUARANTEE_TOPIC_KEYWORDS = [
-        "fiyat garantisi", "daha ucuz gordum", "baska sitede ucuz"
+        "fiyat garantisi", "daha ucuz gordum", "baska sitede ucuz",
+        "daha ucuz bulduk", "es deger fiyat"
     ]
 
+    # Not: "fiyat dusus" (noun, "düşüşü") eklendi -- eski liste sadece "fiyat
+    # dustu"/"fiyati dustu" (fiil) kapsiyordu. "ucuzladi"/"geriledi" de
+    # eklendi (kullanici tarafindan bildirildi).
     PRICE_DROP_TOPIC_KEYWORDS = [
-        "fiyat dustu", "fiyati dustu"
+        "fiyat dustu", "fiyati dustu", "fiyat dusus", "ucuzladi", "geriledi",
+        "indirim farki"
     ]
 
-    PAYMENT_OBJECTION_TOPIC_KEYWORDS = ["odeme", "tutar", "kart"]
+    # Not: "fatura fiyati" eklendi -- "Fatura fiyatı uyumsuzluğu" gibi
+    # ifadeler bare "fatura" kelimesi yuzunden yanlislikla FATURA sikayet
+    # dalina dusuyordu (asagida is_price_payment_objection korumasi ile).
+    PAYMENT_OBJECTION_TOPIC_KEYWORDS = ["odeme", "tutar", "kart", "fatura fiyati", "ucret"]
+    # Not: bare "cekilmesi" KASITLI OLARAK YOK -- "ödeme çekilmesine rağmen
+    # tutar sisteminize yansımadı" gibi TAMAMEN FARKLI bir kirilima
+    # (ODEMENIN_YANSIMAMASI) ait mailler de "cekilmesi" iceriyor, bare
+    # haliyle Odeme-2/Odeme-3 testlerini bozuyordu (denendi, geri alindi).
+    # "yanlis ucret" gibi spesifik compound kalip kullanildi.
     PAYMENT_OBJECTION_EVENT_KEYWORDS = [
-        "itiraz", "fazla cekildi", "yanlis tutar", "fazla odeme"
+        "itiraz", "fazla cekildi", "yanlis tutar", "fazla odeme",
+        "hatali tutar", "yansitilmasi", "uyumsuz", "yanlis ucret"
     ]
 
-    PRICE_GENERAL_TOPIC_KEYWORDS = ["fiyat"]
+    PRICE_GENERAL_TOPIC_KEYWORDS = ["fiyat", "ucret"]
+    # Not: eski EVENT listesi SADECE tutarsizlik/uyusmazlik tespitine
+    # odakliydi ("tutmuyor"/"uyusmuyor" vb.); kullanici bu dali "joker fiyat
+    # sikayeti" (genel memnuniyetsizlik/yuksek fiyat) olarak revize etti --
+    # COMPLAINT_SENTIMENT_KEYWORDS de ayri bir alternatif olarak eklendi.
     PRICE_GENERAL_EVENT_KEYWORDS = [
-        "tutmuyor", "uyusmuyor", "farkli gosteriliyor", "yanlis hesaplanmis", "hatali gosterilmis"
+        "tutmuyor", "uyusmuyor", "farkli gosteriliyor", "yanlis hesaplanmis",
+        "hatali gosterilmis", "cok yuksek"
     ]
+
+    # --- SIKAYET > ONLINE_ISLEMLER (3 kirilim) ---
+    # Not: oncelik sirasi (musteri onayli) -- MOBIL_UYGULAMA > WEB_SITESI >
+    # ONLINE_ISLEMLER (genel/platform belirtilmeyen). Bare "site" KASITLI
+    # OLARAK YOK -- cok kisa/genel bir alt dize, "web sitesi"/"internet
+    # sitesi" gibi compound kaliplar kullanildi.
+    MOBILE_APP_TOPIC_KEYWORDS = ["mobil", "uygulama", " app "]
+    WEBSITE_TOPIC_KEYWORDS = ["web sitesi", "internet sitesi", "site ac", "site don"]
+    ONLINE_OPERATIONS_COMPLAINT_TOPIC_KEYWORDS = ["online islem"]
+    ONLINE_OPERATIONS_COMPLAINT_EVENT_KEYWORDS = [
+        "sistem hata", "islem yapamiyoruz", "islem yapamiyorum", "dijital hata"
+    ]
+
+    # --- SIKAYET > IPTAL (sebep bazli, 4 kirilim) ---
+    CANCELLATION_HEALTH_TOPIC_KEYWORDS = [
+        "saglik problem", "hastane", "hastalik", "saglik rapor", "rahatsizlik"
+    ]
+    CANCELLATION_FORCE_MAJEURE_TOPIC_KEYWORDS = ["mucbir sebep", "dogal afet"]
+    CANCELLATION_SPECIAL_REASON_TOPIC_KEYWORDS = ["ozel sebep", "ozel mazeret"]
+    CANCELLATION_HOTEL_REVIEWS_TOPIC_KEYWORDS = ["otel yorum", "yanilti", "gercek disi puan"]
 
     PAYMENT_OBJECTION_KEYWORDS = [
         "odemeye itiraz ediyorum", "yanlis tutar cekildi", "fazla odeme yapildi", "odeme itirazi"
@@ -709,7 +888,10 @@ class EmailCategorizer:
         # değerlendirilmeli.
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.AIRPLANE_TICKET_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+            and (
+                any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+                or EmailCategorizer.CANCEL_REQUEST_NOUN_PATTERN.search(normalized_text)
+            )
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -725,9 +907,31 @@ class EmailCategorizer:
                 "classification": "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI"
             }
 
+        # Not: bare "degisikli" (CHANGE_INTENT_KEYWORDS) yerine TRANSPORT_MODE_STRONG_INTENT_KEYWORDS
+        # kullanildi -- "Uçuşumuz iptal olursa değişiklik hakkımız var mı ...
+        # öğrenmek istiyorum" gibi SAF SORU cumleleri "degisiklik" NOUN'unu
+        # icerdigi icin somut talep saniliyor, DEGISIKLIK_HAKKI_SORGULAMA
+        # bilgi-istek dalini (Gercekci-10) bozuyordu. Ayrica "degistirildi"
+        # (PASIF, "-di" gecmis zaman) acikca haric tutuluyor -- "Uçuş saatimiz
+        # habersizce değiştirildi" gibi bir SIKAYET ifadesi ("baskasi yapti,
+        # ben istemedim") somut bir DEGISIKLIK TALEBIYLE ("değiştirmek
+        # istiyoruz") ayni "degistir" kokunu paylasiyor ama anlam tam tersi
+        # (Gercekci-44, SIKAYET > UCAK > SAAT_DEGISIKLIGI ile cakisiyordu).
+        # Not: COMPLAINT_SENTIMENT_KEYWORDS ("sikayetciyiz" vb.) de haric
+        # tutuluyor -- "Havayolu firması uçuş rotamızı değiştirdi,
+        # şikayetçiyiz." gibi bir SIKAYET ifadesi ("havayolu DEGISTIRDI",
+        # aktif ama musteri TALEP ETMEDI) "degistir" kokunu paylastigi icin
+        # yanlislikla somut bir Backoffice talebi saniliyor, SIKAYET > UCAK >
+        # HAVAYOLU_DEGISIKLIGI ile cakisiyordu (kullanici tarafindan bildirildi).
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.AIRPLANE_TICKET_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+            and "degistirildi" not in normalized_text
+            and not any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+            and (
+                any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_MODE_STRONG_INTENT_KEYWORDS)
+                or "degisim" in normalized_text
+                or EmailCategorizer.CHANGE_REQUEST_NOUN_PATTERN.search(normalized_text)
+            )
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -850,7 +1054,36 @@ class EmailCategorizer:
         # Not: Musteri onayli oncelik sirasi -- DEGISIKLIK_HAKKI_SORGULAMA (ceza/
         # degisiklik hakki gecen mailler) > OTOBUS (otobus/peron/koltuk gecen
         # mailler) > BILET (genel bilet/PNR/e-bilet bilgilendirme talepleri).
-        if any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_CHANGE_RIGHTS_KEYWORDS):
+        # Not: bare "transfer" (TRANSPORT_CHANGE_RIGHTS_KEYWORDS) somut bir Ek
+        # Hizmet (transfer/balayi/arac kiralama) talebiyle CAKISIRSA geri
+        # cekilir -- aksi halde "daha önce eklenen transfer hizmetinin saat ve
+        # detaylarında değişiklik yapılması" gibi bir talep, bare "transfer"
+        # kelimesi yuzunden yanlislikla bu bilgi-istek dalina dusuyordu
+        # (kullanici tarafindan bildirildi).
+        is_extra_service_change = any(
+            keyword in normalized_text for keyword in EmailCategorizer.EXTRA_SERVICES_TOPIC_KEYWORDS
+        )
+        # Not: "tarih degisikligi"/"ceza" gibi TRANSPORT_CHANGE_RIGHTS_KEYWORDS
+        # ifadeleri, hicbir tasima-modu kelimesi (bilet/otobus/ucak/ucus/
+        # transfer/pnr/havayolu) icermeyen GENEL bir rezervasyon-degisiklik
+        # bilgi sorusuyla karsilasinca da geri cekiliyor -- aksi halde
+        # "Rezervasyonumda tarih değişikliği yapmak istesem değişiklik
+        # şartları ve ücreti hakkında bilgi almak istiyorum." gibi tasimayla
+        # ilgisiz bir soru, bare "tarih degisikligi" yuzunden yanlislikla bu
+        # Ulasim-ozel dalina dusuyordu (kullanici tarafindan bildirildi).
+        is_general_reservation_change_info = (
+            "degisiklik" in normalized_text
+            and ("sart" in normalized_text or "nasil" in normalized_text)
+            and not any(
+                keyword in normalized_text
+                for keyword in ["bilet", "otobus", "ucak", "ucus", "transfer", "pnr", "havayolu"]
+            )
+        )
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_CHANGE_RIGHTS_KEYWORDS)
+            and not is_extra_service_change
+            and not is_general_reservation_change_info
+        ):
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
@@ -865,7 +1098,40 @@ class EmailCategorizer:
                 "classification": "BILGI_ISTEK > ULASIM > DEGISIKLIK_HAKKI_SORGULAMA"
             }
 
-        if any(keyword in normalized_text for keyword in EmailCategorizer.OTOBUS_TOPIC_KEYWORDS):
+        # Not: somut bir Backoffice > Degisiklik > Ulasim talebiyle (asagida,
+        # TRANSPORT_MODE_CHANGE_TOPIC_KEYWORDS / TRANSPORT_MODE_TOPIC_KEYWORDS_PAIRED
+        # + CHANGE_INTENT_KEYWORDS) CAKISIRSA bu bilgi-istek dali GERI CEKILIR --
+        # aksi halde "Uçak veya otobüs bileti saatlerimizin... güncellenerek
+        # backoffice işlemlerinin tamamlanmasını rica ederim" gibi ACIKCA
+        # aksiyoner bir talep, bare "otobus" kelimesi yuzunden yanlislikla
+        # bilgi-istek sayiliyordu (canli ortamda ticket #101939280'de gozlemlendi).
+        is_actionable_transport_change = (
+            any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_MODE_CHANGE_TOPIC_KEYWORDS)
+            or (
+                any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_MODE_TOPIC_KEYWORDS_PAIRED)
+                and (
+                    any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_MODE_STRONG_INTENT_KEYWORDS)
+                    or "degisim" in normalized_text
+                )
+            )
+        )
+        # Not: somut bir Backoffice > Kaydırma > Operasyon/Otel Kaynaklı
+        # talebiyle (asagida, SHIFT_OPERATION_BASED_TOPIC_KEYWORDS/SHIFT_HOTEL_BASED_TOPIC_KEYWORDS
+        # + SHIFT_EVENT_KEYWORDS) CAKISIRSA bu bilgi-istek dallari da GERI
+        # CEKILIR -- aksi halde "iç hat uçuş planlamalarındaki değişiklikler
+        # ... operasyon biriminiz tarafından iletilen bilgilendirmede ..."
+        # gibi bir mail, bare "ucus"+"bilgilendirme" kombinasyonu yuzunden
+        # yanlislikla BILGI_ISTEK > ULASIM > BILET'e dusuyordu (kullanici
+        # tarafindan bildirildi).
+        is_shift_related = (
+            any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_OPERATION_BASED_TOPIC_KEYWORDS)
+            or any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_HOTEL_BASED_TOPIC_KEYWORDS)
+        ) and any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_EVENT_KEYWORDS)
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.OTOBUS_TOPIC_KEYWORDS)
+            and not is_actionable_transport_change
+            and not is_shift_related
+        ):
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
@@ -880,9 +1146,16 @@ class EmailCategorizer:
                 "classification": "BILGI_ISTEK > ULASIM > OTOBUS"
             }
 
+        # Not: is_actionable_transport_change yukarida (OTOBUS kontrolunden once)
+        # hesaplandi, ayni koruma burada da gecerli -- aksi halde "bilet" +
+        # "guncelle" kombinasyonu (TRANSPORT_TICKET_EVENT_KEYWORDS icinde
+        # "guncelle" var) somut bir Backoffice > Degisiklik > Ulasim talebini
+        # de yanlislikla bilgi-istek sayardi.
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_TICKET_TOPIC_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_TICKET_EVENT_KEYWORDS)
+            and not is_actionable_transport_change
+            and not is_shift_related
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -916,9 +1189,16 @@ class EmailCategorizer:
                 "classification": "SIKAYET > EVRAK > EVRAK"
             }
 
+        # Not: "fatura fiyati" ("Fatura fiyatı uyumsuzluğu" gibi) gecen
+        # mailler, bare "fatura"+"sikayet" kombinasyonu yuzunden yanlislikla
+        # buraya (fatura KESILMESI/duzeltilmesi sikayeti) degil, asagida
+        # Fiyatlandirma > Odeme Itirazi'na gitmeli -- bu mailler gercek bir
+        # fatura duzenleme/kesim sorunu degil, fiyat/tutar mutabakatsizligi
+        # (kullanici tarafindan bildirildi).
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_COMPLAINT_KEYWORDS)
+            and "fatura fiyati" not in normalized_text
         ):
             attributes, missing_fields = extract_invoice_attributes(combined_text, sender_email)
             return {
@@ -974,9 +1254,21 @@ class EmailCategorizer:
                 "classification": "SIKAYET > OTEL > OTEL_HIZMETLERI"
             }
 
+        # Not: FLIGHT_TIME_TOPIC_KEYWORDS de gecerse (asagida, SAAT_DEGISIKLIGI
+        # dali) bu dal geri cekilir -- "havayolu firması ... uçuş saatlerinin
+        # ... değiştirilmesi ve saatlerin birbirine uymaması" gibi bir
+        # sikayette asil odak SAAT UYUMSUZLUGU, "havayolu" sadece degisikligi
+        # yapan tarafi belirtiyor (ticket #101939947'de kullanici tarafindan
+        # bildirildi). Iki dal ayni "degisti" kokunu paylastigi icin
+        # havayolu+saat birlikte gecen mailler her zaman SAAT_DEGISIKLIGI'ne
+        # ait sayilir.
+        is_flight_time_change = any(
+            keyword in normalized_text for keyword in EmailCategorizer.FLIGHT_TIME_TOPIC_KEYWORDS
+        )
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.AIRLINE_CHANGE_TOPIC_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.AIRLINE_CHANGE_EVENT_KEYWORDS)
+            and not is_flight_time_change
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -1266,7 +1558,14 @@ class EmailCategorizer:
 
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.PRICE_GENERAL_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.PRICE_GENERAL_EVENT_KEYWORDS)
+            and (
+                any(keyword in normalized_text for keyword in EmailCategorizer.PRICE_GENERAL_EVENT_KEYWORDS)
+                # Not: "joker fiyat şikayeti" olarak revize edildi -- genel
+                # memnuniyetsizlik/sikayet ifadeleri de (COMPLAINT_SENTIMENT_KEYWORDS)
+                # kabul ediliyor, sadece tutarsizlik/uyusmazlik tespitiyle
+                # sinirli degil (kullanici tarafindan bildirildi).
+                or any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+            )
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -1280,6 +1579,144 @@ class EmailCategorizer:
                 "attributes": [],
                 "missing_fields": [],
                 "classification": "SIKAYET > FIYATLANDIRMA > FIYAT_GENEL"
+            }
+
+        # ============================================================
+        # SIKAYET > ONLINE_ISLEMLER (3 kirilim)
+        # Oncelik: MOBIL_UYGULAMA > WEB_SITESI > ONLINE_ISLEMLER (genel).
+        # ============================================================
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.MOBILE_APP_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_ONLINE_OPERATIONS,
+                "category_name": "Online İşlemler",
+                "sub_category_id": SUB_CATEGORY_MOBILE_APP_COMPLAINT,
+                "sub_category_name": "Mobil Uygulama",
+                "sub_category_code": "MOBIL_UYGULAMA",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > ONLINE_ISLEMLER > MOBIL_UYGULAMA"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.WEBSITE_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_ONLINE_OPERATIONS,
+                "category_name": "Online İşlemler",
+                "sub_category_id": SUB_CATEGORY_WEBSITE_COMPLAINT,
+                "sub_category_name": "Web Sitesi",
+                "sub_category_code": "WEB_SITESI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > ONLINE_ISLEMLER > WEB_SITESI"
+            }
+
+        # Not: COMPLAINT_SENTIMENT_KEYWORDS de zorunlu -- "sistem hata veriyor"
+        # gibi ifadeler gercek bir sikayet olmadan (ör. "nasıl
+        # güncelleyebilirim?" gibi bir yardim talebinde) de gecebiliyor,
+        # bare OR mantigi mevcut onayli Online-3 testini bozuyordu (denendi,
+        # geri alindi).
+        if (
+            (
+                any(keyword in normalized_text for keyword in EmailCategorizer.ONLINE_OPERATIONS_COMPLAINT_TOPIC_KEYWORDS)
+                or any(keyword in normalized_text for keyword in EmailCategorizer.ONLINE_OPERATIONS_COMPLAINT_EVENT_KEYWORDS)
+            )
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_ONLINE_OPERATIONS,
+                "category_name": "Online İşlemler",
+                "sub_category_id": SUB_CATEGORY_ONLINE_OPERATIONS_COMPLAINT,
+                "sub_category_name": "Online İşlemler",
+                "sub_category_code": "ONLINE_ISLEMLER",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > ONLINE_ISLEMLER > ONLINE_ISLEMLER"
+            }
+
+        # ============================================================
+        # SIKAYET > IPTAL (sebep bazli, 4 kirilim)
+        # ============================================================
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_HEALTH_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_CANCELLATION,
+                "category_name": "İptal",
+                "sub_category_id": SUB_CATEGORY_CANCELLATION_HEALTH_ISSUE,
+                "sub_category_name": "Sağlık Problemleri",
+                "sub_category_code": "SAGLIK_PROBLEMLERI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > IPTAL > SAGLIK_PROBLEMLERI"
+            }
+
+        if any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_FORCE_MAJEURE_TOPIC_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_CANCELLATION,
+                "category_name": "İptal",
+                "sub_category_id": SUB_CATEGORY_CANCELLATION_FORCE_MAJEURE,
+                "sub_category_name": "Mücbir Sebep",
+                "sub_category_code": "MUCBIR_SEBEP",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > IPTAL > MUCBIR_SEBEP"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_SPECIAL_REASON_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_CANCELLATION,
+                "category_name": "İptal",
+                "sub_category_id": SUB_CATEGORY_CANCELLATION_SPECIAL_REASON,
+                "sub_category_name": "Özel Sebep",
+                "sub_category_code": "OZEL_SEBEP",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > IPTAL > OZEL_SEBEP"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_HOTEL_REVIEWS_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_CANCELLATION,
+                "category_name": "İptal",
+                "sub_category_id": SUB_CATEGORY_CANCELLATION_HOTEL_REVIEWS,
+                "sub_category_name": "Otel Yorumları",
+                "sub_category_code": "OTEL_YORUMLARI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > IPTAL > OTEL_YORUMLARI"
             }
 
         # Not: en spesifik IADE dallari (talep acilmamis, misafire yansimamasi) genel
@@ -1523,7 +1960,28 @@ class EmailCategorizer:
                 "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DOGUM_TARIHI_DEGISIKLIGI"
             }
 
-        if any(keyword in normalized_text for keyword in EmailCategorizer.EXTRA_SERVICES_TOPIC_KEYWORDS):
+        # Not: somut bir sigorta IPTALI talebiyle (asagida, CANCELLATION_INSURANCE_TOPIC_KEYWORDS
+        # + CANCEL_INTENT_KEYWORDS/CANCEL_REQUEST_NOUN_PATTERN) CAKISIRSA bu
+        # genel "Ek Hizmetler" dali GERI CEKILIR -- aksi halde "iptal sigortası
+        # ek hizmetinin kaldırılması" gibi somut bir talep, bare "ek hizmet"
+        # kelimesi yuzunden yanlislikla genel Degisiklik>Ek Hizmetler'e
+        # dusuyordu (kullanici tarafindan bildirildi).
+        is_insurance_cancellation = (
+            any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_INSURANCE_TOPIC_KEYWORDS)
+            and (
+                any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+                or EmailCategorizer.CANCEL_REQUEST_NOUN_PATTERN.search(normalized_text)
+                # Not: "sigorta ek hizmetini ÇIKARMAK istiyoruz" -- "cikar"
+                # (cikarmak) ek hizmet BAGLAMINDA "kaldirma/iptal" ile esdeger
+                # bir fiil, ama CANCEL_INTENT_KEYWORDS'te "iptal" koku
+                # gerektigi icin kapsanmiyordu (kullanici tarafindan bildirildi).
+                or "cikar" in normalized_text
+            )
+        )
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.EXTRA_SERVICES_TOPIC_KEYWORDS)
+            and not is_insurance_cancellation
+        ):
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_RESERVATION,
@@ -1539,7 +1997,10 @@ class EmailCategorizer:
             }
 
         if (
-            any(keyword in normalized_text for keyword in EmailCategorizer.NAME_CHANGE_TOPIC_KEYWORDS)
+            (
+                any(keyword in normalized_text for keyword in EmailCategorizer.NAME_CHANGE_TOPIC_KEYWORDS)
+                or EmailCategorizer.NAME_CHANGE_BARE_ISIM_PATTERN.search(normalized_text)
+            )
             and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
         ):
             return {
@@ -1591,9 +2052,18 @@ class EmailCategorizer:
 
         # Not: "oda tipi" kontrolü, salt "oda" kontrolünden ÖNCE yapılıyor;
         # aksi halde "oda tipi değişikliği" metni de ODA dalına düşebilirdi.
+        # ANCAK: mail SADECE tip degil, ROOM_CONFIG_TOPIC_KEYWORDS ile ifade
+        # edilen BASKA oda unsurlarini da (kisi dagilimi, yatak tercihi,
+        # konfigurasyon vb.) kapsiyorsa, dar "Oda Tipi Değişikliği" yerine
+        # genis "Oda" (545) dalina birakiliyor -- "sadece 'oda tipi'
+        # kelimesine takılıp kalmayacak" (kullanici tarafindan revize edildi).
+        is_broad_room_config = any(
+            keyword in normalized_text for keyword in EmailCategorizer.ROOM_CONFIG_TOPIC_KEYWORDS
+        )
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_TYPE_TOPIC_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+            and not is_broad_room_config
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -1610,8 +2080,20 @@ class EmailCategorizer:
             }
 
         if (
-            any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+            (
+                any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_TOPIC_KEYWORDS)
+                or any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_CONFIG_STANDALONE_TOPIC_KEYWORDS)
+            )
+            and (
+                any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+                # Not: "oda yükseltme (upgrade)" -- "yukselt" CHANGE_INTENT_KEYWORDS'te
+                # yok (baska hicbir Degisiklik dalinda kullanilmadigi icin
+                # sadece burada, dar kapsamda eklendi), kullanici tarafindan
+                # bildirildi.
+                or "yukselt" in normalized_text
+                or "degisim" in normalized_text
+                or EmailCategorizer.CHANGE_REQUEST_NOUN_PATTERN.search(normalized_text)
+            )
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -1693,7 +2175,11 @@ class EmailCategorizer:
                 "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > TUR_DEGISIKLIGI"
             }
 
-        if any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_MODE_CHANGE_TOPIC_KEYWORDS):
+        # Not: is_actionable_transport_change, fonksiyonun basinda (OTOBUS/BILET
+        # bilgi-istek dallarinin geri cekilme kosulu olarak) zaten hesaplandi;
+        # burada AYNI degisken tekrar kullanilarak iki kontrolun birbirinden
+        # SAPMASI (drift) engelleniyor.
+        if is_actionable_transport_change:
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_RESERVATION,
@@ -1708,10 +2194,10 @@ class EmailCategorizer:
                 "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM"
             }
 
-        if (
-            any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_INSURANCE_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
-        ):
+        # Not: is_insurance_cancellation yukarida (Ek Hizmetler dalinin geri
+        # cekilme kosulu olarak) zaten hesaplandi; ayni degisken tekrar
+        # kullanilarak iki kontrolun birbirinden sapmasi (drift) engelleniyor.
+        if is_insurance_cancellation:
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_RESERVATION,
@@ -1731,7 +2217,10 @@ class EmailCategorizer:
         # yakalayip yanlis (daha az spesifik) alt kirilima yonlendirebilirdi.
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+            and (
+                any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+                or EmailCategorizer.CANCEL_REQUEST_NOUN_PATTERN.search(normalized_text)
+            )
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -1831,8 +2320,11 @@ class EmailCategorizer:
             return shift_result
 
         if (
-            any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_COMPLETION_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_COMPLETION_INTENT_KEYWORDS)
+            (
+                any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_COMPLETION_TOPIC_KEYWORDS)
+                and any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_COMPLETION_INTENT_KEYWORDS)
+            )
+            or EmailCategorizer.PAYMENT_COMPLETION_PATTERN.search(normalized_text)
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -2092,9 +2584,65 @@ def send_rejection_email(recipient_email: str, subject: str, customer_name: str)
         server.quit()
         
         print(f"🚫 [RED ONAY MAİLİ GÖNDERİLDİ] (Uygunsuz içerik) -> {recipient_email}")
-    
+
     except Exception as e:
         print(f"❌ Red maili gönderilirken hata: {e}")
+
+
+# Bu kutunun ilgilenmedigi B2B/tedarikci muhasebe yazismalari (ekstre/
+# mutabakat/cari hesap) icin yonlendirilecek gercek muhasebe adresleri
+# (kullanici tarafindan bildirildi).
+VENDOR_FINANCE_REDIRECT_ADDRESSES = [
+    "muhasebe@tatilbudur.com",
+    "maliyetfatura@tatilbudur.com",
+    "extranet@tatilbudur.com",
+    "mutabakatjira@tatilbudur.com",
+    "tatilbudur@mutabakat.com",
+]
+
+
+def send_vendor_redirect_email(recipient_email: str, subject: str, customer_name: str) -> None:
+    """
+    Otel/tedarikci muhasebe biriminden gelen ekstre/mutabakat/cari hesap
+    yazismalarina, bu kutunun bu konularla ilgilenmedigini ve dogru
+    adreslere yonlendirmelerini bildiren otomatik yanit gonderir. Ticket
+    OLUSTURULMAZ.
+
+    Args:
+        recipient_email: Yaniti alacak gonderici adresi
+        subject: Orijinal e-posta konusu
+        customer_name: Gonderici adi
+    """
+    try:
+        message = MIMEMultipart()
+        message['From'] = EMAIL_USER
+        message['To'] = recipient_email
+        message['Subject'] = f"Re: {subject} - Yanlış Adres Yönlendirmesi"
+
+        redirect_list_str = "\n".join([f"  • {addr}" for addr in VENDOR_FINANCE_REDIRECT_ADDRESSES])
+
+        formatted_body = (
+            f"Sayın {customer_name},\n\n"
+            f"Bu e-posta adresi, ekstre/mutabakat/cari hesap gibi muhasebe "
+            f"konularıyla ilgilenmemektedir.\n\n"
+            f"Bu tarz maillerinizi lütfen aşağıdaki adreslerden ilgili olana "
+            f"gönderiniz:\n\n"
+            f"{redirect_list_str}\n\n"
+            f"Anlayışınız için teşekkür ederiz.\n\n"
+            f"Saygılarımızla,\n"
+            f"Müşteri Hizmetleri Ekibi"
+        )
+        message.attach(MIMEText(formatted_body, 'plain', 'utf-8'))
+
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, recipient_email, message.as_string())
+        server.quit()
+
+        print(f"↪️ [YÖNLENDİRME MAİLİ GÖNDERİLDİ] (B2B muhasebe yazışması) -> {recipient_email}")
+
+    except Exception as e:
+        print(f"❌ Yönlendirme maili gönderilirken hata: {e}")
 
 
 def send_missing_fields_email(recipient_email: str, subject: str, missing_fields: List[str], customer_name: str) -> None:

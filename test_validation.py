@@ -23,6 +23,7 @@ from validators import (
     is_valid_email,
     extract_reservation_number,
     detect_priority_level,
+    is_vendor_finance_correspondence,
 )
 from csm_api import TicketPayloadBuilder
 
@@ -624,11 +625,149 @@ check("Degisiklik-KisiEkleCikar", r["classification"] == "BACKOFFICE_ISLEMLERI >
 r = cat("", "Rezervasyonuma not eklemek istiyorum.")
 check("Degisiklik-NotEkleme", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > NOT_EKLEME_TALEBI", r["classification"])
 
+# --- EK HIZMETLER (541) genisletme: bare "transfer" (TRANSPORT_CHANGE_RIGHTS_KEYWORDS)
+# somut bir Ek Hizmet talebini engelliyordu (kullanici tarafindan bildirildi).
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuz kapsamında daha önce "
+    "eklenen transfer hizmetinin saat ve detaylarında değişiklik yapılması "
+    "hususunda işlemlerin gerçekleştirilmesini rica ederim.",
+)
+check(
+    "Degisiklik-EkHizmetler-2 (ONAYLI): 'transfer hizmetinin ... değişiklik' -> bare 'transfer' engeli asilmali",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER",
+    r["classification"],
+)
+
+r = cat("", "Transfer ekleme/çıkarma talebimiz var.")
+check("Degisiklik-EkHizmetler-3: 'transfer ekleme/çıkarma'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER", r["classification"])
+
+r = cat("", "Balayı konsepti güncellemesi yapılmasını rica ederiz.")
+check("Degisiklik-EkHizmetler-4: 'balayı konsepti güncellemesi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER", r["classification"])
+
+r = cat("", "Araç kiralama revizyonu yapılmasını rica ederiz.")
+check("Degisiklik-EkHizmetler-5: 'araç kiralama revizyonu'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER", r["classification"])
+
+# Koruma: bare "balayi" (Not Ekleme Talebi'ne ait "balayı notu" gibi) hala
+# yanlislikla EK_HIZMETLER'e dusmemeli (Gercekci-26'da yakalandi).
+r = cat("", "Otel tarafına iletilmek üzere rezervasyonumuza balayı notu düşürebilir misiniz?")
+check(
+    "Degisiklik-EkHizmetler-Koruma: 'balayı notu' (Not Ekleme'ye ait) EK_HIZMETLER'e dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER",
+    r["classification"],
+)
+
+# --- KISI EKLEME/CIKARMA (543) genisletme ---
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuza ek olarak 1 yetişkin "
+    "misafirin daha dahil edilmesi (kişi ekleme) hususunda backoffice "
+    "işlemlerinin yapılmasını rica ederim.",
+)
+check(
+    "Degisiklik-KisiEkleCikar-2 (ONAYLI): '1 yetişkin misafirin dahil edilmesi (kişi ekleme)'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > KISI_EKLEME_CIKARMA",
+    r["classification"],
+)
+
+r = cat("", "Misafir çıkarma talebimiz var.")
+check("Degisiklik-KisiEkleCikar-3: 'misafir çıkarma'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > KISI_EKLEME_CIKARMA", r["classification"])
+
+r = cat("", "Yolcu ilavesi yapılmasını rica ederiz.")
+check("Degisiklik-KisiEkleCikar-4: 'yolcu ilavesi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > KISI_EKLEME_CIKARMA", r["classification"])
+
+r = cat("", "Kişi sayısı güncellemesi yapılmasını rica ederiz.")
+check("Degisiklik-KisiEkleCikar-5: 'kişi sayısı güncellemesi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > KISI_EKLEME_CIKARMA", r["classification"])
+
+# --- NOT EKLEME TALEBI (544) genisletme ---
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzun detaylarına otel için "
+    "geçerli olmak üzere 'yüksek kat ve sessiz oda' tercihine dair not "
+    "ekleme talebimizin işleme alınmasını rica ederim.",
+)
+check(
+    "Degisiklik-NotEkleme-2 (ONAYLI): 'yüksek kat ve sessiz oda tercihine dair not ekleme'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > NOT_EKLEME_TALEBI",
+    r["classification"],
+)
+
+r = cat("", "Otel için bilgilendirme notu düşülmesini rica ederiz.")
+check("Degisiklik-NotEkleme-3: 'bilgilendirme notu düşülmesi' (pasif 'dusul')", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > NOT_EKLEME_TALEBI", r["classification"])
+
+r = cat("", "Konaklama notu güncellemesi yapılmasını rica ederiz.")
+check("Degisiklik-NotEkleme-4: 'konaklama notu güncellemesi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > NOT_EKLEME_TALEBI", r["classification"])
+
+# Koruma: bare "guncelle" (not ile ilgisiz) NOT_EKLEME_TALEBI'ne dusmemeli --
+# "not edin" (= "lütfen dikkate alın" deyimi) rezervasyon notu talebi degil.
+r = cat("", "Ödeme bilgilerimi güncellememi rica ederim, lütfen not edin.")
+check(
+    "Degisiklik-NotEkleme-Koruma: 'not edin' deyimi (odeme guncellemesi ile ilgisiz) NOT_EKLEME_TALEBI'ne dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > NOT_EKLEME_TALEBI",
+    r["classification"],
+)
+
 r = cat("", "Oda tipi değişikliği yapmak istiyorum.")
 check("Degisiklik-OdaTipi", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA_TIPI_DEGISIKLIGI", r["classification"])
 
 r = cat("", "Oda değişikliği istiyorum, farklı bir oda istiyorum.")
 check("Degisiklik-Oda", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+# Not: "oda tipi" gecen mailler KASITLI OLARAK bu genel "Oda" (545) dalina
+# degil, ayri/daha spesifik "Oda Tipi Değişikliği" (546) dalina gidiyor --
+# kullanici ile netlestirildi, mevcut davranis (546) korunuyor. "Oda" (545)
+# dalı, tip DISINDAKI genel oda degisikliklerini (sayi/ozellik/upgrade) kapsar.
+r = cat("", "İyi günler, 553044193 numaralı rezervasyonumuzdaki oda tipinin değiştirilmesi hususunda işlemlerin yapılmasını rica ederim.")
+check(
+    "Degisiklik-Oda-Koruma: 'oda tipinin değiştirilmesi' Oda Tipi Değişikliği'nde (546) kalmali, 'Oda'ya (545) dusmemeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA_TIPI_DEGISIKLIGI",
+    r["classification"],
+)
+
+r = cat("", "Standart odadan süite geçiş yapmak istiyoruz.")
+check("Degisiklik-Oda-2: 'standart odadan süite geçiş'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+r = cat("", "Oda yükseltme (upgrade) talep ediyoruz.")
+check("Degisiklik-Oda-3: 'oda yükseltme (upgrade)' (yeni 'yukselt' sinyali)", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+r = cat("", "Rezervasyondaki odayı güncellemek istiyoruz.")
+check("Degisiklik-Oda-4: 'rezervasyondaki odayı güncelleme'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+# --- REVIZE KURAL: "oda tipi" ARTIK TEK BASINA yeterli degil dar 546'ya
+# gitmek icin -- eger ROOM_CONFIG_TOPIC_KEYWORDS (konfigurasyon/kisi
+# dagilimi/yatak tercihi vb.) ile BIRLIKTE geciyorsa, genis "Oda" (545)
+# dalina birakiliyor (kullanici tarafindan revize edildi: "sadece 'oda tipi'
+# kelimesine takılıp kalmayacak").
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzdaki oda konfigürasyonu, "
+    "oda tipi ve odada konaklayacak misafir/kişi dağılımı ile ilgili "
+    "değişikliklerin yapılması hususunda işlemlerin gerçekleştirilmesini "
+    "rica ederim.",
+)
+check(
+    "Degisiklik-Oda-5 (ONAYLI): 'oda tipi' + 'konfigürasyon' + 'kişi dağılımı' birlikte -> genis Oda (545)'ye gitmeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA",
+    r["classification"],
+)
+
+r = cat("", "Odadaki kişi sayısı değişimi yapılmasını rica ederiz.")
+check("Degisiklik-Oda-6: 'odadaki kişi sayısı değişimi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+r = cat("", "Yatak tercihi güncellemesi yapılmasını rica ederiz.")
+check("Degisiklik-Oda-7: 'yatak tercihi güncellemesi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+r = cat("", "Oda konfigürasyonu ile ilgili değişiklik yapılmasını rica ederiz.")
+check("Degisiklik-Oda-8: bare 'oda konfigürasyonu'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA", r["classification"])
+
+# Koruma: SAF/dar "oda tipi" (baska hicbir konfigurasyon unsuru olmadan) hala
+# dogru sekilde 546'da (Oda Tipi Değişikliği) kalmali.
+r = cat("", "Oda tipini değiştirmek istiyoruz.")
+check(
+    "Degisiklik-Oda-Koruma-2: saf/dar 'oda tipi' (baska unsur yok) hala ODA_TIPI_DEGISIKLIGI'nde (546) kalmali",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA_TIPI_DEGISIKLIGI",
+    r["classification"],
+)
 
 r = cat("", "Otel değişikliği istiyorum, başka otele geçmek istiyorum.")
 check("Degisiklik-Otel", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > OTEL_DEGISIKLIGI", r["classification"])
@@ -730,11 +869,164 @@ check(
 r = cat("", "Ulaşım değişikliği istiyorum, ulaşım tipimi değiştirmek istiyorum.")
 check("Degisiklik-Ulasim", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM", r["classification"])
 
+# TRANSPORT_MODE_CHANGE_TOPIC_KEYWORDS eski hali sadece "ulasim degisikligi/
+# ulasim tipimi/ucakla gitmek yerine/otobusle gitmek yerine" gibi zaten
+# degisim-niyeti icine gomulu kalip ifadeleri kapsiyordu; "uçak saatini
+# değiştirme"/"ulaşım firması değişimi" gibi genel "ulasim/ucak saat" +
+# degistir/degisim/guncelle kombinasyonlari eksikti (kullanici tarafindan
+# bildirildi). TRANSPORT_MODE_TOPIC_KEYWORDS_PAIRED bu yuzden Bilgi-Istek
+# Otobus/Bilet dallariyla karismamasi icin CHANGE_INTENT_KEYWORDS ile
+# ESLESTIRILEREK eklendi (tek basina tetiklenmiyor).
+r = cat("", "Uçak saatimizi değiştirmek istiyoruz.")
+check("Degisiklik-Ulasim-2: 'ucak saatini degistirme'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM", r["classification"])
+
+r = cat("", "Ulaşım firması değişimi yapmak istiyoruz.")
+check("Degisiklik-Ulasim-3: 'ulasim firmasi degisimi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM", r["classification"])
+
+r = cat("", "Gidiş-dönüş ulaşım saati güncellemesi yapmak istiyoruz.")
+check("Degisiklik-Ulasim-4: 'ulasim saati guncelleme'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM", r["classification"])
+
+# --- CANLI KOD INCELEMESINDE BULUNAN 2 GERCEK HATA (duzeltildi) ---
+# 1) "değişim"in normalize hali ("degisim") tesadufen "isim" alt dizesini
+#    icerdigi icin ("deg-ISIM-i"), NAME_CHANGE_TOPIC_KEYWORDS'teki bare "isim"
+#    stemi ile CHANGE_INTENT_KEYWORDS'e "degisim" eklenmesi bir arada,
+#    "Ulaşım firması değişimi" gibi alakasiz mailleri yanlislikla
+#    ISIM_DEGISIKLIGI'ne cekiyordu -- bare "isim" kelime siniri (\b) sarti
+#    eklenerek NAME_CHANGE_BARE_ISIM_PATTERN'e tasindi.
+check(
+    "IsimDegisikligi-Koruma (CANLI HATA DUZELTMESI): 'ulaşım firması değişimi' yanlislikla ISIM_DEGISIKLIGI'ne dusmemeli",
+    cat("", "Ulaşım firması değişimi yapmak istiyoruz.")["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ISIM_DEGISIKLIGI",
+    cat("", "Ulaşım firması değişimi yapmak istiyoruz.")["classification"],
+)
+r = cat("", "İsim ve soyadımda hata var, düzeltmenizi rica ederim.")
+check(
+    "IsimDegisikligi-Koruma-2: gercek isim degisikligi metni hala dogru calismali",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ISIM_DEGISIKLIGI",
+    r["classification"],
+)
+# 2) "degisim" bare CHANGE_INTENT_KEYWORDS'e (10+ dal tarafindan paylasilan)
+#    eklenseydi, "Otelde havlu değişimi ile ilgili bilgi almak istiyorum."
+#    gibi TAMAMEN alakasiz mailler DEGISIKLIK>DIGER coplukutusuna dusuyordu
+#    (Varsayilan-1 testinde yakalandi) -- "degisim" sadece Ulasim dalina ozel
+#    dar kapsamda birakildi.
+r = cat("", "Otelde havlu değişimi ile ilgili bilgi almak istiyorum.")
+check(
+    "DegisiklikDiger-Koruma (CANLI HATA DUZELTMESI): alakasiz 'havlu değişimi' DIGER coplukutusuna dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DIGER",
+    r["classification"],
+)
+
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi, ticket #101939280) ---
+# "otobus"/"bilet" gibi bare kelimeler iceren mailler, ONCEDEN ONAYLANMIS bir
+# oncelik kurali geregi (DEGISIKLIK_HAKKI_SORGULAMA > OTOBUS > BILET) her
+# zaman Bilgi-Istek dallarina gidiyordu -- somut bir Backoffice degisiklik
+# talebi olsa bile. is_actionable_transport_change korumasi eklenerek, bu
+# bilgi-istek dallari SADECE gercekten aksiyoner olmayan mailler icin
+# devrede kaliyor.
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuz kapsamında yer alan "
+    "ulaşım detaylarında değişiklik yapmak istiyoruz. Uçak veya otobüs "
+    "bileti saatlerimizin/günlerimizin uygun olan farklı bir saate "
+    "güncellenerek backoffice işlemlerinin tamamlanmasını rica eder, iyi "
+    "çalışmalar dilerim.",
+)
+check(
+    "Degisiklik-Ulasim-5 (CANLI HATA DUZELTMESI, ticket #101939280): 'otobüs bileti' + 'güncellenerek' -> OTOBUS/BILET bilgi-istek dallarina degil DEGISIKLIK_ULASIM'a dusmeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM",
+    r["classification"],
+)
+
+# Koruma: saf SORU formundaki bilgi-istek ("değişiklik var mı acaba?") hala
+# dogru sekilde OTOBUS bilgi-istek dalinda kalmali -- TRANSPORT_MODE_STRONG_INTENT_KEYWORDS
+# bilerek bare "degisikli" NOUN'unu icermez (Otobus-4 (ONAYLI) testinde
+# yakalandi, duzeltildi).
+r = cat(
+    "",
+    "Merhaba, satın almış olduğum otobüs ulaşım hizmeti için kalkış peronu "
+    "numarasını ve koltuk detaylarımı öğrenmek istiyorum. Otobüs seferi "
+    "saatinde bir değişiklik var mı acaba? Bilgi rica ederim.",
+)
+check(
+    "Degisiklik-Ulasim-Koruma (CANLI HATA DUZELTMESI): saf soru formu ('değişiklik var mı acaba') DEGISIKLIK_ULASIM'a degil OTOBUS bilgi-istegine dusmeli",
+    r["classification"] == "BILGI_ISTEK > ULASIM > OTOBUS",
+    r["classification"],
+)
+
 r = cat("", "Odamı iptal etmek istiyorum.")
 check("Iptal-Oda", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > ODA_IPTALI", r["classification"])
 
+# --- CANCEL_REQUEST_NOUN_PATTERN (Ucak Bileti Iptali icin eklenmisti) Oda
+# dalina da uygulandi -- CANCEL_INTENT_KEYWORDS'un kapsamadigi "iptal
+# edilmesi ... rica ederim" / bare "iptali" cekimlerini yakalamak icin
+# (kullanici tarafindan bildirildi).
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuzdaki odalardan sadece "
+    "birinin iptal edilmesi hususunda işlemlerin yapılmasını rica ederim.",
+)
+check(
+    "Iptal-Oda-2 (ONAYLI): 'iptal edilmesi hususunda ... rica ederim' (CANCEL_INTENT_KEYWORDS kapsamiyor)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > ODA_IPTALI",
+    r["classification"],
+)
+
+r = cat("", "Oda iptali için işlem rica ederiz.")
+check("Iptal-Oda-3: bare 'oda iptali' + 'rica ederiz'", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > ODA_IPTALI", r["classification"])
+
+r = cat("", "Tek oda iptal talebimiz var.")
+check("Iptal-Oda-4: 'tek oda iptal talebi'", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > ODA_IPTALI", r["classification"])
+
 r = cat("", "İptal sigortası iptal etmek istiyorum.")
 check("EkHizmet-IptalSigortasi", r["classification"] == "BACKOFFICE_ISLEMLERI > EK_HIZMET > IPTAL_SIGORTASI", r["classification"])
+
+# --- CANLI HATA DUZELTMESI: EXTRA_SERVICES_TOPIC_KEYWORDS ("ek hizmet") tek
+# basina (eslestirmeden) tetiklendigi icin, somut bir sigorta iptali talebi
+# ("iptal sigortası ek hizmetinin kaldırılması") daha spesifik EK_HIZMET >
+# IPTAL_SIGORTASI dalindan ONCE genel Degisiklik > Ek Hizmetler'e dusuyordu.
+# is_insurance_cancellation koruma degiskeni eklendi (kullanici tarafindan
+# bildirildi).
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuzdaki iptal sigortası ek "
+    "hizmetinin kaldırılması/iptal edilmesi hususunda işlemlerin "
+    "yapılmasını rica ederim.",
+)
+check(
+    "EkHizmet-IptalSigortasi-2 (ONAYLI): somut sigorta iptali, genel Ek Hizmetler dalina dusmemeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > EK_HIZMET > IPTAL_SIGORTASI",
+    r["classification"],
+)
+
+r = cat("", "Sigorta ek hizmetini çıkarmak istiyoruz.")
+check(
+    "EkHizmet-IptalSigortasi-3: 'sigorta ek hizmetini çıkarma' (cikar = iptal esdegeri fiil)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > EK_HIZMET > IPTAL_SIGORTASI",
+    r["classification"],
+)
+
+r = cat("", "Seyahat sigortası iptali için işlem rica ederiz.")
+check(
+    "EkHizmet-IptalSigortasi-4: bare 'iptali' + 'rica ederiz'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > EK_HIZMET > IPTAL_SIGORTASI",
+    r["classification"],
+)
+
+r = cat("", "Sigorta poliçesi iptal talebimiz var.")
+check(
+    "EkHizmet-IptalSigortasi-5: bare 'sigorta poliçesi' + 'iptal talebi'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > EK_HIZMET > IPTAL_SIGORTASI",
+    r["classification"],
+)
+
+# Koruma: sigorta/iptal ile ilgisi olmayan genel bir ek hizmet talebi hala
+# dogru sekilde genel Ek Hizmetler dalina dusmeli.
+r = cat("", "Rezervasyonumuza ekstra yatak eklemek istiyoruz.")
+check(
+    "EkHizmet-Koruma: sigorta/iptal disi genel ek hizmet talebi Degisiklik>EkHizmetler'de kalmali",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > EK_HIZMETLER",
+    r["classification"],
+)
 
 r = cat("", "Rezervasyonumu iptal etmek istiyorum, genel iptal talebi oluşturuyorum.")
 check("Iptal-Talebi", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > IPTAL_TALEBI", r["classification"])
@@ -833,6 +1125,42 @@ check("Kaydirma-OperasyonKaynakli", r["classification"] == "BACKOFFICE_ISLEMLERI
 r = cat("", "Eksik ödemeyi tamamlamak istiyorum, bakiye ödemesi yapmak istiyorum.")
 check("DigerIslemler-OdemeTamamlama", r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA", r["classification"])
 
+# --- PAYMENT_COMPLETION_INTENT_KEYWORDS eski hali sadece SABIT/UZUN kaliplar
+# icin ("tamamlamak istiyoruz" gibi) tetikleniyordu, gercek musteri
+# mailerindeki dogal varyasyonlarin hicbirini yakalamiyordu (kullanici
+# tarafindan bildirildi). Stem'lere cevrildi + bare "odeme"+"tamamla"
+# yakinligi icin PAYMENT_COMPLETION_PATTERN eklendi.
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzun kalan bakiye "
+    "ödemesini tamamlamak ve kalan tutarın tahsili için gerekli finansal "
+    "işlemlerin backoffice tarafında gerçekleştirilmesini rica ederim.",
+)
+check(
+    "DigerIslemler-OdemeTamamlama-2 (ONAYLI): 'kalan bakiye ödemesini tamamlamak ve kalan tutarın tahsili'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA",
+    r["classification"],
+)
+
+r = cat("", "Ödemeyi tamamlamak istiyoruz.")
+check(
+    "DigerIslemler-OdemeTamamlama-3: bare 'ödemeyi tamamlamak' (PAYMENT_COMPLETION_PATTERN)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA",
+    r["classification"],
+)
+
+r = cat("", "Kalan tutarı tahsil etmenizi rica ederiz.")
+check("DigerIslemler-OdemeTamamlama-4: 'kalan tutarı tahsil'", r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA", r["classification"])
+
+r = cat("", "Bakiye ödemesini kapatmak istiyoruz.")
+check("DigerIslemler-OdemeTamamlama-5: 'bakiye ödemesini kapatma'", r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA", r["classification"])
+
+r = cat("", "Rezervasyon borcunu ödemek istiyoruz.")
+check("DigerIslemler-OdemeTamamlama-6: 'rezervasyon borcunu ödeme'", r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA", r["classification"])
+
+r = cat("", "Kalan ödeme linkini rica ederiz.")
+check("DigerIslemler-OdemeTamamlama-7: 'kalan ödeme linki'", r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA", r["classification"])
+
 # --- BILINEN CAKISMA (KOLLIZYON) DURUMLARI - once tespit, sonra birlikte cozulecek ---
 # "bilet" kelimesi TRANSPORT_CHANGE_RIGHTS_KEYWORDS listesinde COK GENEL bir sinyal
 # oldugu icin, "ucak bileti" ile ilgili degisiklik/iptal talepleri hicbir zaman kendi
@@ -845,10 +1173,114 @@ check(
     r["classification"],
 )
 
+# --- AIRPLANE_TICKET_TOPIC_KEYWORDS genisletildi: eski liste sadece tekil
+# iyelik eklerini ("biletim","biletimiz") kapsiyordu, "uçak biletlerimizin"
+# gibi COGUL formlar kaciyordu (kullanici tarafindan bildirildi). "ucus"/
+# "pnr"/"havayolu"/"ucak seferi" de eklendi.
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuz içinde yer alan uçak "
+    "biletlerimizin uçuş saatinde değişiklik yapmak istiyoruz. Havayolu "
+    "sefer saatimizin daha erken bir saate güncellenerek backoffice "
+    "işlemlerinin tamamlanmasını rica eder, iyi çalışmalar dilerim.",
+)
+check(
+    "UcakBileti-Degisiklik-1 (ONAYLI): cogul 'uçak biletlerimizin' + 'havayolu sefer saati'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI",
+    r["classification"],
+)
+
+r = cat("", "PNR revizyonu yapmak istiyoruz.")
+check("UcakBileti-Degisiklik-2: bare 'pnr' + 'revizyon'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI", r["classification"])
+
+r = cat("", "Havayolu bilet güncellemesi yapmak istiyoruz.")
+check("UcakBileti-Degisiklik-3: bare 'havayolu' + 'guncelle'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI", r["classification"])
+
+r = cat("", "Uçuş saati değişimi yapmak istiyoruz.")
+check("UcakBileti-Degisiklik-4: bare 'ucus' + 'degisim'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI", r["classification"])
+
+# Koruma: SORU formundaki degisiklik-hakki sorgusu (Gercekci-10) hala dogru
+# calismali -- "degisikli" NOUN'u tek basina yeterli sayilmiyor, "isti" ile
+# YAKIN olmasi gerekiyor (CHANGE_REQUEST_NOUN_PATTERN).
+r = cat("", "Uçuşumuz iptal olursa değişiklik hakkımız var mı, transfer saatimiz kesinleşti mi öğrenmek istiyorum.")
+check(
+    "UcakBileti-Degisiklik-Koruma-1: soru formu 'değişiklik hakkımız var mı' UCAK_BILETI_DEGISIKLIGI'ne dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI",
+    r["classification"],
+)
+
+# Koruma: PASIF/sikayet formundaki "değiştirildi" (Gercekci-44) hala dogru
+# SIKAYET dalina dusmeli, aksiyoner bir Backoffice talebi sanilmamali.
+r = cat("", "Uçuş saatimiz habersizce değiştirildi, planlarımız altüst oldu.")
+check(
+    "UcakBileti-Degisiklik-Koruma-2: pasif 'habersizce değiştirildi' sikayeti UCAK_BILETI_DEGISIKLIGI'ne dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI",
+    r["classification"],
+)
+
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi, ticket #101939348 sonrasi
+# kullanicinin verdigi netlestirme ornegi) ---
+# "değişikliği için ... yapılmasını RİCA ederim" gibi ifadeler "isti" kelimesi
+# icermiyor (sadece "rica ederim" kullaniyor), CHANGE_REQUEST_NOUN_PATTERN
+# eski hali sadece "isti"yi araniyordu -- "rica" da eklendi, 45 karakterlik
+# yakinlik penceresi Gercekci-10'daki UZAK "isti" ile (69 karakter) hala
+# ayirt ediliyor.
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuzdaki uçak biletinin "
+    "tarih ve saat değişikliği için işlemlerin yapılmasını rica ederim",
+)
+check(
+    "UcakBileti-Degisiklik-5 (CANLI HATA DUZELTMESI): 'değişikliği için ... rica ederim' (isti degil rica) -> UCAK_BILETI_DEGISIKLIGI",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI",
+    r["classification"],
+)
+
 r = cat("", "Uçak biletimi iptal etmek istiyorum.")
 check(
     "COLLISION-2: 'ucak biletimi iptal' -> beklenen UCAK_BILETI_IPTALI ama 'bilet' kelimesi ULASIM dalina cekiyor",
     r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI",
+    r["classification"],
+)
+
+# --- CANLI HATA DUZELTMESI: CANCEL_INTENT_KEYWORDS'un kapsamadigi "iptal
+# edilmesi ... rica ederim" / bare "iptali" / "iade" cekimlerini tanimak icin
+# CANCEL_REQUEST_NOUN_PATTERN eklendi (kullanici tarafindan bildirildi).
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuzdaki sadece uçak "
+    "biletinin iptal edilmesi hususunda işlemlerin yapılmasını rica ederim.",
+)
+check(
+    "UcakBileti-Iptal-1 (ONAYLI): 'iptal edilmesi hususunda ... rica ederim' (CANCEL_INTENT_KEYWORDS kapsamiyor)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI",
+    r["classification"],
+)
+
+r = cat("", "Uçak bileti iptali için işlem yapar mısınız.")
+check(
+    "UcakBileti-Iptal-2: bare 'iptali' + kibar talep sorusu 'yapar mısınız'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI",
+    r["classification"],
+)
+
+r = cat("", "PNR iptal talebimiz var.")
+check("UcakBileti-Iptal-3: bare 'pnr' + 'iptal talebi'", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI", r["classification"])
+
+r = cat("", "Uçak biletimizin iadesi için işlem yapılmasını rica ederiz.")
+check(
+    "UcakBileti-Iptal-4: 'bilet iadesi' (iade = iptal esdegeri) + 'rica ederiz'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI",
+    r["classification"],
+)
+
+# Koruma: GECMISE DONUK bilgi-istek metni ("iptal ettiğim ... ne zaman
+# yapılır") hala yanlislikla UCAK_BILETI_IPTALI'ne dusmemeli -- CANCEL_REQUEST_NOUN_PATTERN
+# AIRPLANE_TICKET_TOPIC_KEYWORDS ile eslestirilerek dar kapsamda tutuldu.
+r = cat("", "İptal ettiğim rezervasyonun iadesi genelde kaç gün içinde hesabımıza geçiyor?")
+check(
+    "UcakBileti-Iptal-Koruma: gecmise donuk 'iptal ettiğim ... iadesi' bilgi-istegi UCAK_BILETI_IPTALI'ne dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI",
     r["classification"],
 )
 
@@ -1192,6 +1624,38 @@ check(
     (r["classification"], r.get("attributes"), r.get("priority_level")),
 )
 
+# --- CANLI HATA DUZELTMESI: iki ayri sorun bir arada bulundu ---
+# 1) SHIFT_EVENT_KEYWORDS eski hali "kaydirildi" (PASIF, "rezervasyonumuz
+#    kaydırıldı") icermiyordu, sadece "kaydirildik" (biz+pasif) vardi.
+# 2) TRANSPORT_TICKET (Bilgi-Istek > Ulasim > Bilet, "ucus"+"bilgilendirme")
+#    ve OTOBUS dallari, somut bir Kaydirma talebiyle cakistiginda geri
+#    cekilmiyordu -- is_shift_related korumasi eklendi.
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuz için operasyon "
+    "biriminiz tarafından iletilen bilgilendirmede, iç hat uçuş "
+    "planlamalarındaki değişiklikler nedeniyle rezervasyonumuzun operasyon "
+    "kaynaklı olarak başka bir tarihe kaydırılması talep edilmiştir. Bu "
+    "değişiklik için tanınan opsiyon süresi bugün saat 18:40 itibarıyla "
+    "sona erecektir. Süre aşılmadan gerekli backoffice kaydırma "
+    "işlemlerinin ivedilikle yapılmasını rica eder, iyi çalışmalar dilerim.",
+)
+opsiyon_deger3 = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "OPSIYON_SURESI"), None)
+check(
+    "Kaydirma-OperasyonKaynakli-2 (ONAYLI): 'operasyon birimi bilgilendirmesi' + 'uçuş' -> BILET bilgi-istegine degil OPERASYON_KAYNAKLI'ya dusmeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > KAYDIRMA > OPERASYON_KAYNAKLI"
+    and opsiyon_deger3 is not None and opsiyon_deger3.get("textValue") == "18:40"
+    and r.get("priority_level") == "OPSIYONLU",
+    (r["classification"], r.get("attributes"), r.get("priority_level")),
+)
+
+r = cat("", "Acente operasyon birimi yönlendirmesiyle rezervasyonumuz kaydırıldı, bilgi rica ederiz.")
+check(
+    "Kaydirma-OperasyonKaynakli-3 (CANLI HATA DUZELTMESI): pasif 'kaydırıldı' (SHIFT_EVENT_KEYWORDS'e eklendi)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > KAYDIRMA > OPERASYON_KAYNAKLI",
+    r["classification"],
+)
+
 # Koruma: opsiyon suresi gecmiyorsa priority_level set edilmemeli (varsayilan
 # Normal oncelikte kalmali).
 r = cat("", "Otel bizi başka tarihe kaydırdı, bilgi rica ederiz.")
@@ -1305,6 +1769,27 @@ check("Sikayet-Ucak-HavayoluDegisikligi", r["classification"] == "SIKAYET > UCAK
 r = cat("", "Uçak saati değişti, kalkış saati değişti.")
 check("Sikayet-Ucak-SaatDegisikligi", r["classification"] == "SIKAYET > UCAK > SAAT_DEGISIKLIGI", r["classification"])
 
+# --- CANLI HATA DUZELTMESI (ticket #101939947) ---
+# "havayolu firması ... uçuş saatlerinin ... değiştirilmesi ve saatlerin
+# birbirine uymaması" gibi bir sikayette asil odak SAAT UYUMSUZLUGU;
+# "havayolu" sadece degisikligi yapan tarafi belirtiyor. Eskiden: (1)
+# FLIGHT_TIME_TOPIC_KEYWORDS COGUL "uçuş saatlerinin" formunu kapsamiyordu
+# (sadece tekil "saati"), (2) AIRLINE_CHANGE_TOPIC_KEYWORDS ("havayolu" +
+# "degisti") SAAT_DEGISIKLIGI'nden ONCE kontrol edildigi icin her zaman
+# kazaniyordu.
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzdaki uçuş saatlerinin "
+    "havayolu firması tarafından hiçbir gerekçe sunulmadan "
+    "değiştirilmesinden ve saatlerin birbirine uymamasından ötürü mağdur "
+    "olduk, şikayetçiyiz",
+)
+check(
+    "Sikayet-Ucak-SaatDegisikligi-2 (CANLI HATA DUZELTMESI): 'havayolu' + 'uçuş saatlerinin' birlikte -> SAAT_DEGISIKLIGI kazanmali",
+    r["classification"] == "SIKAYET > UCAK > SAAT_DEGISIKLIGI",
+    r["classification"],
+)
+
 r = cat("", "Seferimiz iptal edildi.")
 check("Sikayet-Ucak-SeferIptali", r["classification"] == "SIKAYET > UCAK > SEFER_IPTALI", r["classification"])
 
@@ -1328,6 +1813,44 @@ check("Sikayet-TurRehber-Tur", r["classification"] == "SIKAYET > TUR_ORGANIZASYO
 r = cat("", "Rehberden memnun değilim, rehber ilgisizdi.")
 check("Sikayet-TurRehber-Rehber", r["classification"] == "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > REHBER", r["classification"])
 
+# --- TOUR_TOPIC_KEYWORDS genisletme: eski liste sadece "tur program"/"tur
+# organizasyon" kapsiyordu, "Vaat edilen yerler gezilmedi"/"Rota değiştirildi"/
+# "Tur hizmetinden şikayetçiyiz" gibi "tur" kelimesini hic icermeyen ya da
+# farkli kalip kullanan ifadeler kacyordu (kullanici tarafindan bildirildi).
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı tur rezervasyonumuz kapsamında taahhüt "
+    "edilen tur programının ve rotanın tamamen aksaması, planlanan yerlerin "
+    "gezilememesi nedeniyle yaşanan tur organizasyonu eksikliklerinden "
+    "dolayı şikayetçiyiz, gereğinin yapılmasını rica ederiz.",
+)
+check(
+    "Sikayet-TurRehber-Tur-2 (ONAYLI): tur programı/rota aksaması + planlanan yerler gezilememesi",
+    r["classification"] == "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > TUR",
+    r["classification"],
+)
+
+r = cat("", "Vaat edilen yerler gezilmedi, şikayetçiyiz.")
+check("Sikayet-TurRehber-Tur-3: 'vaat edilen yerler gezilmedi' (bare 'tur' kelimesi yok)", r["classification"] == "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > TUR", r["classification"])
+
+r = cat("", "Rota değiştirildi, şikayetçiyiz.")
+check("Sikayet-TurRehber-Tur-4: 'rota değiştirildi'", r["classification"] == "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > TUR", r["classification"])
+
+r = cat("", "Tur hizmetinden şikayetçiyiz.")
+check("Sikayet-TurRehber-Tur-5: 'tur hizmetinden şikayetçiyiz'", r["classification"] == "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > TUR", r["classification"])
+
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzdaki tur süresince görev "
+    "yapan rehberin ilgisiz, yetersiz ve yanlış yönlendirmelerde bulunması "
+    "nedeniyle yaşadığımız mağduriyetten dolayı şikayetçiyiz.",
+)
+check(
+    "Sikayet-TurRehber-Rehber-2 (ONAYLI): rehberin ilgisiz/yetersiz/yanlış yönlendirmesi",
+    r["classification"] == "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > REHBER",
+    r["classification"],
+)
+
 r = cat("", "İade yapılmadı, param iade edilmedi.")
 check("Sikayet-Iade-Yapilmamasi", r["classification"] == "SIKAYET > IADE > IADENIN_YAPILMAMASI", r["classification"])
 
@@ -1348,6 +1871,169 @@ check("Sikayet-Fiyat-OdemeItirazi", r["classification"] == "SIKAYET > FIYATLANDI
 
 r = cat("", "Fiyat ile ilgili şikayetim var, fiyat hatalı gösterilmiş.")
 check("Sikayet-Fiyat-Genel", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_GENEL", r["classification"])
+
+# ==========================================================
+# SIKAYET > FIYATLANDIRMA (4 kirilim) genisletme
+# ==========================================================
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuz için başka bir "
+    "platformda daha uygun fiyat bulmamıza rağmen 'En İyi Fiyat Garantisi' "
+    "kapsamında aradaki farkın tarafımıza iade edilmemesinden dolayı "
+    "şikayetçiyiz, gereğinin yapılmasını rica ederiz.",
+)
+check("Sikayet-Fiyat-EnIyiFiyatGarantisi-2 (ONAYLI)", r["classification"] == "SIKAYET > FIYATLANDIRMA > EN_IYI_FIYAT_GARANTISI", r["classification"])
+
+r = cat("", "Başka sitede daha ucuz bulduk, şikayetçiyiz.")
+check("Sikayet-Fiyat-EnIyiFiyatGarantisi-3: 'daha ucuz bulduk'", r["classification"] == "SIKAYET > FIYATLANDIRMA > EN_IYI_FIYAT_GARANTISI", r["classification"])
+
+r = cat("", "Eş değer fiyat politikası uygulanmadı, şikayetçiyiz.")
+check("Sikayet-Fiyat-EnIyiFiyatGarantisi-4: 'eş değer fiyat politikası'", r["classification"] == "SIKAYET > FIYATLANDIRMA > EN_IYI_FIYAT_GARANTISI", r["classification"])
+
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzla ilgili genel "
+    "fiyatlandırma politikaları ve uygulanan ücretler konusunda yaşadığımız "
+    "memnuniyetsizlikten ötürü şikayetçiyiz.",
+)
+check("Sikayet-Fiyat-Genel-2 (ONAYLI): genel fiyatlandırma politikası/ücretler memnuniyetsizliği", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_GENEL", r["classification"])
+
+r = cat("", "Fiyatlar çok yüksek, şikayetçiyiz.")
+check("Sikayet-Fiyat-Genel-3: 'fiyatlar çok yüksek'", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_GENEL", r["classification"])
+
+r = cat("", "Genel ücretlendirme hatasından şikayetçiyiz.")
+check("Sikayet-Fiyat-Genel-4: 'ücretlendirme hatası' (bare 'ucret' + COMPLAINT_SENTIMENT)", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_GENEL", r["classification"])
+
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzu yaptıktan kısa süre "
+    "sonra aynı otelin fiyatlarında ciddi bir düşüş gerçekleştiğini gördük. "
+    "Fiyat düşüşü farkının tarafımıza yansıtılmamasından dolayı şikayetçiyiz.",
+)
+check("Sikayet-Fiyat-Dususu-2 (ONAYLI): 'fiyat düşüşü' (noun) + 'yansıtılmaması'", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_DUSUSU", r["classification"])
+
+r = cat("", "Rezervasyonumuz sonradan ucuzladı, şikayetçiyiz.")
+check("Sikayet-Fiyat-Dususu-3: 'sonradan ucuzladı'", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_DUSUSU", r["classification"])
+
+r = cat("", "Otel fiyatı geriledi, şikayetçiyiz.")
+check("Sikayet-Fiyat-Dususu-4: 'otel fiyatı geriledi'", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_DUSUSU", r["classification"])
+
+r = cat("", "İndirim farkı iadesi yapılmadı, şikayetçiyiz.")
+check("Sikayet-Fiyat-Dususu-5: 'indirim farkı iadesi' (genel IADE dalindan ayristirildi)", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_DUSUSU", r["classification"])
+
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzda mutabık kaldığımız "
+    "fiyat ile kartımdan çekilen tutar arasında uyuşmazlık bulunmaktadır. "
+    "Fiyatlandırma hatasına yönelik ödeme itirazımın incelenmesini rica "
+    "ederim",
+)
+check("Sikayet-Fiyat-OdemeItirazi-2 (ONAYLI): fiyat/tutar mutabakatsizligi", r["classification"] == "SIKAYET > FIYATLANDIRMA > ODEME_ITIRAZI", r["classification"])
+
+r = cat("", "Hatalı tutar yansıtılması nedeniyle şikayetçiyiz.")
+check("Sikayet-Fiyat-OdemeItirazi-3: 'hatalı tutar yansıtılması'", r["classification"] == "SIKAYET > FIYATLANDIRMA > ODEME_ITIRAZI", r["classification"])
+
+# --- CANLI HATA DUZELTMESI: bare "fatura"+"sikayet" kombinasyonu, "Fatura
+# fiyatı uyumsuzluğu" gibi aslinda fiyat/tutar mutabakatsizligi olan
+# mailleri yanlislikla FATURA sikayet dalina (fatura KESILMESI sorunu)
+# cekiyordu. Ayrica "uyumsuzluk" kelimesi unsuz yumusamasiyla ("uyumsuzluğu")
+# kendi kokunu icermiyordu -- "uyumsuz" stemine kisaltildi.
+r = cat("", "Fatura fiyatı uyumsuzluğu nedeniyle şikayetçiyiz.")
+check(
+    "Sikayet-Fiyat-OdemeItirazi-4 (CANLI HATA DUZELTMESI): 'fatura fiyatı uyumsuzluğu' -> FATURA sikayetine degil ODEME_ITIRAZI'na dusmeli",
+    r["classification"] == "SIKAYET > FIYATLANDIRMA > ODEME_ITIRAZI",
+    r["classification"],
+)
+
+r = cat("", "Yanlış ücret çekilmesi şikayetimizi iletiyoruz.")
+check(
+    "Sikayet-Fiyat-OdemeItirazi-5: 'yanlış ücret çekilmesi' (bare 'cekilmesi' DEGIL, spesifik 'yanlis ucret' kalibi)",
+    r["classification"] == "SIKAYET > FIYATLANDIRMA > ODEME_ITIRAZI",
+    r["classification"],
+)
+
+# Koruma: bare "cekilmesi" ODEMENIN_YANSIMAMASI ile cakismamali -- "kartımdan
+# ödeme çekilmesine rağmen tutar sisteminize yansımadı" hala dogru dalda
+# kalmali (Odeme-2/Odeme-3 testlerinde zaten kapsanan davranis, burada da
+# aciktan dogrulaniyor).
+r = cat("", "Merhaba, kartımdan ödeme çekilmesine rağmen tutar sisteminize yansımadı. Kontrol eder misiniz?")
+check(
+    "Sikayet-Fiyat-Koruma: 'ödeme çekilmesine rağmen ... yansımadı' ODEME_ITIRAZI'na dusmemeli",
+    r["classification"] != "SIKAYET > FIYATLANDIRMA > ODEME_ITIRAZI",
+    r["classification"],
+)
+
+# ==========================================================
+# 18 KIRILIMLIK BUYUK SERI: Otel Operasyon genisletme, Bilgi-Istek Rezervasyon
+# genisletme (Degisiklik Bilgi Talebi/Konfirme), YENI: SIKAYET > ONLINE_ISLEMLER
+# (3 kirilim) ve SIKAYET > IPTAL (sebep bazli, 4 kirilim).
+# ==========================================================
+r = cat("", "553044193 numaralı rezervasyonumuzda otel yönetiminin karşılamadaki tutumu ve personel ilgisizliği nedeniyle şikayetçiyiz, otel operasyonundan memnun kalmadık.")
+check("Sikayet-Otel-Operasyon-2 (ONAYLI): 'otel operasyonundan' + 'personel ilgisizliği'", r["classification"] == "SIKAYET > OTEL > OPERASYON", r["classification"])
+
+r = cat("", "Rezervasyonumda tarih değişikliği yapmak istesem değişiklik şartları ve ücreti hakkında bilgi almak istiyorum.")
+check(
+    "BilgiIstek-DegisiklikBilgiTalebi-2 (CANLI HATA DUZELTMESI): 'tarih değişikliği' + 'bilgi' -> Ulasim'a ozel DEGISIKLIK_HAKKI_SORGULAMA'ya degil genel DEGISIKLIK_BILGI_TALEBI'ne dusmeli",
+    r["classification"] == "BILGI_ISTEK > REZERVASYON > DEGISIKLIK_BILGI_TALEBI",
+    r["classification"],
+)
+
+r = cat("", "Rezervasyonumuzun otel tarafından onaylanıp onaylanmadığını, konfirme durumunu öğrenmek istiyorum.")
+check("BilgiIstek-Konfirme-2: 'onaylanıp onaylanmadığını ... öğrenmek istiyorum'", r["classification"] == "BILGI_ISTEK > REZERVASYON > KONFIRME", r["classification"])
+
+r = cat("", "Rezervasyonumu iptal edersem kesinti oranı ne olur, iptal süreci hakkında bilgi almak istiyorum.")
+check("BilgiIstek-IptalSurecBilgi-2", r["classification"] == "BILGI_ISTEK > REZERVASYON > IPTAL_SUREC_BILGISI", r["classification"])
+
+# --- YENI: SIKAYET > ONLINE_ISLEMLER (3 kirilim) ---
+r = cat("", "Online işlem yaparken sistem hatası aldık, işlem yapamıyoruz, şikayetçiyiz.")
+check("Sikayet-OnlineIslemler-Genel", r["classification"] == "SIKAYET > ONLINE_ISLEMLER > ONLINE_ISLEMLER", r["classification"])
+
+r = cat("", "Mobil uygulama üzerinden giriş yaparken sürekli hata alıyoruz, app çöküyor, şikayetçiyiz.")
+check("Sikayet-OnlineIslemler-MobilUygulama", r["classification"] == "SIKAYET > ONLINE_ISLEMLER > MOBIL_UYGULAMA", r["classification"])
+
+r = cat("", "Web sitesi açılmıyor, internet sitesi sürekli donuyor, şikayetçiyiz.")
+check("Sikayet-OnlineIslemler-WebSitesi", r["classification"] == "SIKAYET > ONLINE_ISLEMLER > WEB_SITESI", r["classification"])
+
+# Koruma: mevcut onayli bilgi-istek (Online-3) sikayet dallarina dusmemeli --
+# "sistem hata veriyor" gecse bile, sikayet ifadesi (COMPLAINT_SENTIMENT) yoksa
+# bilgi-istek/yardim talebi olarak kalmali.
+r = cat(
+    "",
+    "Merhaba, Tatilbudur.com web siteniz üzerinden mevcut üyeliğime giriş "
+    "yaptım. Profilimdeki kayıtlı telefon numaramı değiştirmek istiyorum "
+    "fakat sistem hata veriyor ve kaydetmiyor. Web siteniz üzerinden profil "
+    "bilgilerimi nasıl güncelleyebilirim veya sistemdeki numaramı "
+    "05321112233 olarak güncelleyebilir misiniz?\n\nÜyelik E-Posta: "
+    "karaguneyyoguz@gmail.com\nDesteklerinizi rica ederim.",
+)
+check(
+    "Sikayet-OnlineIslemler-Koruma (CANLI HATA DUZELTMESI): 'sistem hata veriyor' ama sikayet ifadesi yok -> SIKAYET dallarina dusmemeli",
+    "SIKAYET > ONLINE_ISLEMLER" not in r["classification"],
+    r["classification"],
+)
+
+# --- YENI: SIKAYET > IPTAL (sebep bazli, 4 kirilim) ---
+r = cat("", "Sağlık problemi nedeniyle rezervasyonumuzu iptal ettik, hastane raporumuza rağmen mağdur edildik, şikayetçiyiz.")
+check("Sikayet-Iptal-SaglikProblemleri", r["classification"] == "SIKAYET > IPTAL > SAGLIK_PROBLEMLERI", r["classification"])
+
+r = cat("", "Sitedeki otel yorumları gerçeği yansıtmıyor, yanıltıcı yorumlar yüzünden mağdur olduk, şikayetçiyiz.")
+check("Sikayet-Iptal-OtelYorumlari", r["classification"] == "SIKAYET > IPTAL > OTEL_YORUMLARI", r["classification"])
+
+r = cat("", "Mücbir sebep (doğal afet) nedeniyle iptal talebimiz reddedildi, şikayetçiyiz.")
+check("Sikayet-Iptal-MucbirSebep", r["classification"] == "SIKAYET > IPTAL > MUCBIR_SEBEP", r["classification"])
+
+r = cat("", "Özel sebep/kişisel mazeretimiz nedeniyle iptal talebimiz kabul görmedi, şikayetçiyiz.")
+check("Sikayet-Iptal-OzelSebep", r["classification"] == "SIKAYET > IPTAL > OZEL_SEBEP", r["classification"])
+
+# --- CANLI HATA DUZELTMESI: Havayolu Degisikligi sikayeti, aktif "degistirdi"
+# kokunun UCAK_BILETI_DEGISIKLIGI (Backoffice) ile ayni "degistir" kokunu
+# paylasmasi yuzunden yanlislikla Backoffice talebine dusuyordu.
+r = cat("", "Havayolu firması uçuş rotamızı değiştirdi, şikayetçiyiz.")
+check(
+    "Sikayet-Ucak-HavayoluDegisikligi-2 (CANLI HATA DUZELTMESI): 'havayolu ... değiştirdi' + şikayetçiyiz -> UCAK_BILETI_DEGISIKLIGI'ne degil SIKAYET dalina dusmeli",
+    r["classification"] == "SIKAYET > UCAK > HAVAYOLU_DEGISIKLIGI",
+    r["classification"],
+)
 
 # --- COZULDU (musteri onayli ayrim kurali): "sofor" bare kelimesi tek basina
 # EVRAK'a gitmez; "plaka"/"kaptan" veya "sofor" + isim talebi (adini/ismini)
@@ -1381,7 +2067,7 @@ check(
 # hala basarisiz -- bu, otobus/transfer icerigi ayrica konusulup karara
 # baglanana kadar boyle kalacak.
 # ==========================================================
-KNOWN_ISSUE_SCENARIOS = {15, 23, 32}
+KNOWN_ISSUE_SCENARIOS = {15}
 
 REALISTIC_SCENARIOS = [
     (9, "BILGI_ISTEK > ULASIM > BILET", "Merhaba, yarınki uçuşumuza ait e-biletimiz hala mail kutumuza düşmedi, tekrar gönderebilir misiniz?"),
@@ -1658,6 +2344,50 @@ check(
     "PriorityLevel-4: hem 'acil' hem 'opsiyon' geciyorsa Engelleyici (daha yuksek aciliyet) kazanmali",
     detect_priority_level("Opsiyon süremiz doluyor, acil ilgilenir misiniz?") == "ENGELLEYICI",
     detect_priority_level("Opsiyon süremiz doluyor, acil ilgilenir misiniz?"),
+)
+
+# ==========================================================
+# is_vendor_finance_correspondence: Otel/tedarikci muhasebe birimlerinin
+# gonderdigi B2B ekstre/mutabakat/cari hesap yazismalari -- ticket
+# OLUSTURULMAMALI, sadece dogru muhasebe adreslerine yonlendirilmeli
+# (kullanici tarafindan bildirildi, 3 gercek ornek uzerinden).
+# ==========================================================
+check(
+    "VendorFinance-1 (ONAYLI, gercek ornek): Elite World ekstre + odeme destegi talebi",
+    is_vendor_finance_correspondence(
+        "Merhabalar, Güncel ekstreleriniz ekte olup Ödeme konusunda "
+        "desteklerinizi ve dönüşlerinizi rica ederim. Saygılarımla, iyi "
+        "çalışmalar. Öznur Bulut Gelirler Kredliler Şefi | Income & Account "
+        "Receivable Supervisor"
+    ),
+    "beklenen: True",
+)
+check(
+    "VendorFinance-2 (ONAYLI, gercek ornek): Marriott iade fatura GIB uzerinden iptal",
+    is_vendor_finance_correspondence(
+        "Merhabalar, Tarafımıza kesmiş olduğunuz ekteki EFZ2026000036557 NL "
+        "iade faturanız hatalıdır. GİB üzerinden iptal edilmiştir. "
+        "Onaylamanızı rica ediyorum. İade faturanız işleme alınmayacaktır. "
+        "Muhasebe ekibinizi mütemadiyen aramama rağmen görüşme sağlayamadım."
+    ),
+    "beklenen: True",
+)
+check(
+    "VendorFinance-3 (ONAYLI, gercek ornek): Innvista vadesi gecmis bakiye/odeme",
+    is_vendor_finance_correspondence(
+        "Merhaba, Yaşlandırmaya girmiş vadesi gelen ödeme tutarınız "
+        "aşağıdaki gibidir. Ödeme konusunda sizden bilgi rica eder; iyi "
+        "çalışmalar dilerim."
+    ),
+    "beklenen: True",
+)
+check(
+    "VendorFinance-Koruma: normal musteri odeme sikayeti yanlislikla vendor sayilmamali",
+    not is_vendor_finance_correspondence(
+        "Merhaba, kartımdan ödeme çekilmesine rağmen tutar sisteminize "
+        "yansımadı. Kontrol eder misiniz?"
+    ),
+    "beklenen: False",
 )
 
 # ==========================================================

@@ -257,6 +257,25 @@ SUB_CATEGORY_PRICE_DROP = 100000584                     # Ürün Fiyat Düşüş
 SUB_CATEGORY_PAYMENT_OBJECTION = 100000589              # Ödeme İtirazı
 
 # ==========================================
+# ŞİKAYET - ONLINE İŞLEMLER
+# Not: CATEGORY_ONLINE_OPERATIONS (100000133) Bilgi-İstek tarafinda da
+# kullanilan AYNI kategori -- CSM'de bu numara ticket tipinden bagimsiz.
+# ==========================================
+SUB_CATEGORY_ONLINE_OPERATIONS_COMPLAINT = 100000566     # Online İşlemler
+SUB_CATEGORY_MOBILE_APP_COMPLAINT = 100000725            # Mobil Uygulama
+SUB_CATEGORY_WEBSITE_COMPLAINT = 100000724               # Web Sitesi
+
+# ==========================================
+# ŞİKAYET - İPTAL (SEBEP BAZLI)
+# Not: CATEGORY_CANCELLATION (100000141) Backoffice tarafinda da kullanilan
+# AYNI kategori.
+# ==========================================
+SUB_CATEGORY_CANCELLATION_HEALTH_ISSUE = 100000703       # Sağlık Problemleri
+SUB_CATEGORY_CANCELLATION_SPECIAL_REASON = 100000704     # Özel Sebep
+SUB_CATEGORY_CANCELLATION_FORCE_MAJEURE = 100000705      # Mücbir Sebep
+SUB_CATEGORY_CANCELLATION_HOTEL_REVIEWS = 100000706      # Otel Yorumları
+
+# ==========================================
 # ATTRIBUTE IDs
 # ==========================================
 ATTRIBUTE_TRANSACTION_DATE = 100000037
