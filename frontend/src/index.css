@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* Enigma brand */
+  --color-enigma-primary: #4f7cff;
+  --color-enigma-primary-dark: #3d63e0;
+  --color-enigma-primary-light: #eef2ff;
+
+  --color-enigma-success: #17c653;
+  --color-enigma-success-light: #e8fff3;
+  --color-enigma-warning: #f6b100;
+  --color-enigma-warning-light: #fff8dd;
+  --color-enigma-danger: #f1416c;
+  --color-enigma-danger-light: #fff0f3;
+  --color-enigma-info: #7239ea;
+  --color-enigma-info-light: #f8f5ff;
+
+  /* Sidebar (dark) */
+  --color-enigma-sidebar: #1b1b29;
+  --color-enigma-sidebar-hover: #2a2a3d;
+  --color-enigma-sidebar-active: #2c2c47;
+  --color-enigma-sidebar-text: #9a9ab3;
+  --color-enigma-sidebar-text-active: #ffffff;
+
+  /* Surfaces */
+  --color-enigma-bg: #f7f8fc;
+  --color-enigma-surface: #ffffff;
+  --color-enigma-border: #eaecf3;
+  --color-enigma-text: #1a1a27;
+  --color-enigma-text-muted: #7e8299;
+}
+
+/* Dark theme: overrides the same tokens so every `bg-enigma-*` / `text-enigma-*`
+   utility repaints automatically — no `dark:` variants needed in components. */
+html.dark {
+  --color-enigma-primary-light: #1c2540;
+  --color-enigma-success-light: #103726;
+  --color-enigma-warning-light: #3a2e0a;
+  --color-enigma-danger-light: #3a1220;
+  --color-enigma-info-light: #241a3a;
+
+  --color-enigma-bg: #14141f;
+  --color-enigma-surface: #1c1c2b;
+  --color-enigma-border: #2c2c40;
+  --color-enigma-text: #e7e7f0;
+  --color-enigma-text-muted: #8b8ba3;
+}
+
+body {
+  background-color: var(--color-enigma-bg);
+  color: var(--color-enigma-text);
+  font-family: var(--font-sans);
+}
