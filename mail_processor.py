@@ -738,8 +738,13 @@ class EmailCategorizer:
         "haber verilmeden", "habersiz"
     ]
 
+    # Not: "ucus saat" (sonundaki "i" olmadan) eklendi -- eski liste sadece
+    # tekil iyelik eklerini ("saati","saatimiz") kapsiyordu, "uçuş
+    # saatlerinin" gibi COGUL formlar kaciyordu (kullanici tarafindan
+    # bildirilen ticket #101939947'de gozlemlendi). "saatlerin birbirine
+    # uymamasi" da eklendi.
     FLIGHT_TIME_TOPIC_KEYWORDS = [
-        "ucus saati", "sefer saati", "kalkis saati", "ucus saatimiz"
+        "ucus saat", "sefer saat", "kalkis saat", "saatlerin birbirine"
     ]
     FLIGHT_TIME_EVENT_KEYWORDS = [
         "degisti", "degistirildi", "habersiz", "erteledi", "one alindi"
@@ -1246,9 +1251,21 @@ class EmailCategorizer:
                 "classification": "SIKAYET > OTEL > OTEL_HIZMETLERI"
             }
 
+        # Not: FLIGHT_TIME_TOPIC_KEYWORDS de gecerse (asagida, SAAT_DEGISIKLIGI
+        # dali) bu dal geri cekilir -- "havayolu firması ... uçuş saatlerinin
+        # ... değiştirilmesi ve saatlerin birbirine uymaması" gibi bir
+        # sikayette asil odak SAAT UYUMSUZLUGU, "havayolu" sadece degisikligi
+        # yapan tarafi belirtiyor (ticket #101939947'de kullanici tarafindan
+        # bildirildi). Iki dal ayni "degisti" kokunu paylastigi icin
+        # havayolu+saat birlikte gecen mailler her zaman SAAT_DEGISIKLIGI'ne
+        # ait sayilir.
+        is_flight_time_change = any(
+            keyword in normalized_text for keyword in EmailCategorizer.FLIGHT_TIME_TOPIC_KEYWORDS
+        )
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.AIRLINE_CHANGE_TOPIC_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.AIRLINE_CHANGE_EVENT_KEYWORDS)
+            and not is_flight_time_change
         ):
             return {
                 "channel_id": CHANNEL_ID,

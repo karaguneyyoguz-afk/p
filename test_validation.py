@@ -1769,6 +1769,27 @@ check("Sikayet-Ucak-HavayoluDegisikligi", r["classification"] == "SIKAYET > UCAK
 r = cat("", "Uçak saati değişti, kalkış saati değişti.")
 check("Sikayet-Ucak-SaatDegisikligi", r["classification"] == "SIKAYET > UCAK > SAAT_DEGISIKLIGI", r["classification"])
 
+# --- CANLI HATA DUZELTMESI (ticket #101939947) ---
+# "havayolu firması ... uçuş saatlerinin ... değiştirilmesi ve saatlerin
+# birbirine uymaması" gibi bir sikayette asil odak SAAT UYUMSUZLUGU;
+# "havayolu" sadece degisikligi yapan tarafi belirtiyor. Eskiden: (1)
+# FLIGHT_TIME_TOPIC_KEYWORDS COGUL "uçuş saatlerinin" formunu kapsamiyordu
+# (sadece tekil "saati"), (2) AIRLINE_CHANGE_TOPIC_KEYWORDS ("havayolu" +
+# "degisti") SAAT_DEGISIKLIGI'nden ONCE kontrol edildigi icin her zaman
+# kazaniyordu.
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzdaki uçuş saatlerinin "
+    "havayolu firması tarafından hiçbir gerekçe sunulmadan "
+    "değiştirilmesinden ve saatlerin birbirine uymamasından ötürü mağdur "
+    "olduk, şikayetçiyiz",
+)
+check(
+    "Sikayet-Ucak-SaatDegisikligi-2 (CANLI HATA DUZELTMESI): 'havayolu' + 'uçuş saatlerinin' birlikte -> SAAT_DEGISIKLIGI kazanmali",
+    r["classification"] == "SIKAYET > UCAK > SAAT_DEGISIKLIGI",
+    r["classification"],
+)
+
 r = cat("", "Seferimiz iptal edildi.")
 check("Sikayet-Ucak-SeferIptali", r["classification"] == "SIKAYET > UCAK > SEFER_IPTALI", r["classification"])
 
