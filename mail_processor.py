@@ -2564,9 +2564,65 @@ def send_rejection_email(recipient_email: str, subject: str, customer_name: str)
         server.quit()
         
         print(f"🚫 [RED ONAY MAİLİ GÖNDERİLDİ] (Uygunsuz içerik) -> {recipient_email}")
-    
+
     except Exception as e:
         print(f"❌ Red maili gönderilirken hata: {e}")
+
+
+# Bu kutunun ilgilenmedigi B2B/tedarikci muhasebe yazismalari (ekstre/
+# mutabakat/cari hesap) icin yonlendirilecek gercek muhasebe adresleri
+# (kullanici tarafindan bildirildi).
+VENDOR_FINANCE_REDIRECT_ADDRESSES = [
+    "muhasebe@tatilbudur.com",
+    "maliyetfatura@tatilbudur.com",
+    "extranet@tatilbudur.com",
+    "mutabakatjira@tatilbudur.com",
+    "tatilbudur@mutabakat.com",
+]
+
+
+def send_vendor_redirect_email(recipient_email: str, subject: str, customer_name: str) -> None:
+    """
+    Otel/tedarikci muhasebe biriminden gelen ekstre/mutabakat/cari hesap
+    yazismalarina, bu kutunun bu konularla ilgilenmedigini ve dogru
+    adreslere yonlendirmelerini bildiren otomatik yanit gonderir. Ticket
+    OLUSTURULMAZ.
+
+    Args:
+        recipient_email: Yaniti alacak gonderici adresi
+        subject: Orijinal e-posta konusu
+        customer_name: Gonderici adi
+    """
+    try:
+        message = MIMEMultipart()
+        message['From'] = EMAIL_USER
+        message['To'] = recipient_email
+        message['Subject'] = f"Re: {subject} - Yanlış Adres Yönlendirmesi"
+
+        redirect_list_str = "\n".join([f"  • {addr}" for addr in VENDOR_FINANCE_REDIRECT_ADDRESSES])
+
+        formatted_body = (
+            f"Sayın {customer_name},\n\n"
+            f"Bu e-posta adresi, ekstre/mutabakat/cari hesap gibi muhasebe "
+            f"konularıyla ilgilenmemektedir.\n\n"
+            f"Bu tarz maillerinizi lütfen aşağıdaki adreslerden ilgili olana "
+            f"gönderiniz:\n\n"
+            f"{redirect_list_str}\n\n"
+            f"Anlayışınız için teşekkür ederiz.\n\n"
+            f"Saygılarımızla,\n"
+            f"Müşteri Hizmetleri Ekibi"
+        )
+        message.attach(MIMEText(formatted_body, 'plain', 'utf-8'))
+
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, recipient_email, message.as_string())
+        server.quit()
+
+        print(f"↪️ [YÖNLENDİRME MAİLİ GÖNDERİLDİ] (B2B muhasebe yazışması) -> {recipient_email}")
+
+    except Exception as e:
+        print(f"❌ Yönlendirme maili gönderilirken hata: {e}")
 
 
 def send_missing_fields_email(recipient_email: str, subject: str, missing_fields: List[str], customer_name: str) -> None:

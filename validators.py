@@ -753,3 +753,25 @@ def detect_priority_level(text: str) -> str | None:
     if "opsiyon" in normalized:
         return "OPSIYONLU"
     return None
+
+
+# Otel/tedarikci muhasebe birimlerinin Tatilbudur'a gonderdigi B2B mutabakat/
+# ekstre/cari hesap yazismalari -- bir MUSTERININ kendi rezervasyonuyla ilgili
+# talebi degil, bu kutunun ilgilenmedigi tamamen farkli bir konu (kullanici
+# tarafindan bildirildi). Bu ifadeler gercek musteri sikayetlerinde
+# pratikte hic gecmeyen, B2B muhasebe jargonuna ozgu terimler.
+VENDOR_FINANCE_KEYWORDS = [
+    "ekstre", "mutabakat", "cari hesap", "vadesi gecmis bakiye",
+    "vadesi gelen odeme", "toplam bakiye", "gib uzerinden iptal",
+    "muhasebe ekibinizi"
+]
+
+
+def is_vendor_finance_correspondence(text: str) -> bool:
+    """
+    Metin, bir otel/tedarikci muhasebe biriminin Tatilbudur'a gonderdigi B2B
+    mutabakat/ekstre/cari hesap yazismasi mi (musteri talebi degil) tespit
+    eder.
+    """
+    normalized = normalize_turkish_characters(text)
+    return any(keyword in normalized for keyword in VENDOR_FINANCE_KEYWORDS)

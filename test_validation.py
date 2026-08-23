@@ -23,6 +23,7 @@ from validators import (
     is_valid_email,
     extract_reservation_number,
     detect_priority_level,
+    is_vendor_finance_correspondence,
 )
 from csm_api import TicketPayloadBuilder
 
@@ -2322,6 +2323,50 @@ check(
     "PriorityLevel-4: hem 'acil' hem 'opsiyon' geciyorsa Engelleyici (daha yuksek aciliyet) kazanmali",
     detect_priority_level("Opsiyon süremiz doluyor, acil ilgilenir misiniz?") == "ENGELLEYICI",
     detect_priority_level("Opsiyon süremiz doluyor, acil ilgilenir misiniz?"),
+)
+
+# ==========================================================
+# is_vendor_finance_correspondence: Otel/tedarikci muhasebe birimlerinin
+# gonderdigi B2B ekstre/mutabakat/cari hesap yazismalari -- ticket
+# OLUSTURULMAMALI, sadece dogru muhasebe adreslerine yonlendirilmeli
+# (kullanici tarafindan bildirildi, 3 gercek ornek uzerinden).
+# ==========================================================
+check(
+    "VendorFinance-1 (ONAYLI, gercek ornek): Elite World ekstre + odeme destegi talebi",
+    is_vendor_finance_correspondence(
+        "Merhabalar, Güncel ekstreleriniz ekte olup Ödeme konusunda "
+        "desteklerinizi ve dönüşlerinizi rica ederim. Saygılarımla, iyi "
+        "çalışmalar. Öznur Bulut Gelirler Kredliler Şefi | Income & Account "
+        "Receivable Supervisor"
+    ),
+    "beklenen: True",
+)
+check(
+    "VendorFinance-2 (ONAYLI, gercek ornek): Marriott iade fatura GIB uzerinden iptal",
+    is_vendor_finance_correspondence(
+        "Merhabalar, Tarafımıza kesmiş olduğunuz ekteki EFZ2026000036557 NL "
+        "iade faturanız hatalıdır. GİB üzerinden iptal edilmiştir. "
+        "Onaylamanızı rica ediyorum. İade faturanız işleme alınmayacaktır. "
+        "Muhasebe ekibinizi mütemadiyen aramama rağmen görüşme sağlayamadım."
+    ),
+    "beklenen: True",
+)
+check(
+    "VendorFinance-3 (ONAYLI, gercek ornek): Innvista vadesi gecmis bakiye/odeme",
+    is_vendor_finance_correspondence(
+        "Merhaba, Yaşlandırmaya girmiş vadesi gelen ödeme tutarınız "
+        "aşağıdaki gibidir. Ödeme konusunda sizden bilgi rica eder; iyi "
+        "çalışmalar dilerim."
+    ),
+    "beklenen: True",
+)
+check(
+    "VendorFinance-Koruma: normal musteri odeme sikayeti yanlislikla vendor sayilmamali",
+    not is_vendor_finance_correspondence(
+        "Merhaba, kartımdan ödeme çekilmesine rağmen tutar sisteminize "
+        "yansımadı. Kontrol eder misiniz?"
+    ),
+    "beklenen: False",
 )
 
 # ==========================================================
