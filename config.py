@@ -33,6 +33,7 @@ CSM_AUTH_URL = "https://tatilbudur-api.cloudcsmetiya.com/api/v1/auth/authenticat
 CSM_CREATE_TICKET_URL = "https://tatilbudur-api.cloudcsmetiya.com/api/v1/business/ticket/add"
 CSM_CANCEL_TICKET_URL = "https://tatilbudur-api.cloudcsmetiya.com/api/v1/business/ticket/cancel"
 CSM_SEARCH_PARTY_ROLES_URL = "https://tatilbudur-api.cloudcsmetiya.com/api/v1/business/partyRole/getPartyRoles"
+CSM_SEARCH_PRODUCT_URL = "https://tatilbudur-api.cloudcsmetiya.com/api/v1/business/product/search"
 CSM_BASE_URL = "https://tatilbudur-api.cloudcsmetiya.com"
 
 # ==========================================

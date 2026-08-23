@@ -6,6 +6,14 @@ oncelik/çakisma (precedence) durumlarini ve validators.py fonksiyonlarini
 tek tek kontrol eder. Ag baglantisi (IMAP/SMTP/CSM API) gerektirmez.
 """
 
+import sys
+
+# Not: Windows'ta konsol varsayilan olarak cp1254 kullanabiliyor, bu da
+# csm_api.TicketPayloadBuilder.build_payload() gibi emoji print eden
+# fonksiyonlar test edilirken UnicodeEncodeError'a yol aciyordu.
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 from mail_processor import EmailCategorizer
 from validators import (
     contains_profanity,
@@ -13,7 +21,9 @@ from validators import (
     is_valid_turkish_id,
     is_valid_tax_id,
     is_valid_email,
+    extract_reservation_number,
 )
+from csm_api import TicketPayloadBuilder
 
 # validators.py ile uretilen, algoritmik olarak GECERLI test degerleri
 VALID_TC = "90939729806"
@@ -1097,6 +1107,64 @@ check(
     r["classification"],
 )
 
+# --- Opsiyon Suresi (100000130) + Oncelik="Opsiyonlu" (kullanici tarafindan
+# bildirildi: mailde opsiyon suresi gecerse hem attribute eklenmeli hem de
+# ticket'in Oncelik alaninda "Opsiyonlu" secilmeli). Sadece Kaydırma > Operasyon
+# Kaynaklı / Otel Kaynaklı alt kirilimlarinda gecerli.
+r = cat("", "Otel yönetimi doluluk nedeniyle rezervasyonumuzu kaydırdı. Opsiyon Süresi: 11:40. Bilgilerinizi rica ederiz.")
+opsiyon_deger = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "OPSIYON_SURESI"), None)
+check(
+    "Kaydirma-OtelKaynakli-OpsiyonSuresi (ONAYLI): etiketli 'Opsiyon Süresi: 11:40' -> attribute + Oncelik=Opsiyonlu",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > KAYDIRMA > OTEL_KAYNAKLI"
+    and opsiyon_deger is not None and opsiyon_deger.get("textValue") == "11:40"
+    and r.get("priority_level") == "OPSIYONLU",
+    (r["classification"], r.get("attributes"), r.get("priority_level")),
+)
+
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# "opsiyon süresi" etiketi ile saat degeri arasina "bugün saat" gibi
+# kelimeler girince (ticket #101939124'te gozlemlendi), eski regex ("[:\s]*"
+# ile SADECE bosluk/kolon toleransi) eslesemiyor, Oncelik "Normal" kaliyordu.
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuz için otel yönetimi "
+    "tarafından iletilen bilgilendirmede, tesisin otel kaynaklı doluluk "
+    "problemleri sebebiyle tarihlerimizin başka bir haftaya kaydırılması "
+    "istenmiştir. Otelin bu işlem için tanıdığı opsiyon süresi bugün saat "
+    "18:40 itibariyla dolacaktır. Bu süre aşılmadan backoffice tarafında "
+    "gerekli kaydırma işlemlerinin ivedilikle yapılarak güncel detayların "
+    "tarafımıza iletilmesini rica eder, iyi çalışmalar dilerim.",
+)
+opsiyon_deger3 = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "OPSIYON_SURESI"), None)
+check(
+    "Kaydirma-OtelKaynakli-OpsiyonSuresi-2 (CANLI HATA DUZELTMESI): 'opsiyon süresi bugün saat 18:40 itibariyla' -> araya giren kelimeler tolere edilmeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > KAYDIRMA > OTEL_KAYNAKLI"
+    and opsiyon_deger3 is not None and opsiyon_deger3.get("textValue") == "18:40"
+    and r.get("priority_level") == "OPSIYONLU",
+    (r["classification"], r.get("attributes"), r.get("priority_level")),
+)
+
+r = cat("", "Operasyon kaynaklı bir aksaklık nedeniyle rezervasyonumuzu kaydırdık, 11:40'a kadar opsiyonumuz var, ilgilenir misiniz.")
+opsiyon_deger2 = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "OPSIYON_SURESI"), None)
+check(
+    "Kaydirma-OperasyonKaynakli-OpsiyonSuresi: duz cumle \"11:40'a kadar opsiyon\" -> attribute + Oncelik=Opsiyonlu",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > KAYDIRMA > OPERASYON_KAYNAKLI"
+    and opsiyon_deger2 is not None and opsiyon_deger2.get("textValue") == "11:40"
+    and r.get("priority_level") == "OPSIYONLU",
+    (r["classification"], r.get("attributes"), r.get("priority_level")),
+)
+
+# Koruma: opsiyon suresi gecmiyorsa priority_level set edilmemeli (varsayilan
+# Normal oncelikte kalmali).
+r = cat("", "Otel bizi başka tarihe kaydırdı, bilgi rica ederiz.")
+check(
+    "Kaydirma-OtelKaynakli-OpsiyonYok (KORUMA): opsiyon suresi yoksa priority_level None kalmali",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > KAYDIRMA > OTEL_KAYNAKLI"
+    and not r["attributes"]
+    and r.get("priority_level") is None,
+    (r["classification"], r.get("attributes"), r.get("priority_level")),
+)
+
 # DOCUMENT_COMPLAINT_EVENT_KEYWORDS eski hali sadece "eksik/hatali/yanlis/
 # sikinti/sorun" iceriyordu; gercek musteri sikayetlerinde en sik gecen
 # "ulasmadi/iletilmedi/magduriyet" gibi ifadeler eksikti (kullanici tarafindan
@@ -1444,6 +1512,85 @@ for num, expected, text in REALISTIC_SCENARIOS:
     if num in KNOWN_ISSUE_SCENARIOS:
         label += " (KNOWN ISSUE: otobus/transfer genel kelime cakismasi)"
     check(label, r["classification"] == expected, r["classification"])
+
+# ==========================================================
+# extract_reservation_number + ticketProductId/relatedProduct (Urun Eslestirme)
+# Kullanici tarafindan bildirilen kural: kirilim ne olursa olsun, mailde
+# rezervasyon numarasi geciyorsa CSM/Etiya'dan ilgili urun kaydi cekilip
+# ticket'a ("ticketProductId" + "relatedProduct") gomulmeli -- aksi halde
+# backoffice ekibi ticket icinde ilgili rezervasyona erisemiyor (canli
+# ortamda musteri temsilcisinin "rezervasyon numarasi paylasabilir misiniz"
+# diye geri donmesiyle tespit edildi).
+# ==========================================================
+check(
+    "ReservationNo-1: etiketli 'Rezervasyon No: 553044193'",
+    extract_reservation_number("Rezervasyon No: 553044193 için bilgi rica ederim.") == "553044193",
+    extract_reservation_number("Rezervasyon No: 553044193 için bilgi rica ederim."),
+)
+check(
+    "ReservationNo-2: kisa etiket 'Rez No: 553044193'",
+    extract_reservation_number("Rez No: 553044193, bilgi rica ederim.") == "553044193",
+    extract_reservation_number("Rez No: 553044193, bilgi rica ederim."),
+)
+check(
+    "ReservationNo-3: duz cumle '358109758 nolu rezervasyonum'",
+    extract_reservation_number("358109758 nolu rezervasyonum için bilgi rica ederim.") == "358109758",
+    extract_reservation_number("358109758 nolu rezervasyonum için bilgi rica ederim."),
+)
+check(
+    "ReservationNo-4: duz cumle '358109758 numaralı siparişim'",
+    extract_reservation_number("358109758 numaralı siparişim için bilgi rica ederim.") == "358109758",
+    extract_reservation_number("358109758 numaralı siparişim için bilgi rica ederim."),
+)
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# Etiket sonrasi rakam OLMAYAN bir cumle gelirse (ör. "rezervasyon numarası
+# içermiyor"), eski regex bir sonraki kelimenin ASCII on ekini ("i")
+# yanlislikla rezervasyon numarasi saniyordu -- yakalanan degerin rakamla
+# BASLAMASI zorunlu kilinarak duzeltildi.
+check(
+    "ReservationNo-5 (CANLI HATA DUZELTMESI): rakamsiz 'rezervasyon numarası içermiyor' -> None donmeli",
+    extract_reservation_number("Genel bir bilgi talebim var, rezervasyon numarası içermiyor.") is None,
+    extract_reservation_number("Genel bir bilgi talebim var, rezervasyon numarası içermiyor."),
+)
+
+_urun_ornek_kategorizasyon = cat("", "553044193 numaralı rezervasyonum ile ilgili bilgi almak istiyorum.")
+_urun_related_product = {
+    "accountId": None, "accountNumber": None,
+    "accountStatus": "Kesin rezervasyondan iptal",
+    "attributeValueList": [],
+    "createDate": None, "endDate": "2026-10-01T21:00:00.000Z",
+    "id": None, "isServiceNumberProduct": True,
+    "name": "Limak Eurasia Luxury Hotel", "parentProductId": None,
+    "productCategory": {"shortCode": "SEHIR_OTELLERI_HOTEL", "name": "Şehir Otelleri"},
+    "productId": "6391234", "productNumber": "6391234",
+    "productStatus": "CLO", "serviceNumber": "553044193",
+    "startDate": "2026-09-30T21:00:00.000Z", "status": 1, "updateDate": None,
+}
+_urun_payload = TicketPayloadBuilder.build_payload(
+    "test@example.com", "Test User", "konu",
+    "553044193 numaralı rezervasyonum ile ilgili bilgi almak istiyorum.",
+    _urun_ornek_kategorizasyon,
+    related_product=_urun_related_product,
+)
+check(
+    "UrunEslestirme-1 (ONAYLI): related_product verilince ticketProductId + relatedProduct dolmali",
+    _urun_payload.get("ticketProductId") == "6391234"
+    and _urun_payload.get("relatedProduct", {}).get("name") == "Limak Eurasia Luxury Hotel"
+    and _urun_payload.get("relatedProduct", {}).get("uniqueRowId") == "6391234_None_553044193"
+    and _urun_payload.get("relatedProduct", {}).get("relatedInvoices") == [],
+    (_urun_payload.get("ticketProductId"), _urun_payload.get("relatedProduct")),
+)
+
+_urun_payload_bos = TicketPayloadBuilder.build_payload(
+    "test@example.com", "Test User", "konu",
+    "Genel bir bilgi talebim var.",
+    _urun_ornek_kategorizasyon,
+)
+check(
+    "UrunEslestirme-2 (KORUMA): related_product verilmeyince ticketProductId/relatedProduct payload'da hic olmamali",
+    "ticketProductId" not in _urun_payload_bos and "relatedProduct" not in _urun_payload_bos,
+    _urun_payload_bos.keys(),
+)
 
 # ==========================================================
 # OZET

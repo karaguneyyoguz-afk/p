@@ -5,12 +5,22 @@ Orchestrates email retrieval, validation, and CSM ticket creation.
 """
 
 import sys
+
+# Not: Windows'ta konsol varsayilan olarak cp1254 (Turkce ANSI) kullanabiliyor,
+# bu da print() icindeki emoji karakterlerinde UnicodeEncodeError'a yol aciyor
+# (canli ortamda watch_mail.py'de gozlemlendi). stdout/stderr'i PYTHONIOENCODING
+# ortam degiskenine bagli kalmadan burada UTF-8'e zorluyoruz.
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if sys.stderr.encoding and sys.stderr.encoding.lower() != "utf-8":
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 from mail_processor import (
     EmailProcessor, EmailCategorizer, send_notification_email, 
     send_ticket_confirmation_email, send_rejection_email, 
     send_missing_fields_email
 )
-from validators import contains_profanity
+from validators import contains_profanity, extract_reservation_number
 from csm_api import CSMAPIClient, TicketPayloadBuilder
 from utils import clean_subject_line, clean_mailto_artifacts
 from logging_utils import record_mail_event
@@ -100,13 +110,31 @@ def process_email(
     else:
         print(f"🆕 Müşteri bulunamadı - Potansiyel müşteri olarak kaydedilecek")
     
+    # Not: kirilim ne olursa olsun, mailde bir rezervasyon numarasi geciyorsa
+    # CSM/Etiya'dan ilgili urun kaydi cekilip ticket'a gomuluyor -- aksi
+    # halde backoffice ekibi ticket icinde ilgili rezervasyona/urune
+    # erisemiyor (canli ortamda musteri temsilcisinin "rezervasyon numarasi
+    # paylasabilir misiniz" diye geri donmesiyle tespit edildi).
+    related_product = None
+    reservation_number = extract_reservation_number(body)
+    if reservation_number:
+        print(f"🔍 Rezervasyon numarası tespit edildi, ürün aranıyor: {reservation_number}")
+        products = csm_client.search_product_by_reservation_number(reservation_number)
+        if products:
+            related_product = next(
+                (p for p in products if p.get("serviceNumber") == reservation_number),
+                products[0]
+            )
+            print(f"✅ Ürün bulundu ve ticket'a eklenecek: {related_product.get('name')}")
+
     payload = TicketPayloadBuilder.build_payload(
         sender_email,
         sender_name,
         subject,
         body,
         categorization,
-        customer_id=customer_id
+        customer_id=customer_id,
+        related_product=related_product
     )
     
     ticket_id = csm_client.create_ticket(payload)

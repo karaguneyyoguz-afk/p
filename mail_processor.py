@@ -69,7 +69,10 @@ from utils import (
     decode_email_header, extract_sender_info, 
     clean_subject_line, normalize_turkish_characters
 )
-from validators import contains_profanity, extract_invoice_attributes, extract_payment_attributes
+from validators import (
+    contains_profanity, extract_invoice_attributes, extract_payment_attributes,
+    extract_option_deadline
+)
 
 
 def _levenshtein_distance(a: str, b: str) -> int:
@@ -1754,7 +1757,13 @@ class EmailCategorizer:
             any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_OPERATION_BASED_TOPIC_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_EVENT_KEYWORDS)
         ):
-            return {
+            # Not: mailde "opsiyon suresi" gecerse hem OPSIYON_SURESI (100000130)
+            # attribute'u eklenir, hem de ticket'in Oncelik alaninin "Opsiyonlu"
+            # secilmesi icin priority_level isaretlenir (csm_api.py bunu okuyup
+            # priorityLevel objesini secer).
+            option_deadline = extract_option_deadline(combined_text)
+            shift_attributes = []
+            shift_result = {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_RESERVATION,
                 "ticket_type_name": "Backoffice İşlemleri",
@@ -1763,16 +1772,28 @@ class EmailCategorizer:
                 "sub_category_id": SUB_CATEGORY_SHIFT_OPERATION_BASED,
                 "sub_category_name": "Operasyon Kaynaklı",
                 "sub_category_code": "OPERASYON_KAYNAKLI",
-                "attributes": [],
+                "attributes": shift_attributes,
                 "missing_fields": [],
                 "classification": "BACKOFFICE_ISLEMLERI > KAYDIRMA > OPERASYON_KAYNAKLI"
             }
+            if option_deadline:
+                shift_attributes.append({
+                    "attribute": {
+                        "id": 100000130,
+                        "shortCode": "OPSIYON_SURESI"
+                    },
+                    "textValue": option_deadline
+                })
+                shift_result["priority_level"] = "OPSIYONLU"
+            return shift_result
 
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_HOTEL_BASED_TOPIC_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.SHIFT_EVENT_KEYWORDS)
         ):
-            return {
+            option_deadline = extract_option_deadline(combined_text)
+            shift_attributes = []
+            shift_result = {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_RESERVATION,
                 "ticket_type_name": "Backoffice İşlemleri",
@@ -1781,10 +1802,20 @@ class EmailCategorizer:
                 "sub_category_id": SUB_CATEGORY_SHIFT_HOTEL_BASED,
                 "sub_category_name": "Otel Kaynaklı",
                 "sub_category_code": "OTEL_KAYNAKLI",
-                "attributes": [],
+                "attributes": shift_attributes,
                 "missing_fields": [],
                 "classification": "BACKOFFICE_ISLEMLERI > KAYDIRMA > OTEL_KAYNAKLI"
             }
+            if option_deadline:
+                shift_attributes.append({
+                    "attribute": {
+                        "id": 100000130,
+                        "shortCode": "OPSIYON_SURESI"
+                    },
+                    "textValue": option_deadline
+                })
+                shift_result["priority_level"] = "OPSIYONLU"
+            return shift_result
 
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_COMPLETION_TOPIC_KEYWORDS)

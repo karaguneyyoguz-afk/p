@@ -9,7 +9,7 @@ import json
 from typing import Dict, Optional, List
 from config import (
     CSM_CREATE_TICKET_URL, DEFAULT_HEADERS,
-    CSM_SEARCH_PARTY_ROLES_URL,
+    CSM_SEARCH_PARTY_ROLES_URL, CSM_SEARCH_PRODUCT_URL,
     TICKET_TYPE_COMPLAINT, TICKET_TYPE_THANK_YOU, TICKET_TYPE_INFO_REQUEST,
     CATEGORY_INVOICE, CATEGORY_THANK_YOU, CATEGORY_AGENCY,
     SUB_CATEGORY_GUEST_INVOICE, SUB_CATEGORY_INVOICE_MODIFICATION,
@@ -108,7 +108,52 @@ class CSMAPIClient:
         except Exception as e:
             print(f"❌ Müşteri aranırken hata: {e}")
             return None
-    
+
+    def search_product_by_reservation_number(self, reservation_number: str) -> Optional[List[Dict]]:
+        """
+        Mailde gecen rezervasyon numarasina karsilik gelen urun (otel/tur/vs.)
+        kaydini CSM/Etiya'dan arar. Bu kayit, ticket olusturulurken hem
+        "ticketProductId" hem de "relatedProduct" alanlarini doldurmak icin
+        kullanilir -- aksi halde backoffice ekibi ticket icinde ilgili urune
+        erisemiyor (canli ortamda musteri temsilcisinin "rezervasyon numarasi
+        paylasabilir misiniz" diye geri donmesiyle tespit edildi).
+
+        Args:
+            reservation_number: Mailde gecen rezervasyon/hesap numarasi
+
+        Returns:
+            Bulunan urun kayitlarinin listesi (bos olabilir), hata durumunda None
+        """
+        try:
+            headers = self._get_headers()
+            params = {'customerId': reservation_number}
+
+            response = requests.get(
+                CSM_SEARCH_PRODUCT_URL,
+                headers=headers,
+                params=params
+            )
+
+            if response.status_code == 204:
+                print(f"ℹ️ [BİLGİ] Rezervasyon numarasına ait ürün bulunamadı: {reservation_number}")
+                return []
+
+            if response.status_code == 200:
+                if not response.text or response.text.strip() == '':
+                    return []
+                products = response.json()
+                if isinstance(products, list):
+                    print(f"✅ [BULUNDU] {len(products)} ürün kaydı: {reservation_number}")
+                    return products
+                return []
+
+            print(f"⚠️ [HATA] Ürün arama başarısız. Status: {response.status_code}")
+            return None
+
+        except Exception as e:
+            print(f"❌ Ürün aranırken hata: {e}")
+            return None
+
     def create_ticket(self, payload: Dict) -> Optional[str]:
         """
         Create a new ticket in CSM system.
@@ -170,7 +215,8 @@ class TicketPayloadBuilder:
         subject: str,
         body: str,
         categorization: Dict,
-        customer_id: Optional[int] = None
+        customer_id: Optional[int] = None,
+        related_product: Optional[Dict] = None
     ) -> Dict:
         """
         Build a complete ticket payload for CSM API.
@@ -321,18 +367,45 @@ class TicketPayloadBuilder:
                 "id": categorization["ticket_type_id"],
                 "uuid": ticket_type_uuid
             },
-            "priorityLevel": {
-                "shortCode": "NORMAL",
-                "name": "Normal",
-                "ordinal": 3,
-                "id": 100000037,
-                "uuid": "074266b0-efdf-45a1-ab26-75a627a4b5ed"
-            },
+            "priorityLevel": (
+                {
+                    "shortCode": "OPSIYONLU",
+                    "name": "Opsiyonlu",
+                    "ordinal": 5,
+                    "id": 100000039,
+                    "uuid": "e4486839-eb48-4647-85a7-c988f47c6920"
+                }
+                if categorization.get("priority_level") == "OPSIYONLU"
+                else {
+                    "shortCode": "NORMAL",
+                    "name": "Normal",
+                    "ordinal": 3,
+                    "id": 100000037,
+                    "uuid": "074266b0-efdf-45a1-ab26-75a627a4b5ed"
+                }
+            ),
             "isResolved": False,
             "isProactive": False,
             "isParent": True,
             "reminders": [],
             "detectedLanguage": ""
         }
-        
+
+        # Not: mailde rezervasyon numarasi bulunup CSM'den ilgili urun kaydi
+        # cekilebildiyse, ticket'a "ticketProductId" ve "relatedProduct"
+        # olarak gomuluyor -- aksi halde backoffice ekibi ticket icinde ilgili
+        # rezervasyona/urune erisemiyor (canli ortamda gozlemlendi, gercek
+        # CSM UI'sinin urettigi payload'dan birebir alindi).
+        if related_product:
+            payload["ticketProductId"] = related_product.get("productId")
+            payload["relatedProduct"] = {
+                **related_product,
+                "relatedInvoices": related_product.get("relatedInvoices", []),
+                "uniqueRowId": (
+                    f"{related_product.get('productId')}_"
+                    f"{related_product.get('parentProductId')}_"
+                    f"{related_product.get('serviceNumber')}"
+                )
+            }
+
         return payload

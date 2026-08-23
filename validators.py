@@ -628,8 +628,13 @@ def extract_payment_attributes(text: str, required: bool = False) -> Tuple[List[
     elif required:
         missing_fields.append("Tutar")
 
+    # Not: yakalanan deger MUTLAKA bir rakamla BASLAMALI ("\d[A-Za-z0-9-]*") --
+    # aksi halde etiketten sonra rakamsiz bir cumle gelirse (ör. "Sipariş
+    # Numarası belirtilmemiştir"), sonraki kelimenin ASCII on eki yanlislikla
+    # siparis numarasi saniliyordu (extract_reservation_number'da gorulen ayni
+    # sinif hata, canli ortamda gozlemlendi).
     order_number_match = re.search(
-        r'(?:sipariş\s*no|siparis\s*no|sipariş\s*numara\w*|siparis\s*numara\w*)' + OPTIONAL_LABEL_ANNOTATION + r'(?:\s*ise)?[:\s]*\[?([A-Za-z0-9-]+)\]?',
+        r'(?:sipariş\s*no|siparis\s*no|sipariş\s*numara\w*|siparis\s*numara\w*)' + OPTIONAL_LABEL_ANNOTATION + r'(?:\s*ise)?[:\s]*\[?(\d[A-Za-z0-9-]*)\]?',
         text,
         re.IGNORECASE
     )
@@ -640,7 +645,7 @@ def extract_payment_attributes(text: str, required: bool = False) -> Tuple[List[
         # musteri mailleri cogunlukla "rezervasyon" diyor (canli ortamda
         # gozlemlendi).
         order_number_match = re.search(
-            r'([A-Za-z0-9-]+)\s*(?:numaral[iı]|no[\'’]?lu)\s*(?:sipari[sş]\w*|rezervasyon\w*)',
+            r'(\d[A-Za-z0-9-]*)\s*(?:numaral[iı]|no[\'’]?lu)\s*(?:sipari[sş]\w*|rezervasyon\w*)',
             text,
             re.IGNORECASE
         )
@@ -656,3 +661,74 @@ def extract_payment_attributes(text: str, required: bool = False) -> Tuple[List[
         missing_fields.append("Sipariş No")
 
     return attribute_list, missing_fields
+
+
+def extract_option_deadline(text: str) -> str | None:
+    """
+    Metinde bir "opsiyon süresi" (saat) geciyorsa onu HH:MM formatinda dondurur,
+    yoksa None. Backoffice > Kaydırma > Operasyon Kaynaklı / Otel Kaynaklı
+    kirilimlarinda kullanilir: CSM ticket'inda hem OPSIYON_SURESI (100000130)
+    attribute'una hem de ticket'in Oncelik (priorityLevel) alaninin
+    "Opsiyonlu" secilmesine karar vermek icin.
+
+    NOT: Etiketli ("Opsiyon Süresi: 11:40"), araya kelime giren duz cumle
+    ("opsiyon süresi bugün saat 18:40 itibariyla dolacaktır" -- canli ortamda
+    gozlemlendi) ve ters sirali ("11:40'a kadar opsiyon") kaliplari
+    destekleniyor.
+    """
+    # Not: "opsiyon süresi" ile saat degeri arasina "bugün saat"/"saat" gibi
+    # kelimeler girebiliyor; "[^\d]{0,25}" ile en fazla 25 rakam-disi karakter
+    # toleransi taniniyor (rakam gecmedigi icin bir sonraki farkli sayiya
+    # atlama riski yok).
+    match = re.search(
+        r'opsiyon\s*s[uü]res?i[^\d]{0,25}(\d{1,2}[:.]\d{2})',
+        text,
+        re.IGNORECASE
+    )
+    if not match:
+        # Duz cumle fallback: "saat 11:40'a kadar opsiyonlu/opsiyon" gibi
+        # ifadeler -- saat degeri "opsiyon" kelimesinden ONCE gecebiliyor.
+        match = re.search(
+            r'(\d{1,2}[:.]\d{2})(?:[\'’]\w+)?\s*(?:kadar\s+)?opsiyon',
+            text,
+            re.IGNORECASE
+        )
+    if not match:
+        return None
+    return match.group(1).replace(".", ":")
+
+
+def extract_reservation_number(text: str) -> str | None:
+    """
+    Mailde gecen rezervasyon/siparis numarasini GENEL AMACLI olarak cikarir.
+    extract_payment_attributes icindeki SIPARIS_NO alaniyla benzer bir
+    kalibi hedefler, ama o fonksiyon SADECE odeme/fatura kirilimlarinda
+    cagiriliyor; bu fonksiyon ise ticket olusturulurken -- kirilim ne olursa
+    olsun -- CSM/Etiya'dan ilgili urun kaydini (relatedProduct) cekebilmek
+    icin HER mailde calistirilmak uzere main.py'de kullanilir (kullanici
+    tarafindan bildirilen kural: "gelen mailde rez no var ise ürün kısmına
+    girmemiz gerekiyor").
+    """
+    # Not: yakalanan deger MUTLAKA bir rakamla BASLAMALI ("\d[A-Za-z0-9-]*") --
+    # aksi halde "Rezervasyon Numarası içermiyor" gibi rakamsiz cumlelerde,
+    # etiketten sonraki kelimenin ASCII on eki ("i", "içermiyor" kelimesinden)
+    # yanlislikla rezervasyon numarasi saniliyordu (canli ortamda gozlemlendi).
+    match = re.search(
+        r'(?:rezervasyon\s*no|rez\s*no|sipariş\s*no|siparis\s*no|'
+        r'rezervasyon\s*numara\w*|sipariş\s*numara\w*|siparis\s*numara\w*)'
+        + OPTIONAL_LABEL_ANNOTATION + r'(?:\s*ise)?[:\s]*\[?(\d[A-Za-z0-9-]*)\]?',
+        text,
+        re.IGNORECASE
+    )
+    if not match:
+        # Duz cumle fallback: sayi etiketten ONCE gelebilir, ör. "358109758
+        # numaralı siparişim için..." veya "358109758 nolu rezervasyonum
+        # için...".
+        match = re.search(
+            r'(\d[A-Za-z0-9-]*)\s*(?:numaral[iı]|no[\'’]?lu)\s*(?:sipari[sş]\w*|rezervasyon\w*)',
+            text,
+            re.IGNORECASE
+        )
+    if not match:
+        return None
+    return match.group(1).strip()
