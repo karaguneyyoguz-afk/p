@@ -463,10 +463,17 @@ class EmailCategorizer:
     # Not: "adinda"/"adinin"/"isminde"/"isminin" gibi cekimli formlar da
     # eklendi (ör. "misafirin adında harf hatası", "adının güncellenmesi") --
     # bunlar "adres"/"adet" gibi kelimelerle CAKISMIYOR (ozel ek gerektiriyor).
+    # Not: bare "isim" kasitli olarak buradan CIKARILDI -- "değişim"/"değişimi"
+    # kelimesinin normalize hali ("degisim") tesadufen "isim" alt dizesini
+    # icerdigi icin ("deg-ISIM-i"), CHANGE_INTENT_KEYWORDS'e "degisim" eklenince
+    # "ulaşım firması değişimi" gibi alakasiz mailler yanlislikla ISIM_DEGISIKLIGI'ne
+    # dusuyordu (canli ortamda gozlemlendi). Asagida NAME_CHANGE_BARE_ISIM_PATTERN
+    # ile kelime siniri (\b) sarti eklenerek ayri kontrol ediliyor.
     NAME_CHANGE_TOPIC_KEYWORDS = [
-        "isim", "ad soyad", "soyadim", "adim yanlis",
+        "ad soyad", "soyadim", "adim yanlis",
         "adinda", "adinin", "isminde", "isminin"
     ]
+    NAME_CHANGE_BARE_ISIM_PATTERN = re.compile(r'\bisim\b', re.IGNORECASE)
 
     PERSON_ADD_REMOVE_TOPIC_KEYWORDS = [
         "kisi eklemek", "kisi cikarmak", "kisi ekleme", "kisi cikarma",
@@ -509,6 +516,24 @@ class EmailCategorizer:
 
     TRANSPORT_MODE_CHANGE_TOPIC_KEYWORDS = [
         "ulasim degisikligi", "ulasim tipimi", "ucakla gitmek yerine", "otobusle gitmek yerine"
+    ]
+    # "ulasim"/"ucak bileti"/"otobus bileti" gibi genel bir nesne tek basina COK
+    # GENEL (bilgi-istek Otobus/Bilet dallariyla cakisir), bu yuzden
+    # CHANGE_INTENT_KEYWORDS ile ESLESTIRILEREK kullanilir, tek basina
+    # tetiklenmez.
+    TRANSPORT_MODE_TOPIC_KEYWORDS_PAIRED = [
+        "ulasim", "ucak bileti", "otobus bileti", "sefer saati",
+        "ulasim firmasi", "ucak saat"
+    ]
+    # Not: bare "degisikli" (CHANGE_INTENT_KEYWORDS icinde) kasitli olarak
+    # BURADA kullanilmiyor -- "Otobüs seferi saatinde bir değişiklik var mı
+    # acaba?" gibi SAF SORU cumleleri de "degisiklik" NOUN'unu icerdigi icin,
+    # tam CHANGE_INTENT_KEYWORDS ile eslesince somut bir talep sanilip
+    # Otobus-4 (ONAYLI) gibi mevcut bilgi-istek senaryolarini bozuyordu (canli
+    # denemede yakalandi). Sadece daha guclu, eylem-fiili agirlikli sinyaller
+    # kullanilir; hedeflenen 5 senaryonun hepsi zaten bunlardan birini iceriyor.
+    TRANSPORT_MODE_STRONG_INTENT_KEYWORDS = [
+        "degistir", "guncelle", "revizyon", "revize", "duzenle"
     ]
 
     AIRPLANE_TICKET_TOPIC_KEYWORDS = [
@@ -862,7 +887,27 @@ class EmailCategorizer:
                 "classification": "BILGI_ISTEK > ULASIM > DEGISIKLIK_HAKKI_SORGULAMA"
             }
 
-        if any(keyword in normalized_text for keyword in EmailCategorizer.OTOBUS_TOPIC_KEYWORDS):
+        # Not: somut bir Backoffice > Degisiklik > Ulasim talebiyle (asagida,
+        # TRANSPORT_MODE_CHANGE_TOPIC_KEYWORDS / TRANSPORT_MODE_TOPIC_KEYWORDS_PAIRED
+        # + CHANGE_INTENT_KEYWORDS) CAKISIRSA bu bilgi-istek dali GERI CEKILIR --
+        # aksi halde "Uçak veya otobüs bileti saatlerimizin... güncellenerek
+        # backoffice işlemlerinin tamamlanmasını rica ederim" gibi ACIKCA
+        # aksiyoner bir talep, bare "otobus" kelimesi yuzunden yanlislikla
+        # bilgi-istek sayiliyordu (canli ortamda ticket #101939280'de gozlemlendi).
+        is_actionable_transport_change = (
+            any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_MODE_CHANGE_TOPIC_KEYWORDS)
+            or (
+                any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_MODE_TOPIC_KEYWORDS_PAIRED)
+                and (
+                    any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_MODE_STRONG_INTENT_KEYWORDS)
+                    or "degisim" in normalized_text
+                )
+            )
+        )
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.OTOBUS_TOPIC_KEYWORDS)
+            and not is_actionable_transport_change
+        ):
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
@@ -877,9 +922,15 @@ class EmailCategorizer:
                 "classification": "BILGI_ISTEK > ULASIM > OTOBUS"
             }
 
+        # Not: is_actionable_transport_change yukarida (OTOBUS kontrolunden once)
+        # hesaplandi, ayni koruma burada da gecerli -- aksi halde "bilet" +
+        # "guncelle" kombinasyonu (TRANSPORT_TICKET_EVENT_KEYWORDS icinde
+        # "guncelle" var) somut bir Backoffice > Degisiklik > Ulasim talebini
+        # de yanlislikla bilgi-istek sayardi.
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_TICKET_TOPIC_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_TICKET_EVENT_KEYWORDS)
+            and not is_actionable_transport_change
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -1536,7 +1587,10 @@ class EmailCategorizer:
             }
 
         if (
-            any(keyword in normalized_text for keyword in EmailCategorizer.NAME_CHANGE_TOPIC_KEYWORDS)
+            (
+                any(keyword in normalized_text for keyword in EmailCategorizer.NAME_CHANGE_TOPIC_KEYWORDS)
+                or EmailCategorizer.NAME_CHANGE_BARE_ISIM_PATTERN.search(normalized_text)
+            )
             and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
         ):
             return {
@@ -1690,7 +1744,11 @@ class EmailCategorizer:
                 "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > TUR_DEGISIKLIGI"
             }
 
-        if any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_MODE_CHANGE_TOPIC_KEYWORDS):
+        # Not: is_actionable_transport_change, fonksiyonun basinda (OTOBUS/BILET
+        # bilgi-istek dallarinin geri cekilme kosulu olarak) zaten hesaplandi;
+        # burada AYNI degisken tekrar kullanilarak iki kontrolun birbirinden
+        # SAPMASI (drift) engelleniyor.
+        if is_actionable_transport_change:
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_RESERVATION,

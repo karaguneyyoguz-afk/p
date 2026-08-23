@@ -730,6 +730,90 @@ check(
 r = cat("", "Ulaşım değişikliği istiyorum, ulaşım tipimi değiştirmek istiyorum.")
 check("Degisiklik-Ulasim", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM", r["classification"])
 
+# TRANSPORT_MODE_CHANGE_TOPIC_KEYWORDS eski hali sadece "ulasim degisikligi/
+# ulasim tipimi/ucakla gitmek yerine/otobusle gitmek yerine" gibi zaten
+# degisim-niyeti icine gomulu kalip ifadeleri kapsiyordu; "uçak saatini
+# değiştirme"/"ulaşım firması değişimi" gibi genel "ulasim/ucak saat" +
+# degistir/degisim/guncelle kombinasyonlari eksikti (kullanici tarafindan
+# bildirildi). TRANSPORT_MODE_TOPIC_KEYWORDS_PAIRED bu yuzden Bilgi-Istek
+# Otobus/Bilet dallariyla karismamasi icin CHANGE_INTENT_KEYWORDS ile
+# ESLESTIRILEREK eklendi (tek basina tetiklenmiyor).
+r = cat("", "Uçak saatimizi değiştirmek istiyoruz.")
+check("Degisiklik-Ulasim-2: 'ucak saatini degistirme'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM", r["classification"])
+
+r = cat("", "Ulaşım firması değişimi yapmak istiyoruz.")
+check("Degisiklik-Ulasim-3: 'ulasim firmasi degisimi'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM", r["classification"])
+
+r = cat("", "Gidiş-dönüş ulaşım saati güncellemesi yapmak istiyoruz.")
+check("Degisiklik-Ulasim-4: 'ulasim saati guncelleme'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM", r["classification"])
+
+# --- CANLI KOD INCELEMESINDE BULUNAN 2 GERCEK HATA (duzeltildi) ---
+# 1) "değişim"in normalize hali ("degisim") tesadufen "isim" alt dizesini
+#    icerdigi icin ("deg-ISIM-i"), NAME_CHANGE_TOPIC_KEYWORDS'teki bare "isim"
+#    stemi ile CHANGE_INTENT_KEYWORDS'e "degisim" eklenmesi bir arada,
+#    "Ulaşım firması değişimi" gibi alakasiz mailleri yanlislikla
+#    ISIM_DEGISIKLIGI'ne cekiyordu -- bare "isim" kelime siniri (\b) sarti
+#    eklenerek NAME_CHANGE_BARE_ISIM_PATTERN'e tasindi.
+check(
+    "IsimDegisikligi-Koruma (CANLI HATA DUZELTMESI): 'ulaşım firması değişimi' yanlislikla ISIM_DEGISIKLIGI'ne dusmemeli",
+    cat("", "Ulaşım firması değişimi yapmak istiyoruz.")["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ISIM_DEGISIKLIGI",
+    cat("", "Ulaşım firması değişimi yapmak istiyoruz.")["classification"],
+)
+r = cat("", "İsim ve soyadımda hata var, düzeltmenizi rica ederim.")
+check(
+    "IsimDegisikligi-Koruma-2: gercek isim degisikligi metni hala dogru calismali",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ISIM_DEGISIKLIGI",
+    r["classification"],
+)
+# 2) "degisim" bare CHANGE_INTENT_KEYWORDS'e (10+ dal tarafindan paylasilan)
+#    eklenseydi, "Otelde havlu değişimi ile ilgili bilgi almak istiyorum."
+#    gibi TAMAMEN alakasiz mailler DEGISIKLIK>DIGER coplukutusuna dusuyordu
+#    (Varsayilan-1 testinde yakalandi) -- "degisim" sadece Ulasim dalina ozel
+#    dar kapsamda birakildi.
+r = cat("", "Otelde havlu değişimi ile ilgili bilgi almak istiyorum.")
+check(
+    "DegisiklikDiger-Koruma (CANLI HATA DUZELTMESI): alakasiz 'havlu değişimi' DIGER coplukutusuna dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DIGER",
+    r["classification"],
+)
+
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi, ticket #101939280) ---
+# "otobus"/"bilet" gibi bare kelimeler iceren mailler, ONCEDEN ONAYLANMIS bir
+# oncelik kurali geregi (DEGISIKLIK_HAKKI_SORGULAMA > OTOBUS > BILET) her
+# zaman Bilgi-Istek dallarina gidiyordu -- somut bir Backoffice degisiklik
+# talebi olsa bile. is_actionable_transport_change korumasi eklenerek, bu
+# bilgi-istek dallari SADECE gercekten aksiyoner olmayan mailler icin
+# devrede kaliyor.
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuz kapsamında yer alan "
+    "ulaşım detaylarında değişiklik yapmak istiyoruz. Uçak veya otobüs "
+    "bileti saatlerimizin/günlerimizin uygun olan farklı bir saate "
+    "güncellenerek backoffice işlemlerinin tamamlanmasını rica eder, iyi "
+    "çalışmalar dilerim.",
+)
+check(
+    "Degisiklik-Ulasim-5 (CANLI HATA DUZELTMESI, ticket #101939280): 'otobüs bileti' + 'güncellenerek' -> OTOBUS/BILET bilgi-istek dallarina degil DEGISIKLIK_ULASIM'a dusmeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM",
+    r["classification"],
+)
+
+# Koruma: saf SORU formundaki bilgi-istek ("değişiklik var mı acaba?") hala
+# dogru sekilde OTOBUS bilgi-istek dalinda kalmali -- TRANSPORT_MODE_STRONG_INTENT_KEYWORDS
+# bilerek bare "degisikli" NOUN'unu icermez (Otobus-4 (ONAYLI) testinde
+# yakalandi, duzeltildi).
+r = cat(
+    "",
+    "Merhaba, satın almış olduğum otobüs ulaşım hizmeti için kalkış peronu "
+    "numarasını ve koltuk detaylarımı öğrenmek istiyorum. Otobüs seferi "
+    "saatinde bir değişiklik var mı acaba? Bilgi rica ederim.",
+)
+check(
+    "Degisiklik-Ulasim-Koruma (CANLI HATA DUZELTMESI): saf soru formu ('değişiklik var mı acaba') DEGISIKLIK_ULASIM'a degil OTOBUS bilgi-istegine dusmeli",
+    r["classification"] == "BILGI_ISTEK > ULASIM > OTOBUS",
+    r["classification"],
+)
+
 r = cat("", "Odamı iptal etmek istiyorum.")
 check("Iptal-Oda", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > ODA_IPTALI", r["classification"])
 
@@ -1381,7 +1465,7 @@ check(
 # hala basarisiz -- bu, otobus/transfer icerigi ayrica konusulup karara
 # baglanana kadar boyle kalacak.
 # ==========================================================
-KNOWN_ISSUE_SCENARIOS = {15, 23, 32}
+KNOWN_ISSUE_SCENARIOS = {15, 23}
 
 REALISTIC_SCENARIOS = [
     (9, "BILGI_ISTEK > ULASIM > BILET", "Merhaba, yarınki uçuşumuza ait e-biletimiz hala mail kutumuza düşmedi, tekrar gönderebilir misiniz?"),
