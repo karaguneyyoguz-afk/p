@@ -929,10 +929,114 @@ check(
     r["classification"],
 )
 
+# --- AIRPLANE_TICKET_TOPIC_KEYWORDS genisletildi: eski liste sadece tekil
+# iyelik eklerini ("biletim","biletimiz") kapsiyordu, "uçak biletlerimizin"
+# gibi COGUL formlar kaciyordu (kullanici tarafindan bildirildi). "ucus"/
+# "pnr"/"havayolu"/"ucak seferi" de eklendi.
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuz içinde yer alan uçak "
+    "biletlerimizin uçuş saatinde değişiklik yapmak istiyoruz. Havayolu "
+    "sefer saatimizin daha erken bir saate güncellenerek backoffice "
+    "işlemlerinin tamamlanmasını rica eder, iyi çalışmalar dilerim.",
+)
+check(
+    "UcakBileti-Degisiklik-1 (ONAYLI): cogul 'uçak biletlerimizin' + 'havayolu sefer saati'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI",
+    r["classification"],
+)
+
+r = cat("", "PNR revizyonu yapmak istiyoruz.")
+check("UcakBileti-Degisiklik-2: bare 'pnr' + 'revizyon'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI", r["classification"])
+
+r = cat("", "Havayolu bilet güncellemesi yapmak istiyoruz.")
+check("UcakBileti-Degisiklik-3: bare 'havayolu' + 'guncelle'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI", r["classification"])
+
+r = cat("", "Uçuş saati değişimi yapmak istiyoruz.")
+check("UcakBileti-Degisiklik-4: bare 'ucus' + 'degisim'", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI", r["classification"])
+
+# Koruma: SORU formundaki degisiklik-hakki sorgusu (Gercekci-10) hala dogru
+# calismali -- "degisikli" NOUN'u tek basina yeterli sayilmiyor, "isti" ile
+# YAKIN olmasi gerekiyor (CHANGE_REQUEST_NOUN_PATTERN).
+r = cat("", "Uçuşumuz iptal olursa değişiklik hakkımız var mı, transfer saatimiz kesinleşti mi öğrenmek istiyorum.")
+check(
+    "UcakBileti-Degisiklik-Koruma-1: soru formu 'değişiklik hakkımız var mı' UCAK_BILETI_DEGISIKLIGI'ne dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI",
+    r["classification"],
+)
+
+# Koruma: PASIF/sikayet formundaki "değiştirildi" (Gercekci-44) hala dogru
+# SIKAYET dalina dusmeli, aksiyoner bir Backoffice talebi sanilmamali.
+r = cat("", "Uçuş saatimiz habersizce değiştirildi, planlarımız altüst oldu.")
+check(
+    "UcakBileti-Degisiklik-Koruma-2: pasif 'habersizce değiştirildi' sikayeti UCAK_BILETI_DEGISIKLIGI'ne dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI",
+    r["classification"],
+)
+
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi, ticket #101939348 sonrasi
+# kullanicinin verdigi netlestirme ornegi) ---
+# "değişikliği için ... yapılmasını RİCA ederim" gibi ifadeler "isti" kelimesi
+# icermiyor (sadece "rica ederim" kullaniyor), CHANGE_REQUEST_NOUN_PATTERN
+# eski hali sadece "isti"yi araniyordu -- "rica" da eklendi, 45 karakterlik
+# yakinlik penceresi Gercekci-10'daki UZAK "isti" ile (69 karakter) hala
+# ayirt ediliyor.
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuzdaki uçak biletinin "
+    "tarih ve saat değişikliği için işlemlerin yapılmasını rica ederim",
+)
+check(
+    "UcakBileti-Degisiklik-5 (CANLI HATA DUZELTMESI): 'değişikliği için ... rica ederim' (isti degil rica) -> UCAK_BILETI_DEGISIKLIGI",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > UCAK_BILETI_DEGISIKLIGI",
+    r["classification"],
+)
+
 r = cat("", "Uçak biletimi iptal etmek istiyorum.")
 check(
     "COLLISION-2: 'ucak biletimi iptal' -> beklenen UCAK_BILETI_IPTALI ama 'bilet' kelimesi ULASIM dalina cekiyor",
     r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI",
+    r["classification"],
+)
+
+# --- CANLI HATA DUZELTMESI: CANCEL_INTENT_KEYWORDS'un kapsamadigi "iptal
+# edilmesi ... rica ederim" / bare "iptali" / "iade" cekimlerini tanimak icin
+# CANCEL_REQUEST_NOUN_PATTERN eklendi (kullanici tarafindan bildirildi).
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuzdaki sadece uçak "
+    "biletinin iptal edilmesi hususunda işlemlerin yapılmasını rica ederim.",
+)
+check(
+    "UcakBileti-Iptal-1 (ONAYLI): 'iptal edilmesi hususunda ... rica ederim' (CANCEL_INTENT_KEYWORDS kapsamiyor)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI",
+    r["classification"],
+)
+
+r = cat("", "Uçak bileti iptali için işlem yapar mısınız.")
+check(
+    "UcakBileti-Iptal-2: bare 'iptali' + kibar talep sorusu 'yapar mısınız'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI",
+    r["classification"],
+)
+
+r = cat("", "PNR iptal talebimiz var.")
+check("UcakBileti-Iptal-3: bare 'pnr' + 'iptal talebi'", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI", r["classification"])
+
+r = cat("", "Uçak biletimizin iadesi için işlem yapılmasını rica ederiz.")
+check(
+    "UcakBileti-Iptal-4: 'bilet iadesi' (iade = iptal esdegeri) + 'rica ederiz'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI",
+    r["classification"],
+)
+
+# Koruma: GECMISE DONUK bilgi-istek metni ("iptal ettiğim ... ne zaman
+# yapılır") hala yanlislikla UCAK_BILETI_IPTALI'ne dusmemeli -- CANCEL_REQUEST_NOUN_PATTERN
+# AIRPLANE_TICKET_TOPIC_KEYWORDS ile eslestirilerek dar kapsamda tutuldu.
+r = cat("", "İptal ettiğim rezervasyonun iadesi genelde kaç gün içinde hesabımıza geçiyor?")
+check(
+    "UcakBileti-Iptal-Koruma: gecmise donuk 'iptal ettiğim ... iadesi' bilgi-istegi UCAK_BILETI_IPTALI'ne dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI",
     r["classification"],
 )
 

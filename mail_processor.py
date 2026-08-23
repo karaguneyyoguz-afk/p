@@ -536,9 +536,38 @@ class EmailCategorizer:
         "degistir", "guncelle", "revizyon", "revize", "duzenle"
     ]
 
+    # Not: "ucak bileti\w*" yerine sadece "ucak bilet" koku kullanildi -- eski
+    # liste sadece tekil iyelik eklerini ("biletim","biletimiz") kapsiyordu,
+    # "uçak biletlerimizin" gibi COGUL formlar ("bilet"+"ler"+"imiz"+"in")
+    # kacyordu (kullanici tarafindan bildirildi). "ucus"/"pnr"/"havayolu"/
+    # "ucak seferi" de eklendi.
     AIRPLANE_TICKET_TOPIC_KEYWORDS = [
-        "ucak bileti", "ucak biletim", "ucak biletimiz", "ucak biletimizdeki"
+        "ucak bilet", "ucus", "pnr", "havayolu", "ucak seferi"
     ]
+    # "degisikli" (CHANGE_INTENT_KEYWORDS'teki NOUN stemi) tek basina cok
+    # belirsiz -- "değişiklik hakkımız VAR MI" (soru) ile "değişikliği
+    # İSTİYORUM"/"değişikliği için ... yapılmasını RİCA ederim" (somut talep)
+    # ayni koku paylasiyor. Ayirt edici sinyal: "degisikli" kelimesinden
+    # sonra, ayni cumle icinde (nokta/unlem/soru isaretine kadar, en fazla
+    # ~45 karakter icinde) "isti" (istiyorum/istiyoruz) veya "rica"
+    # (rica ederim/ederiz) gecmesi -- sorularda "isti" cok daha UZAKTA
+    # ("hakkımız var mı ... öğrenmek istiyorum" gibi araya giren baska bir
+    # cumlecikte) gecmeye egilimli (canli ortamda olcduk: 40 vs 69 karakter).
+    CHANGE_REQUEST_NOUN_PATTERN = re.compile(r'degisikli\w*[^.!?]{0,45}(?:isti|rica)', re.IGNORECASE)
+    # Aynı mantik "iptal"/"iade" NOUN'lari icin: "iptal EDİLMESİ hususunda ...
+    # RİCA ederim" veya "bilet iadesi için ... RİCA ederiz" gibi CANCEL_INTENT_KEYWORDS'un
+    # (iptal etmek/edebilir/ediyoruz/talebi vb.) kapsamadigi cekimler
+    # (kullanici tarafindan bildirildi). "yapar mı(sınız)"/"eder mi(siniz)"
+    # de -- Turkce'de cok yaygin bir KIBAR TALEP sorusu formu ("X yapar
+    # mısınız?" = "lutfen X yapin") -- gercek bir soru degil, talep sayilir.
+    # SADECE AIRPLANE_TICKET_TOPIC_KEYWORDS ile ESLESTIRILEREK kullanildigi
+    # icin (asagida), "İptal ettiğim rezervasyonun iadesi ne zaman yapılır"
+    # gibi GECMISE DONUK bilgi-istek metinleriyle cakismiyor (topic + 50
+    # karakterlik dar pencere zaten yeterince ayirt ediyor).
+    CANCEL_REQUEST_NOUN_PATTERN = re.compile(
+        r'(?:iptal|iade)\w*[^.!?]{0,50}(?:isti|rica|yapar\s*m[iı]s|eder\s*m[iı]s)',
+        re.IGNORECASE
+    )
 
     CANCELLATION_INSURANCE_TOPIC_KEYWORDS = [
         "iptal sigortasi", "seyahat sigortasi"
@@ -731,7 +760,10 @@ class EmailCategorizer:
         # değerlendirilmeli.
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.AIRPLANE_TICKET_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+            and (
+                any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+                or EmailCategorizer.CANCEL_REQUEST_NOUN_PATTERN.search(normalized_text)
+            )
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -747,9 +779,24 @@ class EmailCategorizer:
                 "classification": "BACKOFFICE_ISLEMLERI > IPTAL > UCAK_BILETI_IPTALI"
             }
 
+        # Not: bare "degisikli" (CHANGE_INTENT_KEYWORDS) yerine TRANSPORT_MODE_STRONG_INTENT_KEYWORDS
+        # kullanildi -- "Uçuşumuz iptal olursa değişiklik hakkımız var mı ...
+        # öğrenmek istiyorum" gibi SAF SORU cumleleri "degisiklik" NOUN'unu
+        # icerdigi icin somut talep saniliyor, DEGISIKLIK_HAKKI_SORGULAMA
+        # bilgi-istek dalini (Gercekci-10) bozuyordu. Ayrica "degistirildi"
+        # (PASIF, "-di" gecmis zaman) acikca haric tutuluyor -- "Uçuş saatimiz
+        # habersizce değiştirildi" gibi bir SIKAYET ifadesi ("baskasi yapti,
+        # ben istemedim") somut bir DEGISIKLIK TALEBIYLE ("değiştirmek
+        # istiyoruz") ayni "degistir" kokunu paylasiyor ama anlam tam tersi
+        # (Gercekci-44, SIKAYET > UCAK > SAAT_DEGISIKLIGI ile cakisiyordu).
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.AIRPLANE_TICKET_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+            and "degistirildi" not in normalized_text
+            and (
+                any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_MODE_STRONG_INTENT_KEYWORDS)
+                or "degisim" in normalized_text
+                or EmailCategorizer.CHANGE_REQUEST_NOUN_PATTERN.search(normalized_text)
+            )
         ):
             return {
                 "channel_id": CHANNEL_ID,
