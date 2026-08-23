@@ -732,3 +732,24 @@ def extract_reservation_number(text: str) -> str | None:
     if not match:
         return None
     return match.group(1).strip()
+
+
+def detect_priority_level(text: str) -> str | None:
+    """
+    Mailde gecen aciliyet sinyallerine gore, KIRILIM NE OLURSA OLSUN
+    (kullanici tarafindan bildirilen genel kural), ticket'in Oncelik
+    (priorityLevel) alaninda ne secilmesi gerektigini dondurur.
+
+    "acil" ENGELLEYICI'den daha az onemli DEGIL -- CSM'deki Oncelik listesinde
+    Engelleyici (Sira 1, en yuksek) her zaman Opsiyonlu'dan (Sira 5) daha
+    aciliyetli sayildigi icin, ikisi de metinde geciyorsa Engelleyici kazanir.
+
+    Returns:
+        "ENGELLEYICI", "OPSIYONLU" veya hicbiri gecmiyorsa None.
+    """
+    normalized = normalize_turkish_characters(text)
+    if "acil" in normalized:
+        return "ENGELLEYICI"
+    if "opsiyon" in normalized:
+        return "OPSIYONLU"
+    return None

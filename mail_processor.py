@@ -435,9 +435,19 @@ class EmailCategorizer:
         "bloke", "kaldirilmadi", "cozulmedi", "kalkmadi", "dusmedi"
     ]
 
-    CONFIRMATION_TOPIC_KEYWORDS = ["konfirme", "konfirmasyon", "rezervasyon onayi"]
+    CONFIRMATION_TOPIC_KEYWORDS = [
+        "konfirme", "konfirmasyon", "rezervasyon onayi", "otel onayi", "kesinles"
+    ]
+    # Not: bare "sure" (RESERVATION_CONFIRMATION_INFO_EVENT_KEYWORDS, bilgi-istek
+    # dali) kelimesi "surecinin" gibi kelimelerde de gectigi icin ("surec" ile
+    # ayni Turkce koku), somut talep ifadeleri buraya eklenerek bu dalin ONCE
+    # eslesmesi sagliyor -- boylece "...sürecinin tamamlanmasını rica eder..."
+    # gibi gercek talep icerikli mailler yanlislikla bilgi-istek/konfirme
+    # dalina dusmuyor.
     CONFIRMATION_ACTIONABLE_EVENT_KEYWORDS = [
-        "gelmedi", "ulasmadi", "hala", "acil laz"
+        "gelmedi", "ulasmadi", "hala", "acil laz",
+        "etmenizi", "etmesini", "islemi", "tamamlanmasini", "yapilmasini",
+        "iletilmesini", "kesinlesti mi", "bilgisinin"
     ]
 
     PAYMENT_TYPE_TOPIC_KEYWORDS = [

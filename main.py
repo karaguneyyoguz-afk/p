@@ -20,7 +20,7 @@ from mail_processor import (
     send_ticket_confirmation_email, send_rejection_email, 
     send_missing_fields_email
 )
-from validators import contains_profanity, extract_reservation_number
+from validators import contains_profanity, extract_reservation_number, detect_priority_level
 from csm_api import CSMAPIClient, TicketPayloadBuilder
 from utils import clean_subject_line, clean_mailto_artifacts
 from logging_utils import record_mail_event
@@ -75,7 +75,18 @@ def process_email(
     # Categorize email
     categorization = categorizer.categorize(clean_subject, body, sender_email)
     print(f"📌 Sınıflandırma: {categorization['classification']}")
-    
+
+    # Not: kirilim ne olursa olsun, mailde "acil"/"opsiyon" gibi aciliyet
+    # sinyalleri geciyorsa ticket'in Oncelik alani buna gore ayarlanmali
+    # (kullanici tarafindan bildirilen genel kural). Belirli bir kirilimin
+    # kendi mantigi zaten bir priority_level belirlemisse (ör. Kaydırma >
+    # Otel/Operasyon Kaynaklı), bu genel kural onunla AYNI sonucu uretir; farkli
+    # bir kirilimde de aynı sinyaller gecerse artik burada yakalanir.
+    urgency_priority = detect_priority_level(body)
+    if urgency_priority:
+        categorization["priority_level"] = urgency_priority
+        print(f"⚡ Aciliyet sinyali tespit edildi, Öncelik: {urgency_priority}")
+
     # Check for missing required fields
     if categorization.get("missing_fields"):
         missing_fields = categorization["missing_fields"]

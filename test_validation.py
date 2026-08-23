@@ -22,6 +22,7 @@ from validators import (
     is_valid_tax_id,
     is_valid_email,
     extract_reservation_number,
+    detect_priority_level,
 )
 from csm_api import TicketPayloadBuilder
 
@@ -534,6 +535,43 @@ check(
 
 r = cat("", "Konfirme maili hala gelmedi, rezervasyon onayı gelmedi.")
 check("Konfirme-1", r["classification"] == "BACKOFFICE_ISLEMLERI > KONFIRME > KONFIRME", r["classification"])
+
+# CONFIRMATION_ACTIONABLE_EVENT_KEYWORDS eski hali sadece "gelmedi/ulasmadi/
+# hala/acil laz" iceriyordu (yalnizca "konfirme gecikmesi" sikayetlerini
+# kapsiyordu); "konfirme etmenizi rica ederiz" gibi TALEP ifadeleri eksikti
+# (kullanici tarafindan bildirildi). Ayrica bare "sure" kelimesi (bilgi-istek
+# dalinda) "sürecinin" gibi kelimelerde de gectigi icin somut talep icerikli
+# mailleri yanlislikla BILGI_ISTEK > REZERVASYON > KONFIRME dalina cekiyordu.
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuzun otel tarafındaki "
+    "konfirme ve kesinleşme sürecinin tamamlanarak tarafımıza resmi onay "
+    "bilgisinin iletilmesini rica eder, iyi çalışmalar dilerim.",
+)
+check(
+    "Konfirme-2 (ONAYLI): 'konfirme ve kesinleşme süreci' + 'onay bilgisinin iletilmesi' -> 'sure' yanlis eslesmesine ragmen Backoffice onceliklenmeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > KONFIRME > KONFIRME",
+    r["classification"],
+)
+
+r = cat("", "Rezervasyonumuzu konfirme etmenizi rica ederiz.")
+check("Konfirme-3: 'konfirme etmenizi rica'", r["classification"] == "BACKOFFICE_ISLEMLERI > KONFIRME > KONFIRME", r["classification"])
+
+r = cat("", "Otel onayının tamamlanmasını rica ederiz.")
+check("Konfirme-4: 'otel onayının tamamlanması' (yeni topic kelimesi 'otel onayi')", r["classification"] == "BACKOFFICE_ISLEMLERI > KONFIRME > KONFIRME", r["classification"])
+
+r = cat("", "Rezervasyonumuz kesinleşti mi, bilgi verir misiniz?")
+check("Konfirme-5: 'kesinleşti mi' (yeni topic kelimesi 'kesinles')", r["classification"] == "BACKOFFICE_ISLEMLERI > KONFIRME > KONFIRME", r["classification"])
+
+# Koruma: saf tanimsal soru ("konfirme nedir") hala BILGI_ISTEK > REZERVASYON >
+# KONFIRME'de kalmali, genisletilen event listesi bunu yanlislikla yakalamamali
+# (COLLISION-5 ile ayni mantik).
+r = cat("", "Konfirme nedir, açıklar mısınız?")
+check(
+    "Konfirme-6 (KORUMA): saf tanimsal 'konfirme nedir' sorusu Backoffice'e degil Bilgi-Istek'e dusmeli",
+    r["classification"] == "BILGI_ISTEK > REZERVASYON > KONFIRME",
+    r["classification"],
+)
 
 r = cat("", "Ödeme tipi değişikliği yapmak istiyorum.")
 check("Degisiklik-OdemeTipi", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODEME_TIPI_DEGISIKLIGI", r["classification"])
@@ -1590,6 +1628,36 @@ check(
     "UrunEslestirme-2 (KORUMA): related_product verilmeyince ticketProductId/relatedProduct payload'da hic olmamali",
     "ticketProductId" not in _urun_payload_bos and "relatedProduct" not in _urun_payload_bos,
     _urun_payload_bos.keys(),
+)
+
+# ==========================================================
+# detect_priority_level: KIRILIM NE OLURSA OLSUN, mailde "acil"/"opsiyon"
+# gecerse ticket'in Oncelik alani buna gore ayarlanmali (kullanici tarafindan
+# bildirilen genel kural, main.py'de her mailde calistiriliyor).
+# NOT: "ENGELLEYICI" oncelik seviyesinin CSM'deki tam uuid'i henuz bilinmiyor
+# -- su an sadece TESPIT (detect_priority_level) hazir, csm_api.py'nin
+# payload'a gercekten "Engelleyici" priorityLevel objesini gomebilmesi icin
+# o uuid'in kullanicidan alinmasi bekleniyor.
+# ==========================================================
+check(
+    "PriorityLevel-1: bare 'opsiyon' kelimesi -> OPSIYONLU (kirilimdan bagimsiz)",
+    detect_priority_level("Faturamın kesilmesini rica ederim, opsiyon süremiz bugün doluyor.") == "OPSIYONLU",
+    detect_priority_level("Faturamın kesilmesini rica ederim, opsiyon süremiz bugün doluyor."),
+)
+check(
+    "PriorityLevel-2: bare 'acil' kelimesi -> ENGELLEYICI (kirilimdan bagimsiz)",
+    detect_priority_level("Rezervasyonumu acil olarak iptal etmek istiyorum.") == "ENGELLEYICI",
+    detect_priority_level("Rezervasyonumu acil olarak iptal etmek istiyorum."),
+)
+check(
+    "PriorityLevel-3: hicbiri gecmiyorsa None",
+    detect_priority_level("Rezervasyon tarihini değiştirmek istiyorum.") is None,
+    detect_priority_level("Rezervasyon tarihini değiştirmek istiyorum."),
+)
+check(
+    "PriorityLevel-4: hem 'acil' hem 'opsiyon' geciyorsa Engelleyici (daha yuksek aciliyet) kazanmali",
+    detect_priority_level("Opsiyon süremiz doluyor, acil ilgilenir misiniz?") == "ENGELLEYICI",
+    detect_priority_level("Opsiyon süremiz doluyor, acil ilgilenir misiniz?"),
 )
 
 # ==========================================================
