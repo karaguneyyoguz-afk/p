@@ -603,6 +603,39 @@ check("EkHizmet-IptalSigortasi", r["classification"] == "BACKOFFICE_ISLEMLERI > 
 r = cat("", "Rezervasyonumu iptal etmek istiyorum, genel iptal talebi oluşturuyorum.")
 check("Iptal-Talebi", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > IPTAL_TALEBI", r["classification"])
 
+# CANCEL_INTENT_KEYWORDS eski hali "iptal etmek/ettirmek/edebilir/edelim/
+# ediyoruz/talebi" ile siniirliydi; "iptal EDILMESINI talep ediyoruz" gibi
+# EDILGEN (passive) yapida somut bir iptal talebi, hicbirini eslesmedigi icin
+# BILGI_ISTEK > REZERVASYON > IPTAL_SUREC_BILGISI dalina (metindeki "iptal
+# sartlari" ifadesindeki "sart" kelimesi uzerinden) yanlislikla dusuyordu
+# (kullanici tarafindan bildirildi).
+r = cat(
+    "",
+    "İyi günler, planlarımızda meydana gelen ani değişiklik nedeniyle 358109758 "
+    "numaralı tatil rezervasyonumuzun tamamen iptal edilmesini talep ediyoruz. "
+    "İptal şartları doğrultusunda varsa kesintiler düşülerek kalan tutarın iade "
+    "sürecinin başlatılması hususunda yardımlarınızı rica eder, iyi çalışmalar dilerim.",
+)
+check(
+    "Iptal-Talebi-2 (ONAYLI): edilgen 'iptal edilmesini talep ediyoruz' + metinde 'sart'/'surec' kelimeleri de gecse somut talep onceliklenmeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > IPTAL_TALEBI",
+    r["classification"],
+)
+
+r = cat("", "Rezervasyonumun iptalini rica ediyorum.")
+check(
+    "Iptal-Talebi-3: 'iptalini rica ediyorum' (isim+rica kalibi)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > IPTAL_TALEBI",
+    r["classification"],
+)
+
+r = cat("", "İptal işlemi için yardımcı olur musunuz?")
+check(
+    "Iptal-Talebi-4: bare 'iptal islemi'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > IPTAL_TALEBI",
+    r["classification"],
+)
+
 r = cat("", "Otel kaynaklı kaydırma yapıldığını öğrendim, bilgi istiyorum.")
 check("Kaydirma-OtelKaynakli", r["classification"] == "BACKOFFICE_ISLEMLERI > KAYDIRMA > OTEL_KAYNAKLI", r["classification"])
 
@@ -894,6 +927,63 @@ check(
 # ==========================================================
 r = cat("", "Evrak eksik olduğu için şikayetçiyim.")
 check("Evrak-Sikayet-1", r["classification"] == "SIKAYET > EVRAK > EVRAK", r["classification"])
+
+# Backoffice > Kaydirma > Otel Kaynakli -- otelin overbooking/doluluk nedeniyle
+# musteriyi baska tarih/odaya kaydirmasi (musterinin kendi istegiyle yaptigi
+# degisiklikten AYRISMALI, bu yuzden bare "degisiklik" kelimesi kasten
+# eklenmedi -- o zaten SUB_CATEGORY_CHANGE_HOTEL ile cakisirdi).
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuz için iletişime geçen otel "
+    "yönetimi, tesisin otel kaynaklı doluluk ve overbooking problemleri "
+    "nedeniyle tarihlerimizi başka bir haftaya kaydırmamızı talep etti. Otelin "
+    "bu zorunlu yönlendirmesi doğrultusunda rezervasyonumuzun kaydırma "
+    "işlemlerinin backoffice tarafında gerçekleştirilerek güncel bilgilerin "
+    "tarafımıza iletilmesini rica ederiz, iyi çalışmalar.",
+)
+check(
+    "Kaydirma-OtelKaynakli-1 (ONAYLI): otel kaynaklı doluluk/overbooking + kaydırma",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > KAYDIRMA > OTEL_KAYNAKLI",
+    r["classification"],
+)
+
+# "kaydir" koku hic gecmeden, sadece "overbooking" ile tetiklenen versiyon --
+# SHIFT_EVENT_KEYWORDS'e "overbooking" eklendi (once TESIS_ILETISIM'e
+# dusuyordu, canli/gercekci senaryo olarak bildirildi).
+r = cat("", "Otelin overbooking durumu nedeniyle rezervasyonumuz başka bir tarihe alındı, bilgi rica ederiz.")
+check(
+    "Kaydirma-OtelKaynakli-2 (ONAYLI): sadece 'overbooking' ile, 'kaydir' koku olmadan tetiklenmeli",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > KAYDIRMA > OTEL_KAYNAKLI",
+    r["classification"],
+)
+
+# DOCUMENT_COMPLAINT_EVENT_KEYWORDS eski hali sadece "eksik/hatali/yanlis/
+# sikinti/sorun" iceriyordu; gercek musteri sikayetlerinde en sik gecen
+# "ulasmadi/iletilmedi/magduriyet" gibi ifadeler eksikti (kullanici tarafindan
+# bildirildi).
+r = cat(
+    "",
+    "İyi günler, rezervasyonumuzla ilgili tarafımıza gönderilmesi gereken resmi "
+    "evraklar ve belgeler üzerinden haftalar geçmesine rağmen hâlâ elimize "
+    "ulaşmadı. Evrakların zamanında iletilmemesi nedeniyle büyük bir aksaklık "
+    "yaşıyoruz ve bu durumdan şikayetçiyiz. İlgili belgelerin acilen tarafımıza "
+    "elektronik veya kargo yoluyla ulaştırılmasını rica eder, iyi çalışmalar dilerim.",
+)
+check(
+    "Evrak-Sikayet-2 (ONAYLI): 'ulasmadi/iletilmemesi/aksaklik/sikayetciyiz' -> DOCUMENT_COMPLAINT_EVENT_KEYWORDS genisletildi",
+    r["classification"] == "SIKAYET > EVRAK > EVRAK",
+    r["classification"],
+)
+
+# "evrak" koku iyelik eki alinca unsuz yumusamasiyla "evragi/evragimiz" olur
+# (k->g, "degisiklik->degisikligi" ile ayni dilbilgisi sinifi); DOCUMENT_TOPIC_KEYWORDS'e
+# "evrag" stemi eklendi.
+r = cat("", "Merhaba, ıslak imzalı evrağımız hâlâ gönderilmedi, mağduriyet yaşıyoruz.")
+check(
+    "Evrak-Sikayet-3 (ONAYLI): 'evragimiz' unsuz yumusamasi + islak imza",
+    r["classification"] == "SIKAYET > EVRAK > EVRAK",
+    r["classification"],
+)
 
 r = cat("", "Sözleşme metnini gönderir misiniz.")
 check("Evrak-BI-Sozlesme", r["classification"] == "BILGI_ISTEK > EVRAK > SOZLESME", r["classification"])

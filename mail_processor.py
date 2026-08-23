@@ -330,9 +330,15 @@ class EmailCategorizer:
         "aciga alin", "pdf"
     ]
 
-    DOCUMENT_TOPIC_KEYWORDS = ["evrak", "belge"]
+    # Not: "evrag" ayrica eklendi -- "evrak" iyelik eki alinca unsuz yumusamasi
+    # ile "evragi"/"evragimiz"/"evragini" olur (k->g), "evrak" koku artik
+    # metinde gecmez (Turkce dilbilgisi tuzagi, "degisiklik->degisikligi" ile
+    # ayni sinif).
+    DOCUMENT_TOPIC_KEYWORDS = ["evrak", "evrag", "belge"]
     DOCUMENT_COMPLAINT_EVENT_KEYWORDS = [
-        "eksik", "hatali", "yanlis", "sikinti", "sorun"
+        "eksik", "hatali", "yanlis", "sikinti", "sorun",
+        "gelmedi", "ulasmadi", "ulasmiyor", "gonderilmedi", "iletilme",
+        "gecik", "teslim edilmedi", "magduriyet", "sikayetci", "aksakl"
     ]
 
     # ==========================================
@@ -360,7 +366,8 @@ class EmailCategorizer:
     # bilgi-istek mailleri de yanlislikla Backoffice Iptal Talebi'ne dusebilirdi.
     CANCEL_INTENT_KEYWORDS = [
         "iptal etmek", "iptal ettirmek", "iptal edebilir", "iptal edelim",
-        "iptal ediyoruz", "iptal talebi"
+        "iptal ediyoruz", "iptal talebi", "iptal edilmesini", "iptalini rica",
+        "iptalini talep", "iptal islemi"
     ]
 
     # Not: "sikayetci" -> "sikayet" ve "aksama" -> "aksa" olarak genisletildi;
@@ -460,7 +467,8 @@ class EmailCategorizer:
     ]
 
     SHIFT_EVENT_KEYWORDS = [
-        "kaydirdi", "kaydirma", "kaydirildik", "kaydirilmis", "kaydirmis"
+        "kaydirdi", "kaydirma", "kaydirildik", "kaydirilmis", "kaydirmis",
+        "overbooking"
     ]
     SHIFT_HOTEL_BASED_TOPIC_KEYWORDS = ["otel"]
     SHIFT_OPERATION_BASED_TOPIC_KEYWORDS = ["operasyon"]
