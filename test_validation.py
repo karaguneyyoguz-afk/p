@@ -591,6 +591,52 @@ check("Degisiklik-Tarih", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIK
 r = cat("", "Tur değişikliği istiyorum, başka tura geçmek istiyorum.")
 check("Degisiklik-Tur", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > TUR_DEGISIKLIGI", r["classification"])
 
+# TOUR_CHANGE_TOPIC_KEYWORDS eski hali sadece "tur degisikligi/baska tura/
+# baska bir tura/turu yerine" gibi zaten degisim-niyeti icine gomulu kalip
+# ifadeleri kapsiyordu; "tur paketini degistirmek" / "tur rotasi secmek" gibi
+# genel "tur paketi/rotasi/programi" + degistir/sec fiili kombinasyonlari
+# eksikti (kullanici tarafindan bildirildi). TOUR_PACKAGE_TOPIC_KEYWORDS bu
+# yuzden BILGI-ISTEK ile karismamasi icin CHANGE_INTENT_KEYWORDS/"sec" ile
+# ESLESTIRILEREK eklendi (tek basina tetiklenmiyor).
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuzla satın almış olduğumuz "
+    "mevcut tur paketini iptal etmeden, tarihlerimize uygun farklı bir rota "
+    "olan başka bir tur programıyla değiştirmek istiyoruz. Tur değişikliği "
+    "için fiyat farkı ve müsaitlik durumunun kontrol edilerek backoffice "
+    "işlemlerimizin başlatılmasını rica eder, iyi çalışmalar dilerim.",
+)
+check(
+    "Degisiklik-Tur-2 (ONAYLI): tur paketini iptal etmeden baska bir tur programiyla degistirme talebi",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > TUR_DEGISIKLIGI",
+    r["classification"],
+)
+
+r = cat("", "Tur paketini değiştirmek istiyorum, farklı bir rota var mı?")
+check(
+    "Degisiklik-Tur-3: 'tur paketini degistirmek' (TOUR_PACKAGE_TOPIC_KEYWORDS + CHANGE_INTENT)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > TUR_DEGISIKLIGI",
+    r["classification"],
+)
+
+r = cat("", "Farklı bir tur rotası seçmek istiyoruz, yardımcı olur musunuz?")
+check(
+    "Degisiklik-Tur-4: 'tur rotasi secmek' (TOUR_PACKAGE_TOPIC_KEYWORDS + 'sec')",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > TUR_DEGISIKLIGI",
+    r["classification"],
+)
+
+# Koruma: sadece "tur paketi" gecen SAF bilgi-istek (degistirme niyeti yok)
+# yanlislikla TUR_DEGISIKLIGI'ne dusmemeli -- TOUR_PACKAGE_TOPIC_KEYWORDS
+# bilerek CHANGE_INTENT_KEYWORDS/"sec" ile eslestirilmeden tek basina
+# tetiklenmiyor.
+r = cat("", "Tur paketi hakkında bilgi almak istiyorum, içeriği nedir?")
+check(
+    "Degisiklik-Tur-5 (KORUMA): sadece 'tur paketi' bilgi-istegi, degistirme niyeti yok -> TUR_DEGISIKLIGI'ne dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > TUR_DEGISIKLIGI",
+    r["classification"],
+)
+
 r = cat("", "Ulaşım değişikliği istiyorum, ulaşım tipimi değiştirmek istiyorum.")
 check("Degisiklik-Ulasim", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DEGISIKLIK_ULASIM", r["classification"])
 
@@ -633,6 +679,58 @@ r = cat("", "İptal işlemi için yardımcı olur musunuz?")
 check(
     "Iptal-Talebi-4: bare 'iptal islemi'",
     r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > IPTAL_TALEBI",
+    r["classification"],
+)
+
+# --- Backoffice > Degisiklik > Diger (coplukutusu/joker kirilim) ---
+# Tarih/oda/isim/dogum tarihi/odeme tipi/otel/tur/ulasim gibi SPESIFIK
+# degisiklik dallarinin hicbirine uymayan ama genel bir degisiklik/revizyon
+# niyeti tasiyan mailler icin. Bilerek fonksiyonun EN SONUNA (varsayilan
+# TESIS_ILETISIM'den hemen once) yerlestirildi -- daha erken konursa,
+# "degisiklik" kelimesinin sadece baglamsal gectigi ama asil niyeti
+# IPTAL_TALEBI olan ya da soru formundaki (DEGISIKLIK_BILGI_TALEBI) mailleri
+# yanlislikla once yakaliyordu (bu oturumda denendi, geri alindi).
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuzla ilgili sistemde standart "
+    "kategoriye girmeyen ancak yapılmasını istediğimiz bazı özel değişiklikler "
+    "ve revizyon taleplerimiz bulunmaktadır. Bu istisnai durumun incelenerek "
+    "backoffice tarafında gerekli düzenlemelerin yapılmasını rica eder, iyi "
+    "çalışmalar dilerim.",
+)
+check(
+    "Degisiklik-Diger-1 (ONAYLI): standart alt kategorilere uymayan genel degisiklik/revizyon talebi",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DIGER",
+    r["classification"],
+)
+
+r = cat("", "Rezervasyonumda revizyon yapılmasını istiyoruz.")
+check(
+    "Degisiklik-Diger-2: 'revizyon' kelimesi (CHANGE_INTENT_KEYWORDS'e eklendi)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DIGER",
+    r["classification"],
+)
+
+# Onceki iki regresyon: DIGER dalinin CANCEL_INTENT ve soru-formu Bilgi-Istek
+# dallarindan ONCE gelmemesi gerektigini dogrulayan koruma testleri.
+r = cat(
+    "",
+    "İyi günler, planlarımızda meydana gelen ani değişiklik nedeniyle "
+    "358109758 numaralı tatil rezervasyonumuzun tamamen iptal edilmesini "
+    "talep ediyoruz. İptal şartları doğrultusunda varsa kesintiler düşülerek "
+    "kalan tutarın iade sürecinin başlatılması hususunda yardımlarınızı rica "
+    "eder, iyi çalışmalar dilerim.",
+)
+check(
+    "Degisiklik-Diger-3 (KORUMA): metinde baglamsal 'degisiklik' gecse bile IPTAL_TALEBI oncelikli olmali",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > IPTAL_TALEBI",
+    r["classification"],
+)
+
+r = cat("", "Rezervasyonumda değişiklik yapabilir miyim.")
+check(
+    "Degisiklik-Diger-4 (KORUMA): soru formundaki 'degisiklik yapabilir miyim' DEGISIKLIK_BILGI_TALEBI'ne dusmeli, DIGER'e degil",
+    r["classification"] == "BILGI_ISTEK > REZERVASYON > DEGISIKLIK_BILGI_TALEBI",
     r["classification"],
 )
 

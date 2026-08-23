@@ -37,6 +37,7 @@ from config import (
     SUB_CATEGORY_CHANGE_ROOM, SUB_CATEGORY_CHANGE_ROOM_TYPE,
     SUB_CATEGORY_CHANGE_HOTEL, SUB_CATEGORY_CHANGE_DATE,
     SUB_CATEGORY_CHANGE_TOUR, SUB_CATEGORY_CHANGE_TRANSPORT,
+    SUB_CATEGORY_CHANGE_OTHER,
     SUB_CATEGORY_CHANGE_AIRPLANE_TICKET,
     SUB_CATEGORY_CANCELLATION_ROOM, SUB_CATEGORY_CANCELLATION_REQUEST,
     SUB_CATEGORY_CANCELLATION_AIRPLANE,
@@ -356,7 +357,8 @@ class EmailCategorizer:
     CHANGE_INTENT_KEYWORDS = [
         "degistir", "degisikli", "gecmek", "gecis yapmak", "cevirmek",
         "duzelt", "guncelle", "yanlis gir", "yanlis yaz", "hatali yaz",
-        "eklettirmek", "eklemek isti", "ileri almak", "geri almak"
+        "eklettirmek", "eklemek isti", "ileri almak", "geri almak",
+        "revizyon", "revize", "duzenle"
     ]
 
     # Not: bilinçli olarak "iptal etmek/ettirmek/edebilir/edelim/ediyoruz" gibi
@@ -453,6 +455,11 @@ class EmailCategorizer:
     TOUR_CHANGE_TOPIC_KEYWORDS = [
         "tur degisikligi", "baska tura", "baska bir tura", "turu yerine"
     ]
+    # "tur paketi/rotasi/programi" gibi genel bir "tur" nesnesi -- tek basina
+    # bilgi-istek de olabilecegi icin (ör. "tur paketi hakkinda bilgi"),
+    # CHANGE_INTENT_KEYWORDS veya "sec" (secmek) ile ESLESTIRILEREK kullanilir,
+    # TOUR_CHANGE_TOPIC_KEYWORDS'un aksine tek basina tetiklenmez.
+    TOUR_PACKAGE_TOPIC_KEYWORDS = ["tur paket", "tur rota", "tur program"]
 
     TRANSPORT_MODE_CHANGE_TOPIC_KEYWORDS = [
         "ulasim degisikligi", "ulasim tipimi", "ucakla gitmek yerine", "otobusle gitmek yerine"
@@ -1495,7 +1502,16 @@ class EmailCategorizer:
                 "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > TARIH_DEGISIKLIGI"
             }
 
-        if any(keyword in normalized_text for keyword in EmailCategorizer.TOUR_CHANGE_TOPIC_KEYWORDS):
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.TOUR_CHANGE_TOPIC_KEYWORDS)
+            or (
+                any(keyword in normalized_text for keyword in EmailCategorizer.TOUR_PACKAGE_TOPIC_KEYWORDS)
+                and (
+                    any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+                    or "sec" in normalized_text
+                )
+            )
+        ):
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_RESERVATION,
@@ -1733,6 +1749,34 @@ class EmailCategorizer:
                 "attributes": [],
                 "missing_fields": [],
                 "classification": "BILGI_ISTEK > ACENTE > ILETISIM_BILGILERI"
+            }
+
+        # "Diger" (coplukutusu): tarih/oda/isim/dogum tarihi/odeme tipi/otel/
+        # tur/ulasim gibi SPESIFIK degisiklik dallarinin, ayrica IPTAL_TALEBI
+        # ve TUM Bilgi-Istek dallarinin (ozellikle "degisiklik yapabilir
+        # miyim?" gibi SORU formundaki DEGISIKLIK_BILGI_TALEBI) HICBIRINE
+        # uymayan ama genel bir "degisiklik/revizyon" niyeti tasiyan mailler
+        # icin SON CARE fallback. Bilerek fonksiyonun EN SONUNA, varsayilan
+        # TESIS_ILETISIM donusunden hemen once yerlestirildi -- daha erken bir
+        # konuma alinirsa (ör. Backoffice > Degisiklik blogunun hemen
+        # sonunda), "degisiklik" kelimesinin SADECE baglamsal olarak gectigi
+        # ama asil niyeti FARKLI olan mailleri (ör. "iptal edilmesini talep
+        # ediyoruz" + baglamsal "ani degisiklik nedeniyle" ifadesi, veya soru
+        # formundaki bilgi-istek talepleri) yanlislikla once yakaliyordu
+        # (canli ortamda gozlemlendi, denendi).
+        if any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_RESERVATION,
+                "ticket_type_name": "Backoffice İşlemleri",
+                "category_id": CATEGORY_CHANGE,
+                "category_name": "Değişiklik",
+                "sub_category_id": SUB_CATEGORY_CHANGE_OTHER,
+                "sub_category_name": "Diğer",
+                "sub_category_code": "DIGER",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DIGER"
             }
 
         # Default: General information request
