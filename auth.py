@@ -13,6 +13,7 @@ from config import (
     CSM_PASSWORD,
     TOKEN_CACHE_DURATION_MINUTES
 )
+from service_log import record_service_event
 
 # Global token cache
 _cached_token: Optional[str] = None
@@ -76,12 +77,14 @@ def get_bearer_token() -> str:
             _token_expiry = datetime.now() + timedelta(minutes=TOKEN_CACHE_DURATION_MINUTES)
             
             print(f"✅ [TOKEN ALINDI] Süresi Dolacağı Zaman: {_token_expiry.strftime('%Y-%m-%d %H:%M:%S')}")
+            record_service_event("csm_api", "auth", "success", detail="Token alındı")
             return _cached_token
         else:
             raise Exception(f"Token alınamadı. Status Code: {response.status_code}")
-    
+
     except Exception as e:
         print(f"❌ Token alınamadı: {e}")
+        record_service_event("csm_api", "auth", "failed", detail=str(e))
         raise
 
 

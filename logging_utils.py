@@ -6,6 +6,8 @@ from datetime import datetime
 from threading import Lock
 from typing import Any, Dict, List, Optional
 
+from service_log import get_actor
+
 LOG_FILE = os.path.join(os.path.dirname(__file__), "mail_processing_log.jsonl")
 _LOG_LOCK = Lock()
 
@@ -27,6 +29,7 @@ def record_mail_event(
         "timestamp": datetime.now().astimezone().isoformat(),
         "event": event,
         "status": status,
+        "actor": get_actor(),
         "sender_email": sender_email,
         "subject": subject,
         "reason": reason,

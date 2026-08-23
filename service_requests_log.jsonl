@@ -1,0 +1,38 @@
+{"timestamp": "2026-08-23T17:44:32.890352+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-23T17:44:32.891736+03:00", "service": "panel_api", "action": "POST /api/token/refresh", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-23T17:44:35.755740+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-23T17:47:02.449373+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-23T17:51:15.267195+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-23T17:51:21.310335+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-23T17:52:31.678019+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-23T17:56:50.189692+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-23T17:56:50.856687+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-23T17:57:22.995174+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-23T17:57:22.996179+03:00", "service": "panel_api", "action": "POST /api/token/refresh", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-23T17:57:23.573740+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-23T17:59:26.511508+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-23T17:59:46.365768+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-23T17:59:46.548508+03:00", "service": "panel_api", "action": "POST /api/run", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-23T18:15:23.801855+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 418", "duration_ms": null}
+{"timestamp": "2026-08-23T18:15:23.803625+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 502", "duration_ms": null}
+{"timestamp": "2026-08-23T18:15:45.516454+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 418", "duration_ms": null}
+{"timestamp": "2026-08-23T18:15:45.518689+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 502", "duration_ms": null}
+{"timestamp": "2026-08-23T18:15:45.530715+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-23T18:16:04.008604+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-23T18:16:58.945312+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-23T18:16:58.946145+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-23T18:17:50.192766+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-23T18:17:50.195322+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-23T18:17:50.197501+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-23T18:17:50.200347+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-23T18:22:40.800392+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-23T18:22:50.055941+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-23T18:22:50.582112+03:00", "service": "panel_api", "action": "POST /api/run", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-23T18:23:38.393924+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 418", "duration_ms": null}
+{"timestamp": "2026-08-23T18:23:38.395015+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 502", "duration_ms": null}
+{"timestamp": "2026-08-23T18:24:47.178788+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 418", "duration_ms": null}
+{"timestamp": "2026-08-23T18:24:47.180509+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 502", "duration_ms": null}
+{"timestamp": "2026-08-23T18:27:31.239020+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-23T18:27:31.242364+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-23T18:27:31.245882+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-23T18:27:31.249141+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}

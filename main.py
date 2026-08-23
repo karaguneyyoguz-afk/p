@@ -253,4 +253,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    from service_log import set_actor
+    set_actor("cli")
     main()

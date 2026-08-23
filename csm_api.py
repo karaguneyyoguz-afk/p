@@ -17,6 +17,7 @@ from config import (
 )
 from auth import get_bearer_token
 from utils import parse_name_parts
+from service_log import record_service_event
 
 
 class CSMAPIClient:
@@ -73,21 +74,24 @@ class CSMAPIClient:
             # Status 204 = No Content (customer not found)
             if response.status_code == 204:
                 print(f"ℹ️ [BİLGİ] Müşteri veritabanında bulunamadı: {email}")
+                record_service_event("csm_api", "search_customer", "success", detail=f"{email}: bulunamadı")
                 return None
-            
+
             # Status 200 = Customer found
             if response.status_code == 200:
                 # Check if response has content
                 if not response.text or response.text.strip() == '':
                     print(f"ℹ️ [BİLGİ] Boş yanıt - müşteri bulunamadı: {email}")
+                    record_service_event("csm_api", "search_customer", "success", detail=f"{email}: boş yanıt")
                     return None
-                
+
                 try:
                     response_data = response.json()
                     # API returns array of results
                     if isinstance(response_data, list) and len(response_data) > 0:
                         customer = response_data[0]
                         print(f"✅ [BULUNDU] Veritabanında müşteri: {email}")
+                        record_service_event("csm_api", "search_customer", "success", detail=f"{email}: bulundu")
                         return {
                             'id': customer.get('id'),
                             'firstName': customer.get('party', {}).get('firstName', ''),
@@ -97,16 +101,23 @@ class CSMAPIClient:
                         }
                     else:
                         print(f"ℹ️ [BİLGİ] Boş sonuç listesi - müşteri bulunamadı: {email}")
+                        record_service_event("csm_api", "search_customer", "success", detail=f"{email}: sonuç yok")
                         return None
                 except Exception as e:
                     print(f"⚠️ [UYARI] Müşteri verisi ayrıştırılamadı: {e}")
+                    record_service_event("csm_api", "search_customer", "failed", detail=str(e))
                     return None
             else:
                 print(f"⚠️ [HATA] Müşteri arama başarısız. Status: {response.status_code}")
+                record_service_event(
+                    "csm_api", "search_customer", "failed",
+                    detail=f"HTTP {response.status_code}",
+                )
                 return None
-                
+
         except Exception as e:
             print(f"❌ Müşteri aranırken hata: {e}")
+            record_service_event("csm_api", "search_customer", "failed", detail=str(e))
             return None
 
     def search_product_by_reservation_number(self, reservation_number: str) -> Optional[List[Dict]]:
@@ -136,22 +147,43 @@ class CSMAPIClient:
 
             if response.status_code == 204:
                 print(f"ℹ️ [BİLGİ] Rezervasyon numarasına ait ürün bulunamadı: {reservation_number}")
+                record_service_event(
+                    "csm_api", "search_product", "success",
+                    detail=f"{reservation_number}: bulunamadı",
+                )
                 return []
 
             if response.status_code == 200:
                 if not response.text or response.text.strip() == '':
+                    record_service_event(
+                        "csm_api", "search_product", "success",
+                        detail=f"{reservation_number}: boş yanıt",
+                    )
                     return []
                 products = response.json()
                 if isinstance(products, list):
                     print(f"✅ [BULUNDU] {len(products)} ürün kaydı: {reservation_number}")
+                    record_service_event(
+                        "csm_api", "search_product", "success",
+                        detail=f"{reservation_number}: {len(products)} kayıt",
+                    )
                     return products
+                record_service_event(
+                    "csm_api", "search_product", "success",
+                    detail=f"{reservation_number}: liste değil",
+                )
                 return []
 
             print(f"⚠️ [HATA] Ürün arama başarısız. Status: {response.status_code}")
+            record_service_event(
+                "csm_api", "search_product", "failed",
+                detail=f"HTTP {response.status_code}",
+            )
             return None
 
         except Exception as e:
             print(f"❌ Ürün aranırken hata: {e}")
+            record_service_event("csm_api", "search_product", "failed", detail=str(e))
             return None
 
     def create_ticket(self, payload: Dict) -> Optional[str]:
@@ -189,19 +221,26 @@ class CSMAPIClient:
                         "Oluşturuldu"
                     )
                     print(f"🚀 [BAŞARILI] CSM'de Ticket oluşturuldu! Ticket ID: #{ticket_id}")
+                    record_service_event("csm_api", "create_ticket", "success", detail=f"#{ticket_id}")
                     return str(ticket_id)
                 except Exception as e:
                     print(f"🚀 [BAŞARILI] CSM'de Ticket oluşturuldu!")
+                    record_service_event("csm_api", "create_ticket", "success", detail="Oluşturuldu")
                     return "Oluşturuldu"
             else:
                 self.last_error = f"HTTP {response.status_code}: {response.text}"
                 print(f"⚠️ [HATA] CSM isteği başarısız. Status: {response.status_code}")
                 print(f"Yanıt: {response.text}")
+                record_service_event(
+                    "csm_api", "create_ticket", "failed",
+                    detail=f"HTTP {response.status_code}",
+                )
                 return None
-        
+
         except Exception as e:
             self.last_error = str(e)
             print(f"❌ Ticket oluşturulurken hata: {e}")
+            record_service_event("csm_api", "create_ticket", "failed", detail=str(e))
             return None
 
 

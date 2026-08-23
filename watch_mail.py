@@ -12,6 +12,7 @@ import imaplib
 from mail_processor import EmailProcessor, EmailCategorizer
 from csm_api import CSMAPIClient
 from main import process_email
+from service_log import set_actor
 
 POLL_SECONDS = 10
 RECONNECT_RETRY_SECONDS = 15
@@ -33,6 +34,7 @@ def safe_connect(processor: EmailProcessor) -> None:
 
 
 def watch() -> None:
+    set_actor("sistem")
     processor = EmailProcessor(username=None, password=None)
     categorizer = EmailCategorizer()
     csm_client = CSMAPIClient()

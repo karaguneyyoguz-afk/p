@@ -73,6 +73,7 @@ from validators import (
     contains_profanity, extract_invoice_attributes, extract_payment_attributes,
     extract_option_deadline
 )
+from service_log import record_service_event
 
 
 def _levenshtein_distance(a: str, b: str) -> int:
@@ -147,8 +148,10 @@ class EmailProcessor:
             self.mail_connection.login(self.username, self.password)
             self.mail_connection.select("inbox")
             print("✅ E-posta sunucusuna bağlandı")
+            record_service_event("gmail_imap", "connect", "success", detail=self.username)
         except Exception as e:
             print(f"❌ E-posta bağlantı hatası: {e}")
+            record_service_event("gmail_imap", "connect", "failed", detail=str(e))
             raise
     
     def disconnect(self) -> None:
