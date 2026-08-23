@@ -787,21 +787,40 @@ class EmailCategorizer:
     ]
 
     BEST_PRICE_GUARANTEE_TOPIC_KEYWORDS = [
-        "fiyat garantisi", "daha ucuz gordum", "baska sitede ucuz"
+        "fiyat garantisi", "daha ucuz gordum", "baska sitede ucuz",
+        "daha ucuz bulduk", "es deger fiyat"
     ]
 
+    # Not: "fiyat dusus" (noun, "düşüşü") eklendi -- eski liste sadece "fiyat
+    # dustu"/"fiyati dustu" (fiil) kapsiyordu. "ucuzladi"/"geriledi" de
+    # eklendi (kullanici tarafindan bildirildi).
     PRICE_DROP_TOPIC_KEYWORDS = [
-        "fiyat dustu", "fiyati dustu"
+        "fiyat dustu", "fiyati dustu", "fiyat dusus", "ucuzladi", "geriledi",
+        "indirim farki"
     ]
 
-    PAYMENT_OBJECTION_TOPIC_KEYWORDS = ["odeme", "tutar", "kart"]
+    # Not: "fatura fiyati" eklendi -- "Fatura fiyatı uyumsuzluğu" gibi
+    # ifadeler bare "fatura" kelimesi yuzunden yanlislikla FATURA sikayet
+    # dalina dusuyordu (asagida is_price_payment_objection korumasi ile).
+    PAYMENT_OBJECTION_TOPIC_KEYWORDS = ["odeme", "tutar", "kart", "fatura fiyati", "ucret"]
+    # Not: bare "cekilmesi" KASITLI OLARAK YOK -- "ödeme çekilmesine rağmen
+    # tutar sisteminize yansımadı" gibi TAMAMEN FARKLI bir kirilima
+    # (ODEMENIN_YANSIMAMASI) ait mailler de "cekilmesi" iceriyor, bare
+    # haliyle Odeme-2/Odeme-3 testlerini bozuyordu (denendi, geri alindi).
+    # "yanlis ucret" gibi spesifik compound kalip kullanildi.
     PAYMENT_OBJECTION_EVENT_KEYWORDS = [
-        "itiraz", "fazla cekildi", "yanlis tutar", "fazla odeme"
+        "itiraz", "fazla cekildi", "yanlis tutar", "fazla odeme",
+        "hatali tutar", "yansitilmasi", "uyumsuz", "yanlis ucret"
     ]
 
-    PRICE_GENERAL_TOPIC_KEYWORDS = ["fiyat"]
+    PRICE_GENERAL_TOPIC_KEYWORDS = ["fiyat", "ucret"]
+    # Not: eski EVENT listesi SADECE tutarsizlik/uyusmazlik tespitine
+    # odakliydi ("tutmuyor"/"uyusmuyor" vb.); kullanici bu dali "joker fiyat
+    # sikayeti" (genel memnuniyetsizlik/yuksek fiyat) olarak revize etti --
+    # COMPLAINT_SENTIMENT_KEYWORDS de ayri bir alternatif olarak eklendi.
     PRICE_GENERAL_EVENT_KEYWORDS = [
-        "tutmuyor", "uyusmuyor", "farkli gosteriliyor", "yanlis hesaplanmis", "hatali gosterilmis"
+        "tutmuyor", "uyusmuyor", "farkli gosteriliyor", "yanlis hesaplanmis",
+        "hatali gosterilmis", "cok yuksek"
     ]
 
     PAYMENT_OBJECTION_KEYWORDS = [
@@ -1110,9 +1129,16 @@ class EmailCategorizer:
                 "classification": "SIKAYET > EVRAK > EVRAK"
             }
 
+        # Not: "fatura fiyati" ("Fatura fiyatı uyumsuzluğu" gibi) gecen
+        # mailler, bare "fatura"+"sikayet" kombinasyonu yuzunden yanlislikla
+        # buraya (fatura KESILMESI/duzeltilmesi sikayeti) degil, asagida
+        # Fiyatlandirma > Odeme Itirazi'na gitmeli -- bu mailler gercek bir
+        # fatura duzenleme/kesim sorunu degil, fiyat/tutar mutabakatsizligi
+        # (kullanici tarafindan bildirildi).
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_COMPLAINT_KEYWORDS)
+            and "fatura fiyati" not in normalized_text
         ):
             attributes, missing_fields = extract_invoice_attributes(combined_text, sender_email)
             return {
@@ -1460,7 +1486,14 @@ class EmailCategorizer:
 
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.PRICE_GENERAL_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.PRICE_GENERAL_EVENT_KEYWORDS)
+            and (
+                any(keyword in normalized_text for keyword in EmailCategorizer.PRICE_GENERAL_EVENT_KEYWORDS)
+                # Not: "joker fiyat şikayeti" olarak revize edildi -- genel
+                # memnuniyetsizlik/sikayet ifadeleri de (COMPLAINT_SENTIMENT_KEYWORDS)
+                # kabul ediliyor, sadece tutarsizlik/uyusmazlik tespitiyle
+                # sinirli degil (kullanici tarafindan bildirildi).
+                or any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+            )
         ):
             return {
                 "channel_id": CHANNEL_ID,

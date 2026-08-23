@@ -1850,6 +1850,97 @@ check("Sikayet-Fiyat-OdemeItirazi", r["classification"] == "SIKAYET > FIYATLANDI
 r = cat("", "Fiyat ile ilgili şikayetim var, fiyat hatalı gösterilmiş.")
 check("Sikayet-Fiyat-Genel", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_GENEL", r["classification"])
 
+# ==========================================================
+# SIKAYET > FIYATLANDIRMA (4 kirilim) genisletme
+# ==========================================================
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuz için başka bir "
+    "platformda daha uygun fiyat bulmamıza rağmen 'En İyi Fiyat Garantisi' "
+    "kapsamında aradaki farkın tarafımıza iade edilmemesinden dolayı "
+    "şikayetçiyiz, gereğinin yapılmasını rica ederiz.",
+)
+check("Sikayet-Fiyat-EnIyiFiyatGarantisi-2 (ONAYLI)", r["classification"] == "SIKAYET > FIYATLANDIRMA > EN_IYI_FIYAT_GARANTISI", r["classification"])
+
+r = cat("", "Başka sitede daha ucuz bulduk, şikayetçiyiz.")
+check("Sikayet-Fiyat-EnIyiFiyatGarantisi-3: 'daha ucuz bulduk'", r["classification"] == "SIKAYET > FIYATLANDIRMA > EN_IYI_FIYAT_GARANTISI", r["classification"])
+
+r = cat("", "Eş değer fiyat politikası uygulanmadı, şikayetçiyiz.")
+check("Sikayet-Fiyat-EnIyiFiyatGarantisi-4: 'eş değer fiyat politikası'", r["classification"] == "SIKAYET > FIYATLANDIRMA > EN_IYI_FIYAT_GARANTISI", r["classification"])
+
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzla ilgili genel "
+    "fiyatlandırma politikaları ve uygulanan ücretler konusunda yaşadığımız "
+    "memnuniyetsizlikten ötürü şikayetçiyiz.",
+)
+check("Sikayet-Fiyat-Genel-2 (ONAYLI): genel fiyatlandırma politikası/ücretler memnuniyetsizliği", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_GENEL", r["classification"])
+
+r = cat("", "Fiyatlar çok yüksek, şikayetçiyiz.")
+check("Sikayet-Fiyat-Genel-3: 'fiyatlar çok yüksek'", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_GENEL", r["classification"])
+
+r = cat("", "Genel ücretlendirme hatasından şikayetçiyiz.")
+check("Sikayet-Fiyat-Genel-4: 'ücretlendirme hatası' (bare 'ucret' + COMPLAINT_SENTIMENT)", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_GENEL", r["classification"])
+
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzu yaptıktan kısa süre "
+    "sonra aynı otelin fiyatlarında ciddi bir düşüş gerçekleştiğini gördük. "
+    "Fiyat düşüşü farkının tarafımıza yansıtılmamasından dolayı şikayetçiyiz.",
+)
+check("Sikayet-Fiyat-Dususu-2 (ONAYLI): 'fiyat düşüşü' (noun) + 'yansıtılmaması'", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_DUSUSU", r["classification"])
+
+r = cat("", "Rezervasyonumuz sonradan ucuzladı, şikayetçiyiz.")
+check("Sikayet-Fiyat-Dususu-3: 'sonradan ucuzladı'", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_DUSUSU", r["classification"])
+
+r = cat("", "Otel fiyatı geriledi, şikayetçiyiz.")
+check("Sikayet-Fiyat-Dususu-4: 'otel fiyatı geriledi'", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_DUSUSU", r["classification"])
+
+r = cat("", "İndirim farkı iadesi yapılmadı, şikayetçiyiz.")
+check("Sikayet-Fiyat-Dususu-5: 'indirim farkı iadesi' (genel IADE dalindan ayristirildi)", r["classification"] == "SIKAYET > FIYATLANDIRMA > FIYAT_DUSUSU", r["classification"])
+
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzda mutabık kaldığımız "
+    "fiyat ile kartımdan çekilen tutar arasında uyuşmazlık bulunmaktadır. "
+    "Fiyatlandırma hatasına yönelik ödeme itirazımın incelenmesini rica "
+    "ederim",
+)
+check("Sikayet-Fiyat-OdemeItirazi-2 (ONAYLI): fiyat/tutar mutabakatsizligi", r["classification"] == "SIKAYET > FIYATLANDIRMA > ODEME_ITIRAZI", r["classification"])
+
+r = cat("", "Hatalı tutar yansıtılması nedeniyle şikayetçiyiz.")
+check("Sikayet-Fiyat-OdemeItirazi-3: 'hatalı tutar yansıtılması'", r["classification"] == "SIKAYET > FIYATLANDIRMA > ODEME_ITIRAZI", r["classification"])
+
+# --- CANLI HATA DUZELTMESI: bare "fatura"+"sikayet" kombinasyonu, "Fatura
+# fiyatı uyumsuzluğu" gibi aslinda fiyat/tutar mutabakatsizligi olan
+# mailleri yanlislikla FATURA sikayet dalina (fatura KESILMESI sorunu)
+# cekiyordu. Ayrica "uyumsuzluk" kelimesi unsuz yumusamasiyla ("uyumsuzluğu")
+# kendi kokunu icermiyordu -- "uyumsuz" stemine kisaltildi.
+r = cat("", "Fatura fiyatı uyumsuzluğu nedeniyle şikayetçiyiz.")
+check(
+    "Sikayet-Fiyat-OdemeItirazi-4 (CANLI HATA DUZELTMESI): 'fatura fiyatı uyumsuzluğu' -> FATURA sikayetine degil ODEME_ITIRAZI'na dusmeli",
+    r["classification"] == "SIKAYET > FIYATLANDIRMA > ODEME_ITIRAZI",
+    r["classification"],
+)
+
+r = cat("", "Yanlış ücret çekilmesi şikayetimizi iletiyoruz.")
+check(
+    "Sikayet-Fiyat-OdemeItirazi-5: 'yanlış ücret çekilmesi' (bare 'cekilmesi' DEGIL, spesifik 'yanlis ucret' kalibi)",
+    r["classification"] == "SIKAYET > FIYATLANDIRMA > ODEME_ITIRAZI",
+    r["classification"],
+)
+
+# Koruma: bare "cekilmesi" ODEMENIN_YANSIMAMASI ile cakismamali -- "kartımdan
+# ödeme çekilmesine rağmen tutar sisteminize yansımadı" hala dogru dalda
+# kalmali (Odeme-2/Odeme-3 testlerinde zaten kapsanan davranis, burada da
+# aciktan dogrulaniyor).
+r = cat("", "Merhaba, kartımdan ödeme çekilmesine rağmen tutar sisteminize yansımadı. Kontrol eder misiniz?")
+check(
+    "Sikayet-Fiyat-Koruma: 'ödeme çekilmesine rağmen ... yansımadı' ODEME_ITIRAZI'na dusmemeli",
+    r["classification"] != "SIKAYET > FIYATLANDIRMA > ODEME_ITIRAZI",
+    r["classification"],
+)
+
 # --- COZULDU (musteri onayli ayrim kurali): "sofor" bare kelimesi tek basina
 # EVRAK'a gitmez; "plaka"/"kaptan" veya "sofor" + isim talebi (adini/ismini)
 # gerekir. Sadece "sofor" + "evrak/belge" gecen bu metin dogru sekilde
