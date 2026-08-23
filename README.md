@@ -54,7 +54,11 @@ pip install -r requirements.txt
 
 ## Configuration
 
-Create a `.env` file in the project root:
+Copy [.env.example](.env.example) to `.env` and fill in your credentials:
+
+```bash
+cp .env.example .env
+```
 
 ```env
 EMAIL_USER=your-email@gmail.com
@@ -89,6 +93,43 @@ The application will:
    - Create a CSM ticket
    - Send notification emails if needed
 4. Disconnect from Gmail
+
+## Enigma Panel (Web Dashboard)
+
+A React-based management panel ("Enigma") lives in `frontend/` and talks to the
+Flask API in `app.py`. See [ENIGMA_PLAN.md](ENIGMA_PLAN.md) for the full design
+and phase history.
+
+**Development** (hot-reloading frontend, proxied to the Flask API):
+
+```bash
+python app.py                 # Flask API on :5000
+cd frontend && npm run dev    # Vite dev server on :5173 (proxies /api/* to :5000)
+```
+
+Open `http://localhost:5173`.
+
+**Production** (single process, Flask serves the built frontend):
+
+```bash
+cd frontend && npm run build          # outputs to frontend/dist
+cd .. && gunicorn -w 4 -b 0.0.0.0:5000 app:app
+```
+
+Open `http://localhost:5000`. Flask's built-in dev server (`python app.py`) prints
+a warning that it isn't meant for production — use `gunicorn` (included in
+`requirements.txt`) instead once you deploy.
+
+## Testing
+
+```bash
+python test_validation.py     # categorizer + validators (no network required)
+python test_reports_api.py    # /api/reports/* + /api/tickets pagination (no network required)
+cd frontend && npm test        # reportUtils unit tests (Vitest)
+```
+
+These are script-style checks (not pytest) — each prints a pass/fail summary and
+exits non-zero on failure.
 
 ## Module Documentation
 

@@ -4,11 +4,13 @@ Email Automation System - Web UI Dashboard
 Flask-based web interface for managing email automation and ticket creation.
 """
 
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, request, jsonify, send_from_directory
 from flask_session import Session
 from datetime import datetime, timedelta
+from collections import Counter, OrderedDict
 import json
 import os
+import re
 from dotenv import load_dotenv
 
 from mail_processor import EmailProcessor, EmailCategorizer, send_notification_email
@@ -23,12 +25,35 @@ from logging_utils import (
     record_mail_event,
 )
 from main import process_email
+from service_log import (
+    set_actor,
+    record_service_event,
+    read_service_events,
+    clear_service_events,
+)
+from bulk_shift import (
+    BULK_SHIFT_ENV,
+    parse_excel_rows,
+    classify_shift_type,
+    build_bulk_ticket_payload,
+    create_bulk_ticket,
+    get_bulk_shift_token,
+    Reporter,
+)
 
 # Load environment variables
 load_dotenv()
+set_actor('panel')
 
-# Initialize Flask app
-app = Flask(__name__, template_folder='templates', static_folder='static')
+# The Enigma frontend (React/Vite) is built to frontend/dist and served directly by
+# Flask in production. In development, run `npm run dev` in frontend/ instead (Vite
+# on :5173 proxies /api/* to this server) and this static folder stays unused.
+FRONTEND_DIST = os.path.join(os.path.dirname(__file__), 'frontend', 'dist')
+
+# static_folder=None disables Flask's built-in static route, which would otherwise
+# shadow our own catch-all below at the same '/<path:...>' pattern and 404 before it
+# ever gets a chance to fall back to index.html for client-side routes.
+app = Flask(__name__, static_folder=None)
 app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['SESSION_TYPE'] = 'filesystem'
 Session(app)
@@ -44,6 +69,22 @@ system_state = {
 
 email_log = []
 token_info = None
+
+# Requests that are just polling for data (dashboard auto-refresh etc.) aren't
+# "activity" worth an audit-trail entry — only log routes that change state.
+_AUDITED_METHODS = {'POST'}
+
+
+@app.after_request
+def _audit_panel_requests(response):
+    if request.method in _AUDITED_METHODS and request.path.startswith('/api/'):
+        record_service_event(
+            'panel_api',
+            f'{request.method} {request.path}',
+            'success' if response.status_code < 400 else 'failed',
+            detail=f'HTTP {response.status_code}',
+        )
+    return response
 
 
 def get_token_info():
@@ -62,10 +103,6 @@ def get_token_info():
 
 
 # Routes
-@app.route('/')
-def dashboard():
-    """Main dashboard page."""
-    return render_template('dashboard.html')
 
 
 @app.route('/api/status')
@@ -329,18 +366,124 @@ def process_email_manual():
 
 @app.route('/api/mail-logs')
 def get_mail_logs():
-    """Return persistent email and ticket processing logs."""
-    return jsonify({'logs': read_mail_events(limit=200)})
+    """Return persistent email/ticket processing logs, paginated and filterable.
+
+    Defaults (no params) preserve the old behavior — up to 200 most recent
+    events, used by the Dashboard for client-side chart aggregation. The
+    Loglar page passes explicit limit/offset/filters for real pagination.
+    """
+    query = (request.args.get('q') or '').strip().lower()
+    status = request.args.get('status')
+    event_type = request.args.get('event')
+
+    try:
+        limit = int(request.args.get('limit', 200))
+    except (TypeError, ValueError):
+        limit = 200
+    limit = max(1, min(limit, 500))
+
+    try:
+        offset = int(request.args.get('offset', 0))
+    except (TypeError, ValueError):
+        offset = 0
+    offset = max(0, offset)
+
+    logs = _apply_report_filters(
+        read_mail_events(limit=100000),
+        sender=request.args.get('sender'),
+        classification=request.args.get('classification'),
+        since_iso=_cutoff_from_range(request.args.get('range')),
+    )
+
+    if status:
+        logs = [log for log in logs if log.get('status') == status]
+    if event_type:
+        logs = [log for log in logs if log.get('event') == event_type]
+    if query:
+        def matches(log):
+            haystack = ' '.join(
+                str(log.get(field, '') or '')
+                for field in ('sender_email', 'subject', 'reason', 'classification', 'ticket_id')
+            ).lower()
+            return query in haystack
+
+        logs = [log for log in logs if matches(log)]
+
+    total = len(logs)
+    page = logs[offset:offset + limit]
+    return jsonify({'logs': page, 'total': total, 'limit': limit, 'offset': offset})
+
+
+@app.route('/api/mail-logs/detail/<timestamp>')
+def get_mail_log_detail(timestamp):
+    """Return a single processing-log record by its exact timestamp (unique
+    at microsecond precision — logs have no other stable identifier).
+
+    Deliberately under /detail/ rather than /api/mail-logs/<timestamp>: that
+    shape sits at the same path depth as the existing /api/mail-logs/clear
+    (POST-only) route, and Werkzeug will happily route a stray GET to
+    /api/mail-logs/clear into this dynamic rule (timestamp='clear') instead
+    of correctly 405-ing — confirmed by testing before this was split out.
+    """
+    for log in read_mail_events(limit=100000):
+        if log.get('timestamp') == timestamp:
+            return jsonify({'log': log})
+    return jsonify({'error': 'Log kaydı bulunamadı'}), 404
 
 
 @app.route('/api/tickets')
 def get_created_tickets():
-    """Return successful ticket records for the dashboard."""
+    """Return successful ticket records, paginated and filterable by date
+    range, sender, top-level classification, and/or a free-text search."""
+    query = (request.args.get('q') or '').strip().lower()
+
+    try:
+        limit = int(request.args.get('limit', 25))
+    except (TypeError, ValueError):
+        limit = 25
+    limit = max(1, min(limit, 100))
+
+    try:
+        offset = int(request.args.get('offset', 0))
+    except (TypeError, ValueError):
+        offset = 0
+    offset = max(0, offset)
+
     tickets = [
-        log for log in read_mail_events(limit=1000)
+        log for log in read_mail_events(limit=100000)
         if log.get('event') == 'ticket_created'
     ]
-    return jsonify({'tickets': tickets})
+
+    tickets = _apply_report_filters(
+        tickets,
+        sender=request.args.get('sender'),
+        classification=request.args.get('classification'),
+        since_iso=_cutoff_from_range(request.args.get('range')),
+    )
+
+    if query:
+        def matches(ticket):
+            haystack = ' '.join(
+                str(ticket.get(field, '') or '')
+                for field in ('ticket_id', 'sender_email', 'subject', 'classification')
+            ).lower()
+            return query in haystack
+
+        tickets = [t for t in tickets if matches(t)]
+
+    total = len(tickets)
+    page = tickets[offset:offset + limit]
+    return jsonify({'tickets': page, 'total': total, 'limit': limit, 'offset': offset})
+
+
+@app.route('/api/tickets/<ticket_id>')
+def get_ticket_detail(ticket_id):
+    """Return a single ticket record by its CSM ticket id, with full detail
+    (mail body, classification breadcrumb, raw CSM category ids)."""
+    for log in read_mail_events(limit=100000):
+        if log.get('event') == 'ticket_created' and str(log.get('ticket_id')) == str(ticket_id):
+            return jsonify({'ticket': log})
+    return jsonify({'error': f"#{ticket_id} numaralı ticket bulunamadı"}), 404
 
 
 @app.route('/api/mail-logs/clear', methods=['POST'])
@@ -421,12 +564,306 @@ def get_statistics():
     })
 
 
+RANGE_PATTERN = re.compile(r'^(\d+)([dh])$')
+PROCESSED_EVENTS = {'ticket_created', 'ticket_not_created', 'email_processed'}
+
+
+def _parse_range(range_str, default_n, default_unit):
+    """Parse a '7d' / '24h' style range string, falling back to the given default."""
+    if range_str:
+        match = RANGE_PATTERN.match(range_str.strip())
+        if match:
+            return int(match.group(1)), match.group(2)
+    return default_n, default_unit
+
+
+def _cutoff_from_range(range_str):
+    """Return an ISO cutoff timestamp for a '7d'/'24h' range string, or None if absent/invalid."""
+    n, unit = _parse_range(range_str, None, None)
+    if n is None:
+        return None
+    delta = timedelta(days=n) if unit == 'd' else timedelta(hours=n)
+    return (datetime.now().astimezone() - delta).isoformat()
+
+
+def _apply_report_filters(events, sender=None, classification=None, since_iso=None):
+    """Narrow persisted log events by sender, top-level classification, and/or a time cutoff."""
+    filtered = events
+    if since_iso:
+        filtered = [e for e in filtered if (e.get('timestamp') or '') >= since_iso]
+    if sender:
+        filtered = [
+            e for e in filtered
+            if (e.get('sender_email') or '').lower() == sender.lower()
+        ]
+    if classification:
+        filtered = [
+            e for e in filtered
+            if (e.get('classification') or '').split('>')[0].strip().upper()
+            == classification.upper()
+        ]
+    return filtered
+
+
+@app.route('/api/reports/timeseries')
+def reports_timeseries():
+    """Zaman bazlı işlenen e-posta hacmi (gün veya saat kırılımında), başarı/hata kırılımıyla."""
+    n, unit = _parse_range(request.args.get('range'), 14, 'd')
+    granularity_param = request.args.get('granularity')
+    if granularity_param in ('day', 'hour'):
+        unit = 'd' if granularity_param == 'day' else 'h'
+    granularity = 'day' if unit == 'd' else 'hour'
+    n = max(1, min(n, 90 if granularity == 'day' else 168))
+
+    now = datetime.now().astimezone()
+    buckets = OrderedDict()
+    if granularity == 'day':
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        for i in range(n - 1, -1, -1):
+            key = (start - timedelta(days=i)).strftime('%Y-%m-%d')
+            buckets[key] = {'count': 0, 'success_count': 0, 'error_count': 0}
+        key_len = 10
+    else:
+        start = now.replace(minute=0, second=0, microsecond=0)
+        for i in range(n - 1, -1, -1):
+            key = (start - timedelta(hours=i)).strftime('%Y-%m-%dT%H')
+            buckets[key] = {'count': 0, 'success_count': 0, 'error_count': 0}
+        key_len = 13
+
+    events = _apply_report_filters(
+        read_mail_events(limit=100000),
+        sender=request.args.get('sender'),
+        classification=request.args.get('classification'),
+    )
+
+    for log in events:
+        if log.get('event') not in PROCESSED_EVENTS:
+            continue
+        bucket = buckets.get((log.get('timestamp') or '')[:key_len])
+        if not bucket:
+            continue
+        bucket['count'] += 1
+        status = log.get('status')
+        if status == 'success':
+            bucket['success_count'] += 1
+        elif status in {'failed', 'blocked', 'rejected'}:
+            bucket['error_count'] += 1
+
+    points = [{'date': key, **values} for key, values in buckets.items()]
+    return jsonify({'granularity': granularity, 'range': f'{n}{unit}', 'points': points})
+
+
+@app.route('/api/reports/by-classification')
+def reports_by_classification():
+    """Oluşturulan ticket'ların üst seviye sınıflandırmaya göre dağılımı."""
+    events = _apply_report_filters(
+        read_mail_events(limit=100000),
+        sender=request.args.get('sender'),
+        since_iso=_cutoff_from_range(request.args.get('range')),
+    )
+
+    counts = Counter()
+    for log in events:
+        if log.get('event') != 'ticket_created':
+            continue
+        top_level = (log.get('classification') or '').split('>')[0].strip()
+        counts[top_level or 'DIGER'] += 1
+
+    categories = [
+        {'name': name, 'count': count}
+        for name, count in sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
+    ]
+    return jsonify({'categories': categories})
+
+
+@app.route('/api/reports/by-sender')
+def reports_by_sender():
+    """Gönderen bazlı e-posta hacmi (en çok yazan N adres)."""
+    try:
+        limit = int(request.args.get('limit', 10))
+    except (TypeError, ValueError):
+        limit = 10
+    limit = max(1, min(limit, 50))
+
+    events = _apply_report_filters(
+        read_mail_events(limit=100000),
+        classification=request.args.get('classification'),
+        since_iso=_cutoff_from_range(request.args.get('range')),
+    )
+
+    counts = Counter()
+    for log in events:
+        if log.get('event') not in PROCESSED_EVENTS:
+            continue
+        sender = log.get('sender_email') or ''
+        if sender:
+            counts[sender] += 1
+
+    senders = [
+        {'sender_email': sender, 'count': count}
+        for sender, count in counts.most_common(limit)
+    ]
+    return jsonify({'senders': senders})
+
+
 @app.route('/api/clear-errors', methods=['POST'])
 def clear_errors():
     """Clear error log."""
     system_state['errors'] = []
     clear_mail_error_events()
     return jsonify({'success': True, 'message': 'Errors cleared'})
+
+
+@app.route('/api/service-logs')
+def get_service_logs():
+    """Return outbound service-call records (CSM API, Gmail IMAP, panel API),
+    paginated and filterable by service, actor, status, and date range."""
+    service = request.args.get('service')
+    actor = request.args.get('actor')
+    status = request.args.get('status')
+
+    try:
+        limit = int(request.args.get('limit', 25))
+    except (TypeError, ValueError):
+        limit = 25
+    limit = max(1, min(limit, 200))
+
+    try:
+        offset = int(request.args.get('offset', 0))
+    except (TypeError, ValueError):
+        offset = 0
+    offset = max(0, offset)
+
+    since_iso = _cutoff_from_range(request.args.get('range'))
+
+    logs = read_service_events(limit=100000)
+    if since_iso:
+        logs = [log for log in logs if (log.get('timestamp') or '') >= since_iso]
+    if service:
+        logs = [log for log in logs if log.get('service') == service]
+    if actor:
+        logs = [log for log in logs if log.get('actor') == actor]
+    if status:
+        logs = [log for log in logs if log.get('status') == status]
+
+    total = len(logs)
+    page = logs[offset:offset + limit]
+    return jsonify({'logs': page, 'total': total, 'limit': limit, 'offset': offset})
+
+
+@app.route('/api/service-logs/summary')
+def get_service_logs_summary():
+    """Per-service health snapshot: last success/failure timestamp and totals.
+    Powers the Monitoring page's status cards without shipping the full log."""
+    logs = read_service_events(limit=100000)
+    services = ('csm_api', 'gmail_imap', 'panel_api')
+    summary = {}
+    for service in services:
+        service_logs = [log for log in logs if log.get('service') == service]
+        last_success = next((l for l in service_logs if l.get('status') == 'success'), None)
+        last_failure = next((l for l in service_logs if l.get('status') == 'failed'), None)
+        summary[service] = {
+            'total': len(service_logs),
+            'success_count': sum(1 for l in service_logs if l.get('status') == 'success'),
+            'failed_count': sum(1 for l in service_logs if l.get('status') == 'failed'),
+            'last_success_at': last_success.get('timestamp') if last_success else None,
+            'last_failure_at': last_failure.get('timestamp') if last_failure else None,
+        }
+
+    actor_counts = Counter(log.get('actor') for log in logs)
+    return jsonify({
+        'services': summary,
+        'actors': {actor: count for actor, count in actor_counts.items()},
+    })
+
+
+@app.route('/api/service-logs/clear', methods=['POST'])
+def clear_service_logs():
+    """Clear the outbound service-call log."""
+    clear_service_events()
+    return jsonify({'success': True})
+
+
+@app.route('/api/bulk-shift/env')
+def get_bulk_shift_env():
+    """Which CSM environment bulk-shift tickets currently go to (preprod/prod)."""
+    return jsonify({'environment': BULK_SHIFT_ENV})
+
+
+@app.route('/api/bulk-shift/upload', methods=['POST'])
+def upload_bulk_shift():
+    """Parse an uploaded reservation-shift Excel export and create one CSM
+    sub-ticket per row, linked to the given parent ticket. Runs synchronously
+    (one HTTP call per row) — see bulk_shift.MAX_ROWS for the row cap."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'Excel dosyası bulunamadı (file alanı boş)'}), 400
+
+    parent_ticket_uuid = (request.form.get('parent_ticket_uuid') or '').strip()
+    if not parent_ticket_uuid:
+        return jsonify({'error': 'Üst ticket UUID\'si gerekli'}), 400
+
+    reporter: Reporter = {
+        'first_name': (request.form.get('reporter_first_name') or '').strip(),
+        'last_name': (request.form.get('reporter_last_name') or '').strip(),
+        'phone': (request.form.get('reporter_phone') or '').strip(),
+        'email': (request.form.get('reporter_email') or '').strip(),
+    }
+    if not all(reporter.values()):
+        return jsonify({'error': 'Raporlayan kişi için ad, soyad, telefon ve e-posta gerekli'}), 400
+
+    try:
+        rows = parse_excel_rows(request.files['file'].stream)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': f'Excel okunamadı: {e}'}), 400
+
+    if not rows:
+        return jsonify({'error': 'Excel dosyasında işlenecek satır bulunamadı'}), 400
+
+    try:
+        token = get_bulk_shift_token()
+    except RuntimeError as e:
+        return jsonify({'error': str(e)}), 502
+
+    results = []
+    success_count = 0
+    for row in rows:
+        payload = build_bulk_ticket_payload(
+            reservation_no=row['reservation_no'],
+            shift_type_label=row['shift_type'],
+            alternative_text=row['alternative'],
+            parent_ticket_uuid=parent_ticket_uuid,
+            reporter=reporter,
+        )
+        outcome = create_bulk_ticket(payload, token)
+        if outcome['success']:
+            success_count += 1
+        results.append({
+            'reservation_no': row['reservation_no'],
+            'shift_type': row['shift_type'],
+            'shift_type_code': classify_shift_type(row['shift_type']),
+            'success': outcome['success'],
+            'ticket_id': outcome.get('ticket_id'),
+            'error': outcome.get('error'),
+        })
+
+    return jsonify({
+        'environment': BULK_SHIFT_ENV,
+        'total': len(results),
+        'success_count': success_count,
+        'failed_count': len(results) - success_count,
+        'results': results,
+    })
+
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_enigma(path):
+    """Serve the built Enigma SPA; unknown paths fall back to index.html for client-side routing."""
+    if path and os.path.exists(os.path.join(FRONTEND_DIST, path)):
+        return send_from_directory(FRONTEND_DIST, path)
+    return send_from_directory(FRONTEND_DIST, 'index.html')
 
 
 if __name__ == '__main__':
