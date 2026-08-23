@@ -385,6 +385,29 @@ class EmailCategorizer:
         "iptalini talep", "iptal islemi"
     ]
 
+    # Not: iki FARKLI durumda "iptal etmek/islemi" gibi CANCEL_INTENT_KEYWORDS
+    # ifadeleri, yuzeysel olarak eslesse bile GERCEK/CANLI bir iptal talebi
+    # DEGILDIR:
+    #  1) KOSULLU/hipotetik soru: "iptal etmek istedigimiz TAKDIRDE/
+    #     DURUMUNDA/HALINDE izlenmesi gereken surec ... hakkinda bilgi rica
+    #     ederim" -- musteri henuz iptal ETMIYOR, sadece iptal EDERSE ne
+    #     olacagini soruyor (ticket #101940152'de gozlemlendi).
+    #  2) GECMISE DONUK + RAGMEN: "iptal islemi yapmamiza RAGMEN ... iade
+    #     talebimizin acilmadigini ogrendik" -- iptal ZATEN TAMAMLANMIS,
+    #     asil sikayet konusu FARKLI (burada: iade talebinin acilmamis
+    #     olmasi); "iptal islemi" NOUN'u zamana gore CEKIMLENMEDIGI icin
+    #     CANCEL_INTENT_KEYWORDS'teki gecmis-zaman filtresini (bkz. yukarida
+    #     "iptal ettigimiz" notu) atlatiyordu (ticket #101940257'de
+    #     gozlemlendi, kullanici tarafindan bildirildi).
+    # Her iki durumda da "iptal etmek/ettirmek/edebilir/edelim/ediyoruz/
+    # islemi" ifadesinden HEMEN SONRA (~25 karakter icinde) bir KOSUL/GECMIS
+    # baglaci gecerse, bu somut/canli bir talep sayilmaz.
+    CANCEL_NON_ACTIONABLE_PATTERN = re.compile(
+        r'iptal\s+(?:etmek|ettirmek|edebilir|edelim|ediyoruz|islemi)\w*[^.!?]{0,25}'
+        r'(?:takdirde|durumunda|halinde|ragmen)',
+        re.IGNORECASE
+    )
+
     # Not: "sikayetci" -> "sikayet" ve "aksama" -> "aksa" olarak genisletildi;
     # eski dar formlar "sikayetimin"/"aksaklik" gibi cok yaygin cekim
     # varyasyonlarini yakalayamiyordu (canli ortamda gozlemlendi).
@@ -695,6 +718,17 @@ class EmailCategorizer:
         "degisiklik hakkinda bilgi almak istiyorum", "nasil degisiklik yapabilirim",
         "degisiklik sartlari", "degisiklik ucreti"
     ]
+    # Not: "degisiklik yapip yapamayacagimizi ... bilgi talep ediyorum" gibi,
+    # Turkce'de COK YAYGIN olan "yapip yapamama" (yapabilir miyiz/miyim) soru
+    # kalibi, yukaridaki SABIT/UZUN RESERVATION_CHANGE_INFO_KEYWORDS
+    # kaliplarinin hicbirine uymuyordu -- musteri somut bir islem talep
+    # etmeden sadece imkanini soruyor olsa bile, bare "degisikli"
+    # (CHANGE_INTENT_KEYWORDS icinde) eslesip mail yanlislikla Backoffice >
+    # Degisiklik > Diger'e dusuyordu (ticket #101940103'te gozlemlendi,
+    # kullanici tarafindan bildirildi).
+    RESERVATION_CHANGE_INFO_PATTERN = re.compile(
+        r'degisikli\w*[^.!?]{0,45}yap\w*\s+yapamayacag\w*', re.IGNORECASE
+    )
 
     RESERVATION_CANCELLATION_INFO_TOPIC_KEYWORDS = ["iptal"]
     # Not: bare "surec" kasitli olarak CIKARILDI -- "surec" cok genel bir kelime
@@ -785,9 +819,15 @@ class EmailCategorizer:
 
     REFUND_TOPIC_KEYWORDS = ["iade"]
 
+    # Not: "acilmadi"/"alinmadi" (olumsuz isim-fiil kokleri, "acilmadigini
+    # ogrendik"/"alinmadigini ogrendik" gibi cekimleri kapsar) eklendi -- eski
+    # liste sadece "-mamis" (olumsuz sifat-fiil) formlarini kapsiyordu,
+    # "acilmadigini"/"alinmadigini" gibi COK YAYGIN "-madigini" cekimleri
+    # kacyordu (ticket #101940257'de gozlemlendi, kullanici tarafindan
+    # bildirildi).
     REFUND_REQUEST_NOT_OPENED_EVENT_KEYWORDS = [
         "acilmamis", "olusturulmamis", "islenmemis", "isleme alinmamis",
-        "kayit gorunmuyor", "hicbir kayit", "kayit yok"
+        "kayit gorunmuyor", "hicbir kayit", "kayit yok", "acilmadi", "alinmadi"
     ]
 
     # Not: bare "yansima" kasitli olarak CIKARILDI -- "yansima durumu hakkinda
@@ -845,7 +885,30 @@ class EmailCategorizer:
     # OLARAK YOK -- cok kisa/genel bir alt dize, "web sitesi"/"internet
     # sitesi" gibi compound kaliplar kullanildi.
     MOBILE_APP_TOPIC_KEYWORDS = ["mobil", "uygulama", " app "]
-    WEBSITE_TOPIC_KEYWORDS = ["web sitesi", "internet sitesi", "site ac", "site don"]
+    # Not: "siteniz" (sitenize/sitenizin/sitenizde gibi 2. cogul iyelik
+    # ekleriyle CEKIMLENMIS KOK) eklendi -- eski liste sadece 3. tekil sahiplik
+    # eki tasiyan "web sitesi" kalibini kapsiyordu, "web sitenize girerek...
+    # web sitenizin calismamasindan sikayetciyim" gibi COK YAYGIN, dogrudan
+    # musteriye hitaben yazilmis ifadeler (ticket #101940185'te gozlemlendi,
+    # kullanici tarafindan bildirildi) kaciyordu ve varsayilan Bilgi-Istek >
+    # Tesis > Tesis Iletisim'e dusuyordu. Bare "site" hala KASITLI OLARAK YOK
+    # (yukaridaki not gecerliligini koruyor); "siteniz" yeterince spesifik.
+    #
+    # ANCAK: "siteniz" bare COMPLAINT_SENTIMENT_KEYWORDS (genel sikayet tonu)
+    # ile eslestirilince COK GENIS oluyordu -- "web sitenizde yapilan otel
+    # yorumlari/puanlamalari gercegi yansitmiyor ... iptal etmek zorunda
+    # kaldik, sikayetciyiz" gibi mailler, "siteniz" SADECE olayin GECTIGI YERI
+    # belirttigi (asil sikayet konusu FARKLI -- otel yorumlari) halde bu dala
+    # dusuyordu (ticket #101940278'de gozlemlendi, kullanici tarafindan
+    # bildirildi). Bu yuzden WEBSITE_TOPIC_KEYWORDS artik generic
+    # COMPLAINT_SENTIMENT_KEYWORDS ile degil, asagidaki SPESIFIK
+    # WEBSITE_MALFUNCTION_EVENT_KEYWORDS (sitenin/sayfanin TEKNIK olarak
+    # calismamasi) ile eslestiriliyor.
+    WEBSITE_TOPIC_KEYWORDS = ["web sitesi", "internet sitesi", "siteniz"]
+    WEBSITE_MALFUNCTION_EVENT_KEYWORDS = [
+        "acilmiyor", "calismiyor", "calismama", "sayfa don", "site don",
+        "hata al", "giremiyorum", "erisemiyorum", "yuklenmiyor"
+    ]
     ONLINE_OPERATIONS_COMPLAINT_TOPIC_KEYWORDS = ["online islem"]
     ONLINE_OPERATIONS_COMPLAINT_EVENT_KEYWORDS = [
         "sistem hata", "islem yapamiyoruz", "islem yapamiyorum", "dijital hata"
@@ -856,8 +919,26 @@ class EmailCategorizer:
         "saglik problem", "hastane", "hastalik", "saglik rapor", "rahatsizlik"
     ]
     CANCELLATION_FORCE_MAJEURE_TOPIC_KEYWORDS = ["mucbir sebep", "dogal afet"]
-    CANCELLATION_SPECIAL_REASON_TOPIC_KEYWORDS = ["ozel sebep", "ozel mazeret"]
+    # Not: "ozel sebeb" (unsuz yumusamasi -- "sebep" + iyelik eki "sebebimiz"
+    # olur, "p" harfi unluyle baslayan ekten once "b"ye donusur) ve "kisisel
+    # mazeret" (musteriler "ozel mazeret" yerine cok sik "kisisel mazeret"
+    # de diyor) eklendi -- eski liste bu COK YAYGIN cekim/esanlamli
+    # varyasyonlari kaciriyordu (ör. "ozel sebebimiz / kisisel mazeretimiz
+    # nedeniyle iptal etmek zorunda kaldik", ticket #101940293'te
+    # gozlemlendi, kullanici tarafindan bildirildi).
+    CANCELLATION_SPECIAL_REASON_TOPIC_KEYWORDS = [
+        "ozel sebep", "ozel mazeret", "ozel sebeb", "kisisel mazeret", "kisisel sebep"
+    ]
     CANCELLATION_HOTEL_REVIEWS_TOPIC_KEYWORDS = ["otel yorum", "yanilti", "gercek disi puan"]
+    # Not: "otel yorum" bitisik kalibi, "otel icin yapilan yorumlarin ve
+    # puanlamalarin ... gercegi yansitmasindan oturu yanlis yonlendirildik"
+    # gibi araya BASKA kelimeler giren (word order farkli) dogal ifadeleri
+    # kaciriyordu (ticket #101940278'de gozlemlendi, kullanici tarafindan
+    # bildirildi). "otel" ile "yorum"/"puanlama" arasinda ~40 karakterlik bir
+    # pencerede (sira ne olursa olsun) BIRLIKTE gecmesi de yeterli sayilir.
+    CANCELLATION_HOTEL_REVIEWS_PROXIMITY_PATTERN = re.compile(
+        r'otel\w*[^.!?]{0,40}(?:yorum|puanlama)\w*', re.IGNORECASE
+    )
 
     PAYMENT_OBJECTION_KEYWORDS = [
         "odemeye itiraz ediyorum", "yanlis tutar cekildi", "fazla odeme yapildi", "odeme itirazi"
@@ -1079,10 +1160,27 @@ class EmailCategorizer:
                 for keyword in ["bilet", "otobus", "ucak", "ucus", "transfer", "pnr", "havayolu"]
             )
         )
+        # Not: "kesinti uygulan"/"ceza" gibi TRANSPORT_CHANGE_RIGHTS_KEYWORDS
+        # ifadeleri, tasima-modu BAGLAMI olmayan SAF REZERVASYON/OTEL iptal
+        # SIKAYETLERINDE de geciyordu ("... rezervasyonumuzu iptal etmek
+        # zorunda kaldigimiz halde kesinti uygulanmasindan ... sikayetciyiz"
+        # gibi, ticket #101940293'te gozlemlendi) -- bu tamamen alakasiz bir
+        # Ulasim bilgi-istek dalina degil, SIKAYET > IPTAL altindaki genel
+        # iptal sikayeti dallarina ait. Tasima-modu kelimesi HICBIRI yoksa VE
+        # metin acikca bir SIKAYET (COMPLAINT_SENTIMENT_KEYWORDS) tasiyorsa,
+        # bu dal geri cekilir (kullanici tarafindan bildirildi).
+        is_reservation_cancellation_complaint_without_transport = (
+            any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+            and not any(
+                keyword in normalized_text
+                for keyword in ["bilet", "otobus", "ucak", "ucus", "transfer", "pnr", "havayolu"]
+            )
+        )
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_CHANGE_RIGHTS_KEYWORDS)
             and not is_extra_service_change
             and not is_general_reservation_change_info
+            and not is_reservation_cancellation_complaint_without_transport
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -1390,10 +1488,18 @@ class EmailCategorizer:
         # listeleriyle) ile AYNI metin kalibini paylasiyor; ayirt edici
         # sinyal COMPLAINT_SENTIMENT_KEYWORDS (magduriyet/sikayetci vb.) --
         # varsa Sikayet, yoksa Backoffice (islemsel talep) sayiliyor.
+        # Ayrica: REFUND_TOPIC_KEYWORDS ("iade") de BURADA HARIC TUTULUYOR --
+        # "iadesinin gerceklestirildigi soylendi ... tutar ... yansimadi" gibi
+        # mailler "tutar"+"yansimadi" yuzunden bu GENEL odeme dalina
+        # dusuyordu, oysa musteri somut olarak bir IADENIN yansimamasindan
+        # bahsediyor -- daha SPESIFIK olan asagidaki SIKAYET > IADE >
+        # IADENIN_MISAFIRE_YANSIMAMASI dalina birakilmasi gerekiyor (ticket
+        # bildirildi, kullanici tarafindan raporlandi).
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_REFLECTION_TOPIC_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_REFLECTION_EVENT_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+            and not any(keyword in normalized_text for keyword in EmailCategorizer.REFUND_TOPIC_KEYWORDS)
         ):
             payment_attributes, payment_missing_fields = extract_payment_attributes(combined_text, required=False)
             return {
@@ -1605,7 +1711,7 @@ class EmailCategorizer:
 
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.WEBSITE_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.WEBSITE_MALFUNCTION_EVENT_KEYWORDS)
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -1702,7 +1808,10 @@ class EmailCategorizer:
             }
 
         if (
-            any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_HOTEL_REVIEWS_TOPIC_KEYWORDS)
+            (
+                any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_HOTEL_REVIEWS_TOPIC_KEYWORDS)
+                or EmailCategorizer.CANCELLATION_HOTEL_REVIEWS_PROXIMITY_PATTERN.search(normalized_text)
+            )
             and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
         ):
             return {
@@ -2215,8 +2324,12 @@ class EmailCategorizer:
         # Not: oda iptali kontrolu, genel "İptal Talebi" kontrolünden ÖNCE yapılıyor;
         # aksi halde "iptal etmek istiyoruz" gibi genel bir ifade her oda iptalini de
         # yakalayip yanlis (daha az spesifik) alt kirilima yonlendirebilirdi.
+        is_cancel_non_actionable = bool(
+            EmailCategorizer.CANCEL_NON_ACTIONABLE_PATTERN.search(normalized_text)
+        )
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_TOPIC_KEYWORDS)
+            and not is_cancel_non_actionable
             and (
                 any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
                 or EmailCategorizer.CANCEL_REQUEST_NOUN_PATTERN.search(normalized_text)
@@ -2236,7 +2349,10 @@ class EmailCategorizer:
                 "classification": "BACKOFFICE_ISLEMLERI > IPTAL > ODA_IPTALI"
             }
 
-        if any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS):
+        if (
+            not is_cancel_non_actionable
+            and any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+        ):
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_RESERVATION,
@@ -2345,7 +2461,10 @@ class EmailCategorizer:
         # Backoffice > Değişiklik/İptal/Konfirme dallarından FARKLI: burada müşteri
         # somut bir işlem talep etmiyor, süreç hakkında soru soruyor.
         # ============================================================
-        if any(keyword in normalized_text for keyword in EmailCategorizer.RESERVATION_CHANGE_INFO_KEYWORDS):
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.RESERVATION_CHANGE_INFO_KEYWORDS)
+            or EmailCategorizer.RESERVATION_CHANGE_INFO_PATTERN.search(normalized_text)
+        ):
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_INFO_REQUEST,

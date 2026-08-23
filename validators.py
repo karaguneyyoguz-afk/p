@@ -766,6 +766,17 @@ VENDOR_FINANCE_KEYWORDS = [
     "muhasebe ekibinizi"
 ]
 
+# Not: "kart ekstre..." (ekstreme/ekstremde/ekstresi) HER ZAMAN musterinin
+# KENDI kredi/banka karti ekstresine atifta bulunur (ör. "tutar kart
+# ekstreme yansimadi" -- cok yaygin bir IADE/ODEME sikayet ifadesi); B2B
+# tedarikci muhasebesinin kullandigi bare "ekstre"/"ekstreleriniz" (Tatilbudur'a
+# hitaben, kendi hesap ekstresi) ile AYNI KOKU paylasiyor ama TAMAMEN FARKLI
+# bir baglam. Bare "ekstre" eslesmesi yuzunden gercek musteri sikayetleri
+# ticket ACILMADAN B2B yonlendirme mailine dusuyordu (ticket #101940152'de
+# gozlemlendi, kullanici tarafindan bildirildi). Bu yuzden "kart ekstre..."
+# kalibi, tarama YAPILMADAN ONCE metinden cikariliyor.
+CARD_STATEMENT_PATTERN = re.compile(r'kart\s*ekstre\w*', re.IGNORECASE)
+
 
 def is_vendor_finance_correspondence(text: str) -> bool:
     """
@@ -774,4 +785,5 @@ def is_vendor_finance_correspondence(text: str) -> bool:
     eder.
     """
     normalized = normalize_turkish_characters(text)
+    normalized = CARD_STATEMENT_PATTERN.sub(' ', normalized)
     return any(keyword in normalized for keyword in VENDOR_FINANCE_KEYWORDS)

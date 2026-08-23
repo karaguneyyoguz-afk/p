@@ -1714,8 +1714,17 @@ check("Evrak-SoforBilgileri-2 (ONAYLI): sofor adi + plaka", r["classification"] 
 r = cat("", "Rezervasyonumda değişiklik yapabilir miyim.")
 check("Rezervasyon-BI-DegisiklikBilgi", r["classification"] == "BILGI_ISTEK > REZERVASYON > DEGISIKLIK_BILGI_TALEBI", r["classification"])
 
+r = cat("", "İyi günler, 553044193 numaralı rezervasyonumuzda tarih veya kişi bazlı değişiklik yapıp yapamayacağımız, yapabiliyorsak bunun şartları ve varsa ek ücreti hakkında bilgi talep ediyorum.")
+check("Rezervasyon-BI-DegisiklikBilgi-2 (CANLI HATA DUZELTMESI, ticket #101940103): 'degisiklik yapip yapamayacagimiz' soru kalibi DEGISIKLIK_BILGI_TALEBI'ne dusmeli, DIGER'e degil", r["classification"] == "BILGI_ISTEK > REZERVASYON > DEGISIKLIK_BILGI_TALEBI", r["classification"])
+
 r = cat("", "İptal süreci hakkında bilgi almak istiyorum.")
 check("Rezervasyon-BI-IptalSurecBilgi", r["classification"] == "BILGI_ISTEK > REZERVASYON > IPTAL_SUREC_BILGISI", r["classification"])
+
+r = cat("", "İyi günler, 553044193 numaralı rezervasyonumuzu iptal etmek istediğimiz takdirde izlenmesi gereken süreç, uygulanacak kesinti oranları ve iade koşulları hakkında bilgi rica ederim")
+check("Rezervasyon-BI-IptalSurecBilgi-2 (CANLI HATA DUZELTMESI, ticket #101940152): 'iptal etmek istedigimiz takdirde' kosullu sorusu IPTAL_SUREC_BILGISI'ne dusmeli, somut IPTAL_TALEBI'ne degil", r["classification"] == "BILGI_ISTEK > REZERVASYON > IPTAL_SUREC_BILGISI", r["classification"])
+
+r = cat("", "Merhaba, rezervasyonumu iptal etmek istiyorum, lütfen işleme alın.")
+check("Backoffice-Iptal-Koruma: 'iptal etmek istiyorum' (kosulsuz, dogrudan talep) hala IPTAL_TALEBI'ne dusmeli", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > IPTAL_TALEBI", r["classification"])
 
 r = cat("", "İade ne zaman yapılır, iade süresi ne kadar.")
 check("OdemeSistemleri-BI-IadeBilgisi", r["classification"] == "BILGI_ISTEK > ODEME_SISTEMLERI_KONULARI > IADE_BILGISI", r["classification"])
@@ -1857,8 +1866,17 @@ check("Sikayet-Iade-Yapilmamasi", r["classification"] == "SIKAYET > IADE > IADEN
 r = cat("", "İade talebim açılmamış, iade başvurum işlenmemiş.")
 check("Sikayet-Iade-TalebiAcilmamis", r["classification"] == "SIKAYET > IADE > IADE_TALEBININ_ACILMAMIS_OLMASI", r["classification"])
 
+r = cat("", "İyi günler, 553044193 numaralı rezervasyonumuz için daha önce iptal işlemi yapmamıza rağmen sisteminizde iade talebimizin hiç açılmadığını ve işleme alınmadığını öğrendik, bu durumdan şikayetçiyiz.")
+check("Sikayet-Iade-TalebiAcilmamis-2 (CANLI HATA DUZELTMESI, ticket #101940257): 'iptal islemi yapmamiza ragmen' (GECMISE DONUK, tamamlanmis) somut IPTAL_TALEBI sanilmamali, asil sikayet olan IADE_TALEBININ_ACILMAMIS_OLMASI'na dusmeli", r["classification"] == "SIKAYET > IADE > IADE_TALEBININ_ACILMAMIS_OLMASI", r["classification"])
+
+r = cat("", "Merhaba, 553044193 numaralı rezervasyonumu iptal işlemi başlatmak istiyorum, lütfen yardımcı olun.")
+check("Backoffice-Iptal-Koruma-2: 'iptal islemi baslatmak istiyorum' (kosulsuz/gecmis-disi, dogrudan talep) hala IPTAL_TALEBI'ne dusmeli", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > IPTAL_TALEBI", r["classification"])
+
 r = cat("", "İade hesabıma yansımadı.")
 check("Sikayet-Iade-MisafireYansimamasi", r["classification"] == "SIKAYET > IADE > IADENIN_MISAFIRE_YANSIMAMASI", r["classification"])
+
+r = cat("", "İyi günler, 553044193 numaralı rezervasyonumun iadesinin gerçekleştirildiği söylendi ancak aradan geçen süreye rağmen tutar kart ekstreme ve hesabıma kesinlikle yansımadı, şikayetçiyim")
+check("Sikayet-Iade-MisafireYansimamasi-2 (CANLI HATA DUZELTMESI): 'tutar'+'yansimadi' genel ODEME_SISTEMLERI dalina degil, 'iade' konusu daha spesifik oldugu icin IADENIN_MISAFIRE_YANSIMAMASI'na dusmeli", r["classification"] == "SIKAYET > IADE > IADENIN_MISAFIRE_YANSIMAMASI", r["classification"])
 
 r = cat("", "En iyi fiyat garantisi talep ediyorum, başka sitede daha ucuz gördüm.")
 check("Sikayet-Fiyat-EnIyiFiyatGarantisi", r["classification"] == "SIKAYET > FIYATLANDIRMA > EN_IYI_FIYAT_GARANTISI", r["classification"])
@@ -1994,6 +2012,9 @@ check("Sikayet-OnlineIslemler-MobilUygulama", r["classification"] == "SIKAYET > 
 r = cat("", "Web sitesi açılmıyor, internet sitesi sürekli donuyor, şikayetçiyiz.")
 check("Sikayet-OnlineIslemler-WebSitesi", r["classification"] == "SIKAYET > ONLINE_ISLEMLER > WEB_SITESI", r["classification"])
 
+r = cat("", "İyi günler, bilgisayar üzerinden web sitenize girerek 553044193 numaralı rezervasyonumu yönetmek istediğimde sayfa donuyor ve sürekli hata alıyorum, web sitenizin çalışmamasından şikayetçiyim.")
+check("Sikayet-OnlineIslemler-WebSitesi-2 (CANLI HATA DUZELTMESI, ticket #101940185): 'web sitenize/sitenizin' (2. cogul iyelik) WEB_SITESI'ne dusmeli, varsayilan Tesis_Iletisim'e degil", r["classification"] == "SIKAYET > ONLINE_ISLEMLER > WEB_SITESI", r["classification"])
+
 # Koruma: mevcut onayli bilgi-istek (Online-3) sikayet dallarina dusmemeli --
 # "sistem hata veriyor" gecse bile, sikayet ifadesi (COMPLAINT_SENTIMENT) yoksa
 # bilgi-istek/yardim talebi olarak kalmali.
@@ -2019,11 +2040,17 @@ check("Sikayet-Iptal-SaglikProblemleri", r["classification"] == "SIKAYET > IPTAL
 r = cat("", "Sitedeki otel yorumları gerçeği yansıtmıyor, yanıltıcı yorumlar yüzünden mağdur olduk, şikayetçiyiz.")
 check("Sikayet-Iptal-OtelYorumlari", r["classification"] == "SIKAYET > IPTAL > OTEL_YORUMLARI", r["classification"])
 
+r = cat("", "İyi günler, web sitenizde 553044193 numaralı otel için yapılan yorumların ve puanlamaların tamamen gerçeği yansıtmasından ötürü yanlış yönlendirildik, iptal etmek zorunda kaldık ve bu durumdan şikayetçiyiz.")
+check("Sikayet-Iptal-OtelYorumlari-2 (CANLI HATA DUZELTMESI, ticket #101940278): 'otel icin yapilan yorumlarin' (araya kelime giren siralama) OTEL_YORUMLARI'na dusmeli, sadece olayin gectigi yer olan 'web siteniz' yuzunden WEB_SITESI'ne degil", r["classification"] == "SIKAYET > IPTAL > OTEL_YORUMLARI", r["classification"])
+
 r = cat("", "Mücbir sebep (doğal afet) nedeniyle iptal talebimiz reddedildi, şikayetçiyiz.")
 check("Sikayet-Iptal-MucbirSebep", r["classification"] == "SIKAYET > IPTAL > MUCBIR_SEBEP", r["classification"])
 
 r = cat("", "Özel sebep/kişisel mazeretimiz nedeniyle iptal talebimiz kabul görmedi, şikayetçiyiz.")
 check("Sikayet-Iptal-OzelSebep", r["classification"] == "SIKAYET > IPTAL > OZEL_SEBEP", r["classification"])
+
+r = cat("", "İyi günler, son anda ortaya çıkan ani ve zorunlu özel sebebimiz / kişisel mazeretimiz nedeniyle 553044193 numaralı rezervasyonumuzu iptal etmek zorunda kaldığımız halde kesinti uygulanmasından ve anlayış gösterilmemesinden şikayetçiyiz.")
+check("Sikayet-Iptal-OzelSebep-2 (CANLI HATA DUZELTMESI, ticket #101940293): 'ozel sebebimiz' (unsuz yumusamasi) + 'kesinti uygulanmasindan sikayetciyiz' (tasima-modu YOK) OZEL_SEBEP'e dusmeli, alakasiz ULASIM>DEGISIKLIK_HAKKI_SORGULAMA'ya degil", r["classification"] == "SIKAYET > IPTAL > OZEL_SEBEP", r["classification"])
 
 # --- CANLI HATA DUZELTMESI: Havayolu Degisikligi sikayeti, aktif "degistirdi"
 # kokunun UCAK_BILETI_DEGISIKLIGI (Backoffice) ile ayni "degistir" kokunu
@@ -2386,6 +2413,15 @@ check(
     not is_vendor_finance_correspondence(
         "Merhaba, kartımdan ödeme çekilmesine rağmen tutar sisteminize "
         "yansımadı. Kontrol eder misiniz?"
+    ),
+    "beklenen: False",
+)
+check(
+    "VendorFinance-Koruma-2 (CANLI HATA DUZELTMESI, ticket #101940152): 'kart ekstreme yansimadi' (musterinin KENDI kart ekstresi) bare 'ekstre' kelimesi yuzunden yanlislikla vendor sayilip ticket acilmadan yonlendirme mailine dusmemeli",
+    not is_vendor_finance_correspondence(
+        "İyi günler, 553044193 numaralı rezervasyonumun iadesinin "
+        "gerçekleştirildiği söylendi ancak aradan geçen süreye rağmen tutar "
+        "kart ekstreme ve hesabıma kesinlikle yansımadı, şikayetçiyim"
     ),
     "beklenen: False",
 )
