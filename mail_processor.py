@@ -628,13 +628,29 @@ class EmailCategorizer:
     SHIFT_HOTEL_BASED_TOPIC_KEYWORDS = ["otel"]
     SHIFT_OPERATION_BASED_TOPIC_KEYWORDS = ["operasyon"]
 
+    # Not: "kalan tutar"/"borc"/"odeme link" eklendi -- eski liste sadece
+    # "bakiye" iceren ifadeleri kapsiyordu, "kalan tutarı tahsil etme"/
+    # "rezervasyon borcunu ödeme"/"kalan ödeme linki" gibi ifadeler kacyordu
+    # (kullanici tarafindan bildirildi).
     PAYMENT_COMPLETION_TOPIC_KEYWORDS = [
-        "bakiye", "kalan bakiye", "eksik odeme", "kalan odeme"
+        "bakiye", "kalan bakiye", "eksik odeme", "kalan odeme", "kalan tutar",
+        "borc", "odeme link"
     ]
+    # "Ödemeyi tamamlamak istiyoruz" gibi, bare "odeme" ile "tamamla" fiilinin
+    # BIRLIKTE (ama farkli ek/cekimlerle) gectigi durumlar icin -- bare
+    # "odeme" tek basina TOPIC listesine eklenemez (cok genel, diger
+    # onlarca dalla cakisir), bu yuzden "tamamla" fiiliyle YAKINLIK sarti
+    # tasiyan bu regex kendi kendine yeterli (self-sufficient) sayilir.
+    PAYMENT_COMPLETION_PATTERN = re.compile(r'odeme\w*\s+tamamla', re.IGNORECASE)
 
+    # Not: eski liste tamamen SABIT/UZUN kaliplardan olustugu icin ("tamamlamak
+    # istiyoruz" gibi) gercek musteri mailerindeki dogal varyasyonlarin
+    # (ör. "tamamlamak ve ... rica ederim", "kapatmak istiyoruz", "tahsil
+    # etmenizi rica ederiz") HICBIRINI yakalamiyordu. Stem'lere cevrildi --
+    # PAYMENT_COMPLETION_TOPIC_KEYWORDS ile ESLESTIRILEREK kullanildigi icin
+    # bare "isti"/"rica" burada guvenli (topic zaten yeterince spesifik).
     PAYMENT_COMPLETION_INTENT_KEYWORDS = [
-        "tamamlamak istiyoruz", "tamamlamak istiyorum", "odemesi yapmak istiyorum",
-        "simdi tamamlamak", "tamamlayabilir miyiz"
+        "tamamla", "kapat", "tahsil", "isti", "rica"
     ]
 
     # ==========================================
@@ -738,7 +754,16 @@ class EmailCategorizer:
         "hatta bekletil"
     ]
 
-    TOUR_TOPIC_KEYWORDS = ["tur program", "tur organizasyon"]
+    # Not: "rota"/"vaat edilen yer"/"tur hizmet" eklendi -- eski liste sadece
+    # bare "tur" kelimesiyle baslayan iki kalibi ("tur program"/"tur
+    # organizasyon") kapsiyordu, "Vaat edilen yerler gezilmedi"/"Rota
+    # değiştirildi"/"Tur hizmetinden şikayetçiyiz" gibi ifadeler "tur"
+    # kelimesini hic icermeyebiliyor veya farkli bir kalip kullaniyordu
+    # (kullanici tarafindan bildirildi).
+    TOUR_TOPIC_KEYWORDS = [
+        "tur program", "tur organizasyon", "tur hizmet", "rota",
+        "vaat edilen yer", "planlanan yer"
+    ]
 
     GUIDE_COMPLAINT_TOPIC_KEYWORDS = ["rehber"]
 
@@ -2052,8 +2077,11 @@ class EmailCategorizer:
             return shift_result
 
         if (
-            any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_COMPLETION_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_COMPLETION_INTENT_KEYWORDS)
+            (
+                any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_COMPLETION_TOPIC_KEYWORDS)
+                and any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_COMPLETION_INTENT_KEYWORDS)
+            )
+            or EmailCategorizer.PAYMENT_COMPLETION_PATTERN.search(normalized_text)
         ):
             return {
                 "channel_id": CHANNEL_ID,

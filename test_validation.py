@@ -1124,6 +1124,42 @@ check("Kaydirma-OperasyonKaynakli", r["classification"] == "BACKOFFICE_ISLEMLERI
 r = cat("", "Eksik ödemeyi tamamlamak istiyorum, bakiye ödemesi yapmak istiyorum.")
 check("DigerIslemler-OdemeTamamlama", r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA", r["classification"])
 
+# --- PAYMENT_COMPLETION_INTENT_KEYWORDS eski hali sadece SABIT/UZUN kaliplar
+# icin ("tamamlamak istiyoruz" gibi) tetikleniyordu, gercek musteri
+# mailerindeki dogal varyasyonlarin hicbirini yakalamiyordu (kullanici
+# tarafindan bildirildi). Stem'lere cevrildi + bare "odeme"+"tamamla"
+# yakinligi icin PAYMENT_COMPLETION_PATTERN eklendi.
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzun kalan bakiye "
+    "ödemesini tamamlamak ve kalan tutarın tahsili için gerekli finansal "
+    "işlemlerin backoffice tarafında gerçekleştirilmesini rica ederim.",
+)
+check(
+    "DigerIslemler-OdemeTamamlama-2 (ONAYLI): 'kalan bakiye ödemesini tamamlamak ve kalan tutarın tahsili'",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA",
+    r["classification"],
+)
+
+r = cat("", "Ödemeyi tamamlamak istiyoruz.")
+check(
+    "DigerIslemler-OdemeTamamlama-3: bare 'ödemeyi tamamlamak' (PAYMENT_COMPLETION_PATTERN)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA",
+    r["classification"],
+)
+
+r = cat("", "Kalan tutarı tahsil etmenizi rica ederiz.")
+check("DigerIslemler-OdemeTamamlama-4: 'kalan tutarı tahsil'", r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA", r["classification"])
+
+r = cat("", "Bakiye ödemesini kapatmak istiyoruz.")
+check("DigerIslemler-OdemeTamamlama-5: 'bakiye ödemesini kapatma'", r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA", r["classification"])
+
+r = cat("", "Rezervasyon borcunu ödemek istiyoruz.")
+check("DigerIslemler-OdemeTamamlama-6: 'rezervasyon borcunu ödeme'", r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA", r["classification"])
+
+r = cat("", "Kalan ödeme linkini rica ederiz.")
+check("DigerIslemler-OdemeTamamlama-7: 'kalan ödeme linki'", r["classification"] == "BACKOFFICE_ISLEMLERI > DIGER_ISLEMLER > ODEME_TAMAMLAMA", r["classification"])
+
 # --- BILINEN CAKISMA (KOLLIZYON) DURUMLARI - once tespit, sonra birlikte cozulecek ---
 # "bilet" kelimesi TRANSPORT_CHANGE_RIGHTS_KEYWORDS listesinde COK GENEL bir sinyal
 # oldugu icin, "ucak bileti" ile ilgili degisiklik/iptal talepleri hicbir zaman kendi
@@ -1754,6 +1790,44 @@ check("Sikayet-TurRehber-Tur", r["classification"] == "SIKAYET > TUR_ORGANIZASYO
 
 r = cat("", "Rehberden memnun değilim, rehber ilgisizdi.")
 check("Sikayet-TurRehber-Rehber", r["classification"] == "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > REHBER", r["classification"])
+
+# --- TOUR_TOPIC_KEYWORDS genisletme: eski liste sadece "tur program"/"tur
+# organizasyon" kapsiyordu, "Vaat edilen yerler gezilmedi"/"Rota değiştirildi"/
+# "Tur hizmetinden şikayetçiyiz" gibi "tur" kelimesini hic icermeyen ya da
+# farkli kalip kullanan ifadeler kacyordu (kullanici tarafindan bildirildi).
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı tur rezervasyonumuz kapsamında taahhüt "
+    "edilen tur programının ve rotanın tamamen aksaması, planlanan yerlerin "
+    "gezilememesi nedeniyle yaşanan tur organizasyonu eksikliklerinden "
+    "dolayı şikayetçiyiz, gereğinin yapılmasını rica ederiz.",
+)
+check(
+    "Sikayet-TurRehber-Tur-2 (ONAYLI): tur programı/rota aksaması + planlanan yerler gezilememesi",
+    r["classification"] == "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > TUR",
+    r["classification"],
+)
+
+r = cat("", "Vaat edilen yerler gezilmedi, şikayetçiyiz.")
+check("Sikayet-TurRehber-Tur-3: 'vaat edilen yerler gezilmedi' (bare 'tur' kelimesi yok)", r["classification"] == "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > TUR", r["classification"])
+
+r = cat("", "Rota değiştirildi, şikayetçiyiz.")
+check("Sikayet-TurRehber-Tur-4: 'rota değiştirildi'", r["classification"] == "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > TUR", r["classification"])
+
+r = cat("", "Tur hizmetinden şikayetçiyiz.")
+check("Sikayet-TurRehber-Tur-5: 'tur hizmetinden şikayetçiyiz'", r["classification"] == "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > TUR", r["classification"])
+
+r = cat(
+    "",
+    "İyi günler, 553044193 numaralı rezervasyonumuzdaki tur süresince görev "
+    "yapan rehberin ilgisiz, yetersiz ve yanlış yönlendirmelerde bulunması "
+    "nedeniyle yaşadığımız mağduriyetten dolayı şikayetçiyiz.",
+)
+check(
+    "Sikayet-TurRehber-Rehber-2 (ONAYLI): rehberin ilgisiz/yetersiz/yanlış yönlendirmesi",
+    r["classification"] == "SIKAYET > TUR_ORGANIZASYONU_VE_REHBER > REHBER",
+    r["classification"],
+)
 
 r = cat("", "İade yapılmadı, param iade edilmedi.")
 check("Sikayet-Iade-Yapilmamasi", r["classification"] == "SIKAYET > IADE > IADENIN_YAPILMAMASI", r["classification"])
