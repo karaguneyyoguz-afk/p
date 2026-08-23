@@ -59,6 +59,9 @@ from config import (
     SUB_CATEGORY_REFUND_REQUEST_NOT_OPENED, SUB_CATEGORY_REFUND_NOT_REFLECTED,
     CATEGORY_PRICING, SUB_CATEGORY_BEST_PRICE_GUARANTEE, SUB_CATEGORY_PRICE_GENERAL,
     SUB_CATEGORY_PRICE_DROP, SUB_CATEGORY_PAYMENT_OBJECTION,
+    SUB_CATEGORY_PAYMENT_COMPLAINT_BANK_OBJECTION, SUB_CATEGORY_PAYMENT_COMPLAINT_OVERCHARGE,
+    SUB_CATEGORY_PAYMENT_COMPLAINT_CAMPAIGN, SUB_CATEGORY_PAYMENT_COMPLAINT_REFLECTION,
+    SUB_CATEGORY_PAYMENT_COMPLAINT_PROVISION,
     MAIL_CHARSET_DEFAULT,
     MAIL_CHARSET_FALLBACK
 )
@@ -403,6 +406,32 @@ class EmailCategorizer:
         "sisteme yansimadi", "hesaba yansimadi", "olusmadi", "sistemde yok"
     ]
 
+    # --- SIKAYET > ODEME_SISTEMLERI (5 kirilim) ---
+    # Not: "banka" mecburi konu kelimesi olarak tutuldu -- SADECE "itiraz"
+    # kelimesi zaten SIKAYET > FIYATLANDIRMA > ODEME_ITIRAZI (genel/banka
+    # disi) dalini tetikliyor; "banka" sarti bu iki dali birbirinden ayirir.
+    BANK_OBJECTION_TOPIC_KEYWORDS = ["banka"]
+    BANK_OBJECTION_EVENT_KEYWORDS = [
+        "itiraz", "chargeback", "bilgim disinda", "iznim disinda",
+        "onaylamadigim", "haberim olmadan"
+    ]
+
+    OVERCHARGE_TOPIC_KEYWORDS = ["tutar", "kart", "odeme"]
+    OVERCHARGE_EVENT_KEYWORDS = [
+        "fazla cekil", "fazla odendi", "mukerrer cekim", "cift cekim",
+        "fazladan cekil"
+    ]
+
+    CAMPAIGN_TOPIC_KEYWORDS = ["kampanya", "promosyon", "indirim"]
+    CAMPAIGN_EVENT_KEYWORDS = [
+        "uygulanma", "yansitilma", "yansimadi", "dusulmedi"
+    ]
+
+    PROVISION_TOPIC_KEYWORDS = ["provizyon"]
+    PROVISION_EVENT_KEYWORDS = [
+        "bloke", "kaldirilmadi", "cozulmedi", "kalkmadi", "dusmedi"
+    ]
+
     CONFIRMATION_TOPIC_KEYWORDS = ["konfirme", "konfirmasyon", "rezervasyon onayi"]
     CONFIRMATION_ACTIONABLE_EVENT_KEYWORDS = [
         "gelmedi", "ulasmadi", "hala", "acil laz"
@@ -446,6 +475,10 @@ class EmailCategorizer:
         "otel degisikligi", "baska otele", "baska bir otele", "otelimi degistirmek",
         "yakinindaki baska bir otel"
     ]
+    # "tesis" tek basina cok genel (CATEGORY_FACILITY / TESIS_ILETISIM ile
+    # cakisir), bu yuzden CHANGE_INTENT_KEYWORDS veya "aktar" (aktarma/
+    # aktarmak) ile ESLESTIRILEREK kullanilir, tek basina tetiklenmez.
+    FACILITY_CHANGE_TOPIC_KEYWORDS = ["tesis"]
 
     RESERVATION_DATE_TOPIC_KEYWORDS = [
         "rezervasyon tarihi", "tatil tarihi", "tatil tarihlerimiz", "giris tarihi",
@@ -979,6 +1012,115 @@ class EmailCategorizer:
                 "classification": "SIKAYET > UCAK > SEFER_IPTALI"
             }
 
+        # ============================================================
+        # SIKAYET > ODEME_SISTEMLERI (5 kirilim: Banka Itirazi, Fazla Cekim,
+        # Kampanya Uygulama, Odemenin Yansimamasi, Provizyon)
+        # Not: RESERVATION_PROCESS ve FIYATLANDIRMA > ODEME_ITIRAZI dallarindan
+        # ONCE kontrol ediliyor -- aksi halde "itiraz" gibi genel kelimeler
+        # veya "rezervasyon islemim" gibi genel ifadeler bu daha spesifik 5
+        # kirilimdan ONCE devreye girip yanlis (daha az spesifik) dallara
+        # yonlendirebilirdi.
+        # ============================================================
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.BANK_OBJECTION_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.BANK_OBJECTION_EVENT_KEYWORDS)
+        ):
+            payment_attributes, payment_missing_fields = extract_payment_attributes(combined_text, required=False)
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_PAYMENT,
+                "category_name": "Ödeme Sistemleri",
+                "sub_category_id": SUB_CATEGORY_PAYMENT_COMPLAINT_BANK_OBJECTION,
+                "sub_category_name": "Banka İtirazı",
+                "sub_category_code": "BANKA_ITIRAZI",
+                "attributes": payment_attributes,
+                "missing_fields": payment_missing_fields,
+                "classification": "SIKAYET > ODEME_SISTEMLERI > BANKA_ITIRAZI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.OVERCHARGE_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.OVERCHARGE_EVENT_KEYWORDS)
+        ):
+            payment_attributes, payment_missing_fields = extract_payment_attributes(combined_text, required=False)
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_PAYMENT,
+                "category_name": "Ödeme Sistemleri",
+                "sub_category_id": SUB_CATEGORY_PAYMENT_COMPLAINT_OVERCHARGE,
+                "sub_category_name": "Fazla Çekim",
+                "sub_category_code": "FAZLA_CEKIM",
+                "attributes": payment_attributes,
+                "missing_fields": payment_missing_fields,
+                "classification": "SIKAYET > ODEME_SISTEMLERI > FAZLA_CEKIM"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.CAMPAIGN_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.CAMPAIGN_EVENT_KEYWORDS)
+        ):
+            payment_attributes, payment_missing_fields = extract_payment_attributes(combined_text, required=False)
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_PAYMENT,
+                "category_name": "Ödeme Sistemleri",
+                "sub_category_id": SUB_CATEGORY_PAYMENT_COMPLAINT_CAMPAIGN,
+                "sub_category_name": "Kampanya Uygulama",
+                "sub_category_code": "KAMPANYA_UYGULAMA",
+                "attributes": payment_attributes,
+                "missing_fields": payment_missing_fields,
+                "classification": "SIKAYET > ODEME_SISTEMLERI > KAMPANYA_UYGULAMA"
+            }
+
+        # Not: Backoffice > Odeme > Odemenin Yansimamasi (ayni topic/event
+        # listeleriyle) ile AYNI metin kalibini paylasiyor; ayirt edici
+        # sinyal COMPLAINT_SENTIMENT_KEYWORDS (magduriyet/sikayetci vb.) --
+        # varsa Sikayet, yoksa Backoffice (islemsel talep) sayiliyor.
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_REFLECTION_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.PAYMENT_REFLECTION_EVENT_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            payment_attributes, payment_missing_fields = extract_payment_attributes(combined_text, required=False)
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_PAYMENT,
+                "category_name": "Ödeme Sistemleri",
+                "sub_category_id": SUB_CATEGORY_PAYMENT_COMPLAINT_REFLECTION,
+                "sub_category_name": "Ödemenin Yansımaması",
+                "sub_category_code": "ODEMENIN_YANSIMAMASI",
+                "attributes": payment_attributes,
+                "missing_fields": payment_missing_fields,
+                "classification": "SIKAYET > ODEME_SISTEMLERI > ODEMENIN_YANSIMAMASI"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.PROVISION_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.PROVISION_EVENT_KEYWORDS)
+        ):
+            payment_attributes, payment_missing_fields = extract_payment_attributes(combined_text, required=False)
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_PAYMENT,
+                "category_name": "Ödeme Sistemleri",
+                "sub_category_id": SUB_CATEGORY_PAYMENT_COMPLAINT_PROVISION,
+                "sub_category_name": "Provizyon",
+                "sub_category_code": "PROVIZYON",
+                "attributes": payment_attributes,
+                "missing_fields": payment_missing_fields,
+                "classification": "SIKAYET > ODEME_SISTEMLERI > PROVIZYON"
+            }
+
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.RESERVATION_PROCESS_TOPIC_KEYWORDS)
             and (
@@ -1469,7 +1611,16 @@ class EmailCategorizer:
                 "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > ODA"
             }
 
-        if any(keyword in normalized_text for keyword in EmailCategorizer.HOTEL_CHANGE_TOPIC_KEYWORDS):
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.HOTEL_CHANGE_TOPIC_KEYWORDS)
+            or (
+                any(keyword in normalized_text for keyword in EmailCategorizer.FACILITY_CHANGE_TOPIC_KEYWORDS)
+                and (
+                    any(keyword in normalized_text for keyword in EmailCategorizer.CHANGE_INTENT_KEYWORDS)
+                    or "aktar" in normalized_text
+                )
+            )
+        ):
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_RESERVATION,

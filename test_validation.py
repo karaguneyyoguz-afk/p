@@ -585,6 +585,48 @@ check("Degisiklik-Oda", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLI
 r = cat("", "Otel değişikliği istiyorum, başka otele geçmek istiyorum.")
 check("Degisiklik-Otel", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > OTEL_DEGISIKLIGI", r["classification"])
 
+# HOTEL_CHANGE_TOPIC_KEYWORDS eski hali tumu "otel" koklu kalip ifadelerdi;
+# "tesis degistirme talebi" / "farkli bir tesise aktarma" gibi "tesis" koklu
+# ifadeler eksikti (kullanici tarafindan bildirildi). FACILITY_CHANGE_TOPIC_KEYWORDS
+# ("tesis") bilgi-istek ile karismamasi icin CHANGE_INTENT_KEYWORDS/"aktar"
+# ile ESLESTIRILEREK eklendi (tek basina tetiklenmiyor).
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuzda yer alan otelimizi "
+    "değiştirerek tatilimize başka bir tesiste devam etmek istiyoruz. Otel "
+    "değişikliği için aradaki fiyat farkı ve müsaitlik durumunun incelenerek "
+    "backoffice tarafında gerekli güncellemelerin yapılmasını rica eder, iyi "
+    "çalışmalar dilerim.",
+)
+check(
+    "Degisiklik-Otel-2 (ONAYLI): otelimizi degistirerek baska tesiste devam etme talebi",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > OTEL_DEGISIKLIGI",
+    r["classification"],
+)
+
+r = cat("", "Tesis değiştirme talebimiz var.")
+check(
+    "Degisiklik-Otel-3: 'tesis degistirme talebi' (FACILITY_CHANGE_TOPIC_KEYWORDS + CHANGE_INTENT)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > OTEL_DEGISIKLIGI",
+    r["classification"],
+)
+
+r = cat("", "Otel rezervasyonumuzu farklı bir tesise aktarmak istiyoruz.")
+check(
+    "Degisiklik-Otel-4: 'tesise aktarma' (FACILITY_CHANGE_TOPIC_KEYWORDS + 'aktar')",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > OTEL_DEGISIKLIGI",
+    r["classification"],
+)
+
+# Koruma: sadece "tesis" gecen SAF bilgi-istek (degistirme niyeti yok)
+# yanlislikla OTEL_DEGISIKLIGI'ne dusmemeli.
+r = cat("", "Tesisin iletişim numarasını öğrenebilir miyim?")
+check(
+    "Degisiklik-Otel-5 (KORUMA): sadece 'tesis' bilgi-istegi, degistirme niyeti yok -> OTEL_DEGISIKLIGI'ne dusmemeli",
+    r["classification"] != "BACKOFFICE_ISLEMLERI > DEGISIKLIK > OTEL_DEGISIKLIGI",
+    r["classification"],
+)
+
 r = cat("", "Rezervasyon tarihini değiştirmek istiyorum.")
 check("Degisiklik-Tarih", r["classification"] == "BACKOFFICE_ISLEMLERI > DEGISIKLIK > TARIH_DEGISIKLIGI", r["classification"])
 
@@ -1291,6 +1333,110 @@ REALISTIC_SCENARIOS = [
     (56, "SIKAYET > FIYATLANDIRMA > FIYAT_DUSUSU", "Rezervasyon yaptıktan bir gün sonra aynı paketin fiyatı düştü, aradaki farkı talep ediyorum."),
     (57, "SIKAYET > FIYATLANDIRMA > ODEME_ITIRAZI", "Kartımdan çekilen tutar anlaştığımız tutardan fazla, buna itiraz ediyorum."),
 ]
+
+# ==========================================================
+# SIKAYET > ODEME_SISTEMLERI (5 kirilim): Banka Itirazi, Fazla Cekim,
+# Kampanya Uygulama, Odemenin Yansimamasi, Provizyon. Finansal attribute'lar
+# (Islem Tarihi/Kart Ilk 6/Kart Son 4/Tutar/Siparis No) OPSIYONEL tutuluyor
+# (musteri onayiyla, Backoffice > Odeme > Odemenin Yansimamasi'nin aksine).
+# ==========================================================
+r = cat(
+    "",
+    "İyi günler, 21.08.2026 tarihinde 358109758 numaralı siparişim için 454360 "
+    "ile başlayan ve 1234 ile biten kartımdan çekilen 12.500 TL tutarındaki "
+    "işlem bilgim dışındadır veya hizmet alınamadığı için bankaya harcama "
+    "itirazında bulundum, bu mağduriyetin giderilmesini ve şikayetimin işleme "
+    "alınmasını talep ediyorum.",
+)
+tarih_deger = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "ISLEM_TARIHI"), None)
+check(
+    "OdemeSistemleri-Sikayet-BankaItirazi (ONAYLI)",
+    r["classification"] == "SIKAYET > ODEME_SISTEMLERI > BANKA_ITIRAZI"
+    and not r["missing_fields"]
+    and tarih_deger is not None and tarih_deger.get("textValue") == "21/08/2026",
+    (r["classification"], r["missing_fields"], r["attributes"]),
+)
+
+r = cat(
+    "",
+    "Merhaba, 21.08.2026 tarihinde 358109758 nolu rezervasyonum için "
+    "454360******1234 kartımdan yapılması gereken tutardan fazla olacak "
+    "şekilde 12.500 TL çekilmiştir. Fazla çekilen tutarın tarafıma iadesi "
+    "hususunda acil yardımlarınızı rica eder, bu hatadan ötürü şikayetçiyim.",
+)
+check(
+    "OdemeSistemleri-Sikayet-FazlaCekim (ONAYLI)",
+    r["classification"] == "SIKAYET > ODEME_SISTEMLERI > FAZLA_CEKIM",
+    r["classification"],
+)
+# --- CANLI ORTAMDA BULUNAN GERCEK HATA (duzeltildi) ---
+# Yukaridaki AYNI metin, CSM ekranina basildiginda: Islem Tarihi alani BUGUNUN
+# tarihini gosteriyordu (CSM'in tarih widget'i "21.08.2026" nokta formatini
+# parse edemiyordu -- "DD/MM/YYYY" egik cizgi formati bekliyor), Kartin Ilk
+# 6/Son 4 Rakami alanlari BOS kaliyordu (maskeli "454360******1234" formati
+# desteklenmiyordu) ve Siparis No alani BOS kaliyordu ("358109758 nolu
+# rezervasyonum" -- "numarali siparis" degil -- eslesmiyordu).
+tarih_deger2 = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "ISLEM_TARIHI"), None)
+ilk6_deger2 = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "KARTIN_ILK_6_RAKAMI"), None)
+son4_deger2 = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "KARTIN_SON_4_RAKAMI"), None)
+siparis_deger2 = next((a for a in r["attributes"] if a.get("attribute", {}).get("shortCode") == "SIPARIS_NO"), None)
+check(
+    "OdemeSistemleri-Sikayet-FazlaCekim-Attributes (CANLI HATA DUZELTMESI): maskeli kart + 'nolu rezervasyon' + tarih formati",
+    tarih_deger2 is not None and tarih_deger2.get("textValue") == "21/08/2026"
+    and ilk6_deger2 is not None and ilk6_deger2.get("textValue") == "454360"
+    and son4_deger2 is not None and son4_deger2.get("textValue") == "1234"
+    and siparis_deger2 is not None and siparis_deger2.get("textValue") == "358109758",
+    r["attributes"],
+)
+
+r = cat(
+    "",
+    "İyi günler, 21.08.2026 tarihinde gerçekleştirdiğim 358109758 numaralı "
+    "siparişimde 454360******1234 kartımla yaptığım 12.500 TL ödemede hak "
+    "kazandığım kampanya indirimi tutara uygulanmamıştır. İndirimin "
+    "yansıtılmaması nedeniyle yaşadığım mağduriyetin giderilmesini rica ederim.",
+)
+check(
+    "OdemeSistemleri-Sikayet-KampanyaUygulama (ONAYLI)",
+    r["classification"] == "SIKAYET > ODEME_SISTEMLERI > KAMPANYA_UYGULAMA",
+    r["classification"],
+)
+
+# Not: Backoffice > Odeme > Odemenin Yansimamasi ile AYNI topic/event
+# kaliplarini paylasir; ayirt edici sinyal COMPLAINT_SENTIMENT_KEYWORDS
+# ("magduriyet" burada) -- bu yuzden koruma testi de asagida ekli.
+r = cat(
+    "",
+    "Merhaba, 21.08.2026 tarihinde 358109758 nolu siparişim için "
+    "454360******1234 kartımdan 12.500 TL çekilmesine rağmen ödeme "
+    "sisteminize yansımadı ve rezervasyonum askıda kaldı. Mağduriyetimin "
+    "giderilmesi için ödememin eşleştirilmesini talep ediyorum.",
+)
+check(
+    "OdemeSistemleri-Sikayet-OdemeninYansimamasi (ONAYLI)",
+    r["classification"] == "SIKAYET > ODEME_SISTEMLERI > ODEMENIN_YANSIMAMASI",
+    r["classification"],
+)
+
+r = cat("", "Kartımdan tutar çekildi ancak rezervasyon sistemde hiç oluşmadı, ödeme kayboldu sanırım.")
+check(
+    "OdemeSistemleri-Sikayet-OdemeninYansimamasi-Koruma: magduriyet/sikayet kelimesi YOK -> Backoffice (islemsel) kalmali",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > ODEME > ODEMENIN_YANSIMAMASI",
+    r["classification"],
+)
+
+r = cat(
+    "",
+    "İyi günler, 21.08.2026 tarihli 358109758 numaralı rezervasyon işlemim "
+    "sonrasında 454360******1234 kartımda 12.500 TL tutarındaki provizyon "
+    "blokesi günlerdir kaldırılmadı. Bu durum kart limitimi olumsuz "
+    "etkilediği için şikayetçiyim, blokenin kaldırılmasını rica ederim.",
+)
+check(
+    "OdemeSistemleri-Sikayet-Provizyon (ONAYLI)",
+    r["classification"] == "SIKAYET > ODEME_SISTEMLERI > PROVIZYON",
+    r["classification"],
+)
 
 for num, expected, text in REALISTIC_SCENARIOS:
     r = cat("", text)

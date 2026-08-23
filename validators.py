@@ -18,6 +18,25 @@ from utils import normalize_turkish_characters
 OPTIONAL_LABEL_ANNOTATION = r'(?:\s*\([^)]*\))?'
 
 
+def _normalize_date_to_ddmmyyyy(date_str: str) -> str:
+    """
+    "21.08.2026" / "1.8.2026" / "21-08-2026" gibi metinden cikarilan tarihleri
+    CSM'in tarih (date-picker) alaninin bekledigi "DD/MM/YYYY" formatina
+    (sifirla doldurulmus, "/" ayiracli) cevirir. CSM, "21.08.2026" gibi nokta
+    ayiracli bir deger aldiginda parse edemeyip alani BUGUNUN tarihine
+    varsayilan olarak sifirliyordu (canli ortamda gozlemlendi -- metinde
+    "21.08.2026" yaziyken ticket'ta "23/08/2026" -- yani o gunun tarihi --
+    goruntulenmisti).
+    """
+    parts = re.split(r'[./-]', date_str.strip())
+    if len(parts) != 3:
+        return date_str.strip()
+    day, month, year = parts
+    if len(year) == 2:
+        year = "20" + year
+    return f"{day.zfill(2)}/{month.zfill(2)}/{year}"
+
+
 def _is_placeholder_value(value: str) -> bool:
     normalized_value = normalize_turkish_characters(value).strip()
     return "buraya" in normalized_value or normalized_value in {"yaz", "girilmedi", "belirtilmedi"}
@@ -535,10 +554,14 @@ def extract_payment_attributes(text: str, required: bool = False) -> Tuple[List[
                 "id": 100000037,
                 "shortCode": "ISLEM_TARIHI"
             },
-            "textValue": date_match.group(1).strip()
+            "textValue": _normalize_date_to_ddmmyyyy(date_match.group(1))
         })
     elif required:
         missing_fields.append("İşlem Tarihi")
+
+    # Musterilerin en sik kullandigi format: karti maskeleyerek "454360******1234"
+    # seklinde yazmalari. Hem ilk-6 hem son-4 alanini TEK SEFERDE karsilar.
+    masked_card_match = re.search(r'(\d{6})\*{2,}(\d{4})', text)
 
     card_first6_match = re.search(
         r'(?:kart(?:ı|i)n\s*ilk\s*6(?:\s*hane(?:si)?|\s*rakam(?:ı|i))?)' + OPTIONAL_LABEL_ANNOTATION + r'[:\s]*\[?(\d{6})\]?',
@@ -548,13 +571,16 @@ def extract_payment_attributes(text: str, required: bool = False) -> Tuple[List[
     if not card_first6_match:
         # Duz cumle fallback: "454360 ile başlayan ... kartımla" gibi ifadeler
         card_first6_match = re.search(r'(\d{6})\s+ile\s+ba[sş]la', text, re.IGNORECASE)
-    if card_first6_match:
+    card_first6_value = card_first6_match.group(1) if card_first6_match else None
+    if card_first6_value is None and masked_card_match:
+        card_first6_value = masked_card_match.group(1)
+    if card_first6_value is not None:
         attribute_list.append({
             "attribute": {
                 "id": 100000189,
                 "shortCode": "KARTIN_ILK_6_RAKAMI"
             },
-            "textValue": card_first6_match.group(1)
+            "textValue": card_first6_value
         })
     elif required:
         missing_fields.append("Kartın İlk 6 Rakamı")
@@ -567,13 +593,16 @@ def extract_payment_attributes(text: str, required: bool = False) -> Tuple[List[
     if not card_last4_match:
         # Duz cumle fallback: "... 1234 ile biten kartımla" gibi ifadeler
         card_last4_match = re.search(r'(\d{4})\s+ile\s+bit', text, re.IGNORECASE)
-    if card_last4_match:
+    card_last4_value = card_last4_match.group(1) if card_last4_match else None
+    if card_last4_value is None and masked_card_match:
+        card_last4_value = masked_card_match.group(2)
+    if card_last4_value is not None:
         attribute_list.append({
             "attribute": {
                 "id": 100000190,
                 "shortCode": "KARTIN_SON_4_RAKAMI"
             },
-            "textValue": card_last4_match.group(1)
+            "textValue": card_last4_value
         })
     elif required:
         missing_fields.append("Kartın Son 4 Rakamı")
@@ -605,9 +634,16 @@ def extract_payment_attributes(text: str, required: bool = False) -> Tuple[List[
         re.IGNORECASE
     )
     if not order_number_match:
-        # Duz cumle fallback: sayi etiketten ONCE gelebilir, ör.
-        # "358109758 numaralı siparişim için..."
-        order_number_match = re.search(r'([A-Za-z0-9-]+)\s*numaral[iı]\s*sipari[sş]\w*', text, re.IGNORECASE)
+        # Duz cumle fallback: sayi etiketten ONCE gelebilir, ör. "358109758
+        # numaralı siparişim için..." veya "358109758 nolu rezervasyonum
+        # için..." -- nesne kelimesi "siparis" ile SINIRLI DEGIL, gercek
+        # musteri mailleri cogunlukla "rezervasyon" diyor (canli ortamda
+        # gozlemlendi).
+        order_number_match = re.search(
+            r'([A-Za-z0-9-]+)\s*(?:numaral[iı]|no[\'’]?lu)\s*(?:sipari[sş]\w*|rezervasyon\w*)',
+            text,
+            re.IGNORECASE
+        )
     if order_number_match:
         attribute_list.append({
             "attribute": {

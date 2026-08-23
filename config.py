@@ -124,6 +124,18 @@ SUB_CATEGORY_TRANSPORT_COMPLAINT_OTHER = 100000539                  # Diğer
 SUB_CATEGORY_PAYMENT_REFLECTION = 100000591  # Ödemenin Yansımaması
 
 # ==========================================
+# SUB-CATEGORY IDs - ŞİKAYET (ÖDEME SİSTEMLERİ)
+# Not: "Ödemenin Yansımaması" (100000591) burada AYNI ID ile ama Backoffice
+# yerine Şikayet ticket tipi altinda tekrar kullaniliyor -- CSM sisteminde
+# ayni sub-category node'u farkli ticket tiplerinde tekrar etiketlenebiliyor.
+# ==========================================
+SUB_CATEGORY_PAYMENT_COMPLAINT_BANK_OBJECTION = 100000581     # Banka İtirazı
+SUB_CATEGORY_PAYMENT_COMPLAINT_OVERCHARGE = 100000583         # Fazla Çekim
+SUB_CATEGORY_PAYMENT_COMPLAINT_CAMPAIGN = 100000586           # Kampanya Uygulama
+SUB_CATEGORY_PAYMENT_COMPLAINT_REFLECTION = 100000591         # Ödemenin Yansımaması (Şikayet)
+SUB_CATEGORY_PAYMENT_COMPLAINT_PROVISION = 100000592          # Provizyon
+
+# ==========================================
 # SUB-CATEGORY IDs - RESERVATION (CONFIRMATION)
 # ==========================================
 SUB_CATEGORY_CONFIRMATION = 100000531       # Konfirme
