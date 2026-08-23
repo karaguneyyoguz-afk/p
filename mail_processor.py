@@ -62,6 +62,10 @@ from config import (
     SUB_CATEGORY_PAYMENT_COMPLAINT_BANK_OBJECTION, SUB_CATEGORY_PAYMENT_COMPLAINT_OVERCHARGE,
     SUB_CATEGORY_PAYMENT_COMPLAINT_CAMPAIGN, SUB_CATEGORY_PAYMENT_COMPLAINT_REFLECTION,
     SUB_CATEGORY_PAYMENT_COMPLAINT_PROVISION,
+    SUB_CATEGORY_ONLINE_OPERATIONS_COMPLAINT, SUB_CATEGORY_MOBILE_APP_COMPLAINT,
+    SUB_CATEGORY_WEBSITE_COMPLAINT,
+    SUB_CATEGORY_CANCELLATION_HEALTH_ISSUE, SUB_CATEGORY_CANCELLATION_SPECIAL_REASON,
+    SUB_CATEGORY_CANCELLATION_FORCE_MAJEURE, SUB_CATEGORY_CANCELLATION_HOTEL_REVIEWS,
     MAIL_CHARSET_DEFAULT,
     MAIL_CHARSET_FALLBACK
 )
@@ -685,7 +689,8 @@ class EmailCategorizer:
     # ==========================================
     RESERVATION_CHANGE_INFO_KEYWORDS = [
         "degisiklik yapabilir miyim", "degisiklik yapilabilir mi",
-        "degisiklik hakkinda bilgi almak istiyorum", "nasil degisiklik yapabilirim"
+        "degisiklik hakkinda bilgi almak istiyorum", "nasil degisiklik yapabilirim",
+        "degisiklik sartlari", "degisiklik ucreti"
     ]
 
     RESERVATION_CANCELLATION_INFO_TOPIC_KEYWORDS = ["iptal"]
@@ -698,7 +703,8 @@ class EmailCategorizer:
     ]
 
     RESERVATION_CONFIRMATION_INFO_EVENT_KEYWORDS = [
-        "nedir", "ne zaman", "sure", "ulasir"
+        "nedir", "ne zaman", "sure", "ulasir", "ogrenmek", "onayladi mi",
+        "onaylanip", "onay bilgisi"
     ]
 
     # ==========================================
@@ -717,7 +723,9 @@ class EmailCategorizer:
     # birlikte arandigi icin gercek musteri ifadelerine cok daha dayanikli.
     # ==========================================
     HOTEL_OPERATION_TOPIC_KEYWORDS = [
-        "resepsiyon", "check-in", "checkin", "check-out", "checkout", "otelin operasyon"
+        "resepsiyon", "check-in", "checkin", "check-out", "checkout",
+        "otelin operasyon", "otel operasyon", "personel ilgisiz",
+        "otel yonetim", "kotu karsilama"
     ]
 
     HOTEL_SERVICES_TOPIC_KEYWORDS = [
@@ -823,6 +831,26 @@ class EmailCategorizer:
         "hatali gosterilmis", "cok yuksek"
     ]
 
+    # --- SIKAYET > ONLINE_ISLEMLER (3 kirilim) ---
+    # Not: oncelik sirasi (musteri onayli) -- MOBIL_UYGULAMA > WEB_SITESI >
+    # ONLINE_ISLEMLER (genel/platform belirtilmeyen). Bare "site" KASITLI
+    # OLARAK YOK -- cok kisa/genel bir alt dize, "web sitesi"/"internet
+    # sitesi" gibi compound kaliplar kullanildi.
+    MOBILE_APP_TOPIC_KEYWORDS = ["mobil", "uygulama", " app "]
+    WEBSITE_TOPIC_KEYWORDS = ["web sitesi", "internet sitesi", "site ac", "site don"]
+    ONLINE_OPERATIONS_COMPLAINT_TOPIC_KEYWORDS = ["online islem"]
+    ONLINE_OPERATIONS_COMPLAINT_EVENT_KEYWORDS = [
+        "sistem hata", "islem yapamiyoruz", "islem yapamiyorum", "dijital hata"
+    ]
+
+    # --- SIKAYET > IPTAL (sebep bazli, 4 kirilim) ---
+    CANCELLATION_HEALTH_TOPIC_KEYWORDS = [
+        "saglik problem", "hastane", "hastalik", "saglik rapor", "rahatsizlik"
+    ]
+    CANCELLATION_FORCE_MAJEURE_TOPIC_KEYWORDS = ["mucbir sebep", "dogal afet"]
+    CANCELLATION_SPECIAL_REASON_TOPIC_KEYWORDS = ["ozel sebep", "ozel mazeret"]
+    CANCELLATION_HOTEL_REVIEWS_TOPIC_KEYWORDS = ["otel yorum", "yanilti", "gercek disi puan"]
+
     PAYMENT_OBJECTION_KEYWORDS = [
         "odemeye itiraz ediyorum", "yanlis tutar cekildi", "fazla odeme yapildi", "odeme itirazi"
     ]
@@ -881,9 +909,16 @@ class EmailCategorizer:
         # ben istemedim") somut bir DEGISIKLIK TALEBIYLE ("değiştirmek
         # istiyoruz") ayni "degistir" kokunu paylasiyor ama anlam tam tersi
         # (Gercekci-44, SIKAYET > UCAK > SAAT_DEGISIKLIGI ile cakisiyordu).
+        # Not: COMPLAINT_SENTIMENT_KEYWORDS ("sikayetciyiz" vb.) de haric
+        # tutuluyor -- "Havayolu firması uçuş rotamızı değiştirdi,
+        # şikayetçiyiz." gibi bir SIKAYET ifadesi ("havayolu DEGISTIRDI",
+        # aktif ama musteri TALEP ETMEDI) "degistir" kokunu paylastigi icin
+        # yanlislikla somut bir Backoffice talebi saniliyor, SIKAYET > UCAK >
+        # HAVAYOLU_DEGISIKLIGI ile cakisiyordu (kullanici tarafindan bildirildi).
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.AIRPLANE_TICKET_TOPIC_KEYWORDS)
             and "degistirildi" not in normalized_text
+            and not any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
             and (
                 any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_MODE_STRONG_INTENT_KEYWORDS)
                 or "degisim" in normalized_text
@@ -1020,9 +1055,26 @@ class EmailCategorizer:
         is_extra_service_change = any(
             keyword in normalized_text for keyword in EmailCategorizer.EXTRA_SERVICES_TOPIC_KEYWORDS
         )
+        # Not: "tarih degisikligi"/"ceza" gibi TRANSPORT_CHANGE_RIGHTS_KEYWORDS
+        # ifadeleri, hicbir tasima-modu kelimesi (bilet/otobus/ucak/ucus/
+        # transfer/pnr/havayolu) icermeyen GENEL bir rezervasyon-degisiklik
+        # bilgi sorusuyla karsilasinca da geri cekiliyor -- aksi halde
+        # "Rezervasyonumda tarih değişikliği yapmak istesem değişiklik
+        # şartları ve ücreti hakkında bilgi almak istiyorum." gibi tasimayla
+        # ilgisiz bir soru, bare "tarih degisikligi" yuzunden yanlislikla bu
+        # Ulasim-ozel dalina dusuyordu (kullanici tarafindan bildirildi).
+        is_general_reservation_change_info = (
+            "degisiklik" in normalized_text
+            and ("sart" in normalized_text or "nasil" in normalized_text)
+            and not any(
+                keyword in normalized_text
+                for keyword in ["bilet", "otobus", "ucak", "ucus", "transfer", "pnr", "havayolu"]
+            )
+        )
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.TRANSPORT_CHANGE_RIGHTS_KEYWORDS)
             and not is_extra_service_change
+            and not is_general_reservation_change_info
         ):
             return {
                 "channel_id": CHANNEL_ID,
@@ -1507,6 +1559,144 @@ class EmailCategorizer:
                 "attributes": [],
                 "missing_fields": [],
                 "classification": "SIKAYET > FIYATLANDIRMA > FIYAT_GENEL"
+            }
+
+        # ============================================================
+        # SIKAYET > ONLINE_ISLEMLER (3 kirilim)
+        # Oncelik: MOBIL_UYGULAMA > WEB_SITESI > ONLINE_ISLEMLER (genel).
+        # ============================================================
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.MOBILE_APP_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_ONLINE_OPERATIONS,
+                "category_name": "Online İşlemler",
+                "sub_category_id": SUB_CATEGORY_MOBILE_APP_COMPLAINT,
+                "sub_category_name": "Mobil Uygulama",
+                "sub_category_code": "MOBIL_UYGULAMA",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > ONLINE_ISLEMLER > MOBIL_UYGULAMA"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.WEBSITE_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_ONLINE_OPERATIONS,
+                "category_name": "Online İşlemler",
+                "sub_category_id": SUB_CATEGORY_WEBSITE_COMPLAINT,
+                "sub_category_name": "Web Sitesi",
+                "sub_category_code": "WEB_SITESI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > ONLINE_ISLEMLER > WEB_SITESI"
+            }
+
+        # Not: COMPLAINT_SENTIMENT_KEYWORDS de zorunlu -- "sistem hata veriyor"
+        # gibi ifadeler gercek bir sikayet olmadan (ör. "nasıl
+        # güncelleyebilirim?" gibi bir yardim talebinde) de gecebiliyor,
+        # bare OR mantigi mevcut onayli Online-3 testini bozuyordu (denendi,
+        # geri alindi).
+        if (
+            (
+                any(keyword in normalized_text for keyword in EmailCategorizer.ONLINE_OPERATIONS_COMPLAINT_TOPIC_KEYWORDS)
+                or any(keyword in normalized_text for keyword in EmailCategorizer.ONLINE_OPERATIONS_COMPLAINT_EVENT_KEYWORDS)
+            )
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_ONLINE_OPERATIONS,
+                "category_name": "Online İşlemler",
+                "sub_category_id": SUB_CATEGORY_ONLINE_OPERATIONS_COMPLAINT,
+                "sub_category_name": "Online İşlemler",
+                "sub_category_code": "ONLINE_ISLEMLER",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > ONLINE_ISLEMLER > ONLINE_ISLEMLER"
+            }
+
+        # ============================================================
+        # SIKAYET > IPTAL (sebep bazli, 4 kirilim)
+        # ============================================================
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_HEALTH_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_CANCELLATION,
+                "category_name": "İptal",
+                "sub_category_id": SUB_CATEGORY_CANCELLATION_HEALTH_ISSUE,
+                "sub_category_name": "Sağlık Problemleri",
+                "sub_category_code": "SAGLIK_PROBLEMLERI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > IPTAL > SAGLIK_PROBLEMLERI"
+            }
+
+        if any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_FORCE_MAJEURE_TOPIC_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_CANCELLATION,
+                "category_name": "İptal",
+                "sub_category_id": SUB_CATEGORY_CANCELLATION_FORCE_MAJEURE,
+                "sub_category_name": "Mücbir Sebep",
+                "sub_category_code": "MUCBIR_SEBEP",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > IPTAL > MUCBIR_SEBEP"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_SPECIAL_REASON_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_CANCELLATION,
+                "category_name": "İptal",
+                "sub_category_id": SUB_CATEGORY_CANCELLATION_SPECIAL_REASON,
+                "sub_category_name": "Özel Sebep",
+                "sub_category_code": "OZEL_SEBEP",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > IPTAL > OZEL_SEBEP"
+            }
+
+        if (
+            any(keyword in normalized_text for keyword in EmailCategorizer.CANCELLATION_HOTEL_REVIEWS_TOPIC_KEYWORDS)
+            and any(keyword in normalized_text for keyword in EmailCategorizer.COMPLAINT_SENTIMENT_KEYWORDS)
+        ):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": TICKET_TYPE_COMPLAINT,
+                "ticket_type_name": "Şikayet",
+                "category_id": CATEGORY_CANCELLATION,
+                "category_name": "İptal",
+                "sub_category_id": SUB_CATEGORY_CANCELLATION_HOTEL_REVIEWS,
+                "sub_category_name": "Otel Yorumları",
+                "sub_category_code": "OTEL_YORUMLARI",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "SIKAYET > IPTAL > OTEL_YORUMLARI"
             }
 
         # Not: en spesifik IADE dallari (talep acilmamis, misafire yansimamasi) genel

@@ -1941,6 +1941,78 @@ check(
     r["classification"],
 )
 
+# ==========================================================
+# 18 KIRILIMLIK BUYUK SERI: Otel Operasyon genisletme, Bilgi-Istek Rezervasyon
+# genisletme (Degisiklik Bilgi Talebi/Konfirme), YENI: SIKAYET > ONLINE_ISLEMLER
+# (3 kirilim) ve SIKAYET > IPTAL (sebep bazli, 4 kirilim).
+# ==========================================================
+r = cat("", "553044193 numaralı rezervasyonumuzda otel yönetiminin karşılamadaki tutumu ve personel ilgisizliği nedeniyle şikayetçiyiz, otel operasyonundan memnun kalmadık.")
+check("Sikayet-Otel-Operasyon-2 (ONAYLI): 'otel operasyonundan' + 'personel ilgisizliği'", r["classification"] == "SIKAYET > OTEL > OPERASYON", r["classification"])
+
+r = cat("", "Rezervasyonumda tarih değişikliği yapmak istesem değişiklik şartları ve ücreti hakkında bilgi almak istiyorum.")
+check(
+    "BilgiIstek-DegisiklikBilgiTalebi-2 (CANLI HATA DUZELTMESI): 'tarih değişikliği' + 'bilgi' -> Ulasim'a ozel DEGISIKLIK_HAKKI_SORGULAMA'ya degil genel DEGISIKLIK_BILGI_TALEBI'ne dusmeli",
+    r["classification"] == "BILGI_ISTEK > REZERVASYON > DEGISIKLIK_BILGI_TALEBI",
+    r["classification"],
+)
+
+r = cat("", "Rezervasyonumuzun otel tarafından onaylanıp onaylanmadığını, konfirme durumunu öğrenmek istiyorum.")
+check("BilgiIstek-Konfirme-2: 'onaylanıp onaylanmadığını ... öğrenmek istiyorum'", r["classification"] == "BILGI_ISTEK > REZERVASYON > KONFIRME", r["classification"])
+
+r = cat("", "Rezervasyonumu iptal edersem kesinti oranı ne olur, iptal süreci hakkında bilgi almak istiyorum.")
+check("BilgiIstek-IptalSurecBilgi-2", r["classification"] == "BILGI_ISTEK > REZERVASYON > IPTAL_SUREC_BILGISI", r["classification"])
+
+# --- YENI: SIKAYET > ONLINE_ISLEMLER (3 kirilim) ---
+r = cat("", "Online işlem yaparken sistem hatası aldık, işlem yapamıyoruz, şikayetçiyiz.")
+check("Sikayet-OnlineIslemler-Genel", r["classification"] == "SIKAYET > ONLINE_ISLEMLER > ONLINE_ISLEMLER", r["classification"])
+
+r = cat("", "Mobil uygulama üzerinden giriş yaparken sürekli hata alıyoruz, app çöküyor, şikayetçiyiz.")
+check("Sikayet-OnlineIslemler-MobilUygulama", r["classification"] == "SIKAYET > ONLINE_ISLEMLER > MOBIL_UYGULAMA", r["classification"])
+
+r = cat("", "Web sitesi açılmıyor, internet sitesi sürekli donuyor, şikayetçiyiz.")
+check("Sikayet-OnlineIslemler-WebSitesi", r["classification"] == "SIKAYET > ONLINE_ISLEMLER > WEB_SITESI", r["classification"])
+
+# Koruma: mevcut onayli bilgi-istek (Online-3) sikayet dallarina dusmemeli --
+# "sistem hata veriyor" gecse bile, sikayet ifadesi (COMPLAINT_SENTIMENT) yoksa
+# bilgi-istek/yardim talebi olarak kalmali.
+r = cat(
+    "",
+    "Merhaba, Tatilbudur.com web siteniz üzerinden mevcut üyeliğime giriş "
+    "yaptım. Profilimdeki kayıtlı telefon numaramı değiştirmek istiyorum "
+    "fakat sistem hata veriyor ve kaydetmiyor. Web siteniz üzerinden profil "
+    "bilgilerimi nasıl güncelleyebilirim veya sistemdeki numaramı "
+    "05321112233 olarak güncelleyebilir misiniz?\n\nÜyelik E-Posta: "
+    "karaguneyyoguz@gmail.com\nDesteklerinizi rica ederim.",
+)
+check(
+    "Sikayet-OnlineIslemler-Koruma (CANLI HATA DUZELTMESI): 'sistem hata veriyor' ama sikayet ifadesi yok -> SIKAYET dallarina dusmemeli",
+    "SIKAYET > ONLINE_ISLEMLER" not in r["classification"],
+    r["classification"],
+)
+
+# --- YENI: SIKAYET > IPTAL (sebep bazli, 4 kirilim) ---
+r = cat("", "Sağlık problemi nedeniyle rezervasyonumuzu iptal ettik, hastane raporumuza rağmen mağdur edildik, şikayetçiyiz.")
+check("Sikayet-Iptal-SaglikProblemleri", r["classification"] == "SIKAYET > IPTAL > SAGLIK_PROBLEMLERI", r["classification"])
+
+r = cat("", "Sitedeki otel yorumları gerçeği yansıtmıyor, yanıltıcı yorumlar yüzünden mağdur olduk, şikayetçiyiz.")
+check("Sikayet-Iptal-OtelYorumlari", r["classification"] == "SIKAYET > IPTAL > OTEL_YORUMLARI", r["classification"])
+
+r = cat("", "Mücbir sebep (doğal afet) nedeniyle iptal talebimiz reddedildi, şikayetçiyiz.")
+check("Sikayet-Iptal-MucbirSebep", r["classification"] == "SIKAYET > IPTAL > MUCBIR_SEBEP", r["classification"])
+
+r = cat("", "Özel sebep/kişisel mazeretimiz nedeniyle iptal talebimiz kabul görmedi, şikayetçiyiz.")
+check("Sikayet-Iptal-OzelSebep", r["classification"] == "SIKAYET > IPTAL > OZEL_SEBEP", r["classification"])
+
+# --- CANLI HATA DUZELTMESI: Havayolu Degisikligi sikayeti, aktif "degistirdi"
+# kokunun UCAK_BILETI_DEGISIKLIGI (Backoffice) ile ayni "degistir" kokunu
+# paylasmasi yuzunden yanlislikla Backoffice talebine dusuyordu.
+r = cat("", "Havayolu firması uçuş rotamızı değiştirdi, şikayetçiyiz.")
+check(
+    "Sikayet-Ucak-HavayoluDegisikligi-2 (CANLI HATA DUZELTMESI): 'havayolu ... değiştirdi' + şikayetçiyiz -> UCAK_BILETI_DEGISIKLIGI'ne degil SIKAYET dalina dusmeli",
+    r["classification"] == "SIKAYET > UCAK > HAVAYOLU_DEGISIKLIGI",
+    r["classification"],
+)
+
 # --- COZULDU (musteri onayli ayrim kurali): "sofor" bare kelimesi tek basina
 # EVRAK'a gitmez; "plaka"/"kaptan" veya "sofor" + isim talebi (adini/ismini)
 # gerekir. Sadece "sofor" + "evrak/belge" gecen bu metin dogru sekilde
