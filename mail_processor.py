@@ -560,10 +560,11 @@ class EmailCategorizer:
     # (kullanici tarafindan bildirildi). "yapar mı(sınız)"/"eder mi(siniz)"
     # de -- Turkce'de cok yaygin bir KIBAR TALEP sorusu formu ("X yapar
     # mısınız?" = "lutfen X yapin") -- gercek bir soru degil, talep sayilir.
-    # SADECE AIRPLANE_TICKET_TOPIC_KEYWORDS ile ESLESTIRILEREK kullanildigi
-    # icin (asagida), "İptal ettiğim rezervasyonun iadesi ne zaman yapılır"
-    # gibi GECMISE DONUK bilgi-istek metinleriyle cakismiyor (topic + 50
-    # karakterlik dar pencere zaten yeterince ayirt ediyor).
+    # Her kullanildigi yerde SADECE ilgili konu listesiyle (AIRPLANE_TICKET_TOPIC_KEYWORDS,
+    # ROOM_TOPIC_KEYWORDS, vb.) ESLESTIRILEREK kullanilir, boylece "İptal
+    # ettiğim rezervasyonun iadesi ne zaman yapılır" gibi GECMISE DONUK
+    # bilgi-istek metinleriyle cakismiyor (topic + 50 karakterlik dar pencere
+    # zaten yeterince ayirt ediyor).
     CANCEL_REQUEST_NOUN_PATTERN = re.compile(
         r'(?:iptal|iade)\w*[^.!?]{0,50}(?:isti|rica|yapar\s*m[iı]s|eder\s*m[iı]s)',
         re.IGNORECASE
@@ -1833,7 +1834,10 @@ class EmailCategorizer:
         # yakalayip yanlis (daha az spesifik) alt kirilima yonlendirebilirdi.
         if (
             any(keyword in normalized_text for keyword in EmailCategorizer.ROOM_TOPIC_KEYWORDS)
-            and any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+            and (
+                any(keyword in normalized_text for keyword in EmailCategorizer.CANCEL_INTENT_KEYWORDS)
+                or EmailCategorizer.CANCEL_REQUEST_NOUN_PATTERN.search(normalized_text)
+            )
         ):
             return {
                 "channel_id": CHANNEL_ID,

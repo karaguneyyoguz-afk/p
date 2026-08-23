@@ -817,6 +817,27 @@ check(
 r = cat("", "Odamı iptal etmek istiyorum.")
 check("Iptal-Oda", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > ODA_IPTALI", r["classification"])
 
+# --- CANCEL_REQUEST_NOUN_PATTERN (Ucak Bileti Iptali icin eklenmisti) Oda
+# dalina da uygulandi -- CANCEL_INTENT_KEYWORDS'un kapsamadigi "iptal
+# edilmesi ... rica ederim" / bare "iptali" cekimlerini yakalamak icin
+# (kullanici tarafindan bildirildi).
+r = cat(
+    "",
+    "İyi günler, 358109758 numaralı rezervasyonumuzdaki odalardan sadece "
+    "birinin iptal edilmesi hususunda işlemlerin yapılmasını rica ederim.",
+)
+check(
+    "Iptal-Oda-2 (ONAYLI): 'iptal edilmesi hususunda ... rica ederim' (CANCEL_INTENT_KEYWORDS kapsamiyor)",
+    r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > ODA_IPTALI",
+    r["classification"],
+)
+
+r = cat("", "Oda iptali için işlem rica ederiz.")
+check("Iptal-Oda-3: bare 'oda iptali' + 'rica ederiz'", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > ODA_IPTALI", r["classification"])
+
+r = cat("", "Tek oda iptal talebimiz var.")
+check("Iptal-Oda-4: 'tek oda iptal talebi'", r["classification"] == "BACKOFFICE_ISLEMLERI > IPTAL > ODA_IPTALI", r["classification"])
+
 r = cat("", "İptal sigortası iptal etmek istiyorum.")
 check("EkHizmet-IptalSigortasi", r["classification"] == "BACKOFFICE_ISLEMLERI > EK_HIZMET > IPTAL_SIGORTASI", r["classification"])
 
