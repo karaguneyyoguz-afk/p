@@ -155,24 +155,43 @@ def is_valid_email(email: str) -> bool:
     return re.match(pattern, email) is not None
 
 
+# Turkce karakter normalizasyonundan (ö->o, ç->c vb.) sonra cok yaygin,
+# zararsiz Ingilizce kelimelerle CAKISAN kufurler -- "göt" normalize edilince
+# "got" olur (ör. "you've got mail" gibi neredeyse her Ingilizce mailde
+# geciyor), "piç" normalize edilince "pic" olur (foto icin son derece yaygin
+# bir kisaltma). Canli ortamda gozlemlendi: bir GitHub tanitim maili "you've
+# got GitHub Copilot..." ifadesi yuzunden kufur sanilip reddedildi. Bu
+# kelimeler icin normalizasyon ATLANIP sadece gercek Turkce diyakritikli hali
+# (ö, ç) araniyor -- kufur pratikte zaten dogru diyakritikle yazilir, cakisan
+# Ingilizce kelime ise hicbir zaman Turkce diyakritik almaz.
+_DIACRITIC_SENSITIVE_PROFANITY = {"göt", "piç"}
+
+
 def contains_profanity(text: str) -> bool:
     """
     Check if text contains profanity or hate speech.
-    
+
     Args:
         text: Text to check
-        
+
     Returns:
         bool: True if profanity detected, False otherwise
     """
     normalized_text = normalize_turkish_characters(text)
-    
+    lowered_text = text.lower()
+
     for word in PROFANITY_WORDS:
+        if word in _DIACRITIC_SENSITIVE_PROFANITY:
+            pattern = r'\b' + re.escape(word) + r'(?:lar|ler)?\b'
+            if re.search(pattern, lowered_text):
+                return True
+            continue
+
         normalized_word = normalize_turkish_characters(word)
         pattern = r'\b' + re.escape(normalized_word) + r'(?:lar|ler)?\b'
         if re.search(pattern, normalized_text):
             return True
-    
+
     return False
 
 

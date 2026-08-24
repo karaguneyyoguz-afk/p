@@ -256,11 +256,19 @@ def process_email_manual():
         msg = processor.fetch_email(email_id.encode())
         subject, sender_email, sender_name, body = processor.extract_email_content(msg)
 
+        # Gated on invoice-context keywords so OCR doesn't run on unrelated PDF
+        # attachments (uçak/otobüs bileti vb.) -- those are routed to the right
+        # kırılım by subject/body keywords alone, no attribute extraction needed.
         attachment_fields = None
-        ocr_attachments = processor.extract_ocr_attachments(msg)
-        if ocr_attachments:
-            from ocr_utils import extract_invoice_fields_from_attachments
-            attachment_fields = extract_invoice_fields_from_attachments(ocr_attachments)
+        normalized_for_ocr_gate = normalize_turkish_characters(f"{subject} {body}")
+        looks_invoice_related = any(
+            keyword in normalized_for_ocr_gate for keyword in EmailCategorizer.INVOICE_CONTEXT_KEYWORDS
+        )
+        if looks_invoice_related:
+            ocr_attachments = processor.extract_ocr_attachments(msg)
+            if ocr_attachments:
+                from ocr_utils import extract_invoice_fields_from_attachments
+                attachment_fields = extract_invoice_fields_from_attachments(ocr_attachments)
 
         # Check profanity
         if contains_profanity(f"{subject} {body}"):

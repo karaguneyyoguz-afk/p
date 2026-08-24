@@ -455,3 +455,47 @@
 {"timestamp": "2026-08-24T13:48:36.807467+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
 {"timestamp": "2026-08-24T13:48:36.814733+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
 {"timestamp": "2026-08-24T13:51:57.050695+03:00", "service": "panel_api", "action": "POST /api/mail-logs/clear", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-24T13:53:21.020664+03:00", "service": "gmail_imap", "action": "connect", "actor": "cli", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T13:53:23.270154+03:00", "service": "csm_api", "action": "auth", "actor": "cli", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T13:53:24.274578+03:00", "service": "csm_api", "action": "search_customer", "actor": "cli", "status": "success", "detail": "oguz.karaguney@tatilbudur.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T13:53:25.969991+03:00", "service": "csm_api", "action": "create_ticket", "actor": "cli", "status": "success", "detail": "#101942119", "duration_ms": null}
+{"timestamp": "2026-08-24T13:53:40.487242+03:00", "service": "gmail_imap", "action": "connect", "actor": "cli", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T13:53:42.972580+03:00", "service": "csm_api", "action": "search_customer", "actor": "cli", "status": "success", "detail": "oguz.karaguney@tatilbudur.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T13:53:44.504297+03:00", "service": "csm_api", "action": "create_ticket", "actor": "cli", "status": "success", "detail": "#101942121", "duration_ms": null}
+{"timestamp": "2026-08-24T14:07:31.684225+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T14:10:24.089148+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T14:17:05.934621+03:00", "service": "gmail_imap", "action": "connect", "actor": "cli", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T14:17:07.741673+03:00", "service": "csm_api", "action": "auth", "actor": "cli", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T14:17:08.609890+03:00", "service": "csm_api", "action": "search_customer", "actor": "cli", "status": "success", "detail": "oguz.karaguney@tatilbudur.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T14:17:09.772732+03:00", "service": "csm_api", "action": "create_ticket", "actor": "cli", "status": "success", "detail": "#101942228", "duration_ms": null}
+{"timestamp": "2026-08-24T14:19:37.702597+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T14:24:03.250998+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T14:24:07.779160+03:00", "service": "csm_api", "action": "auth", "actor": "sistem", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T14:24:09.072583+03:00", "service": "csm_api", "action": "search_customer", "actor": "sistem", "status": "success", "detail": "oguz.karaguney@tatilbudur.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T14:24:10.782269+03:00", "service": "csm_api", "action": "create_ticket", "actor": "sistem", "status": "success", "detail": "#101942261", "duration_ms": null}
+{"timestamp": "2026-08-24T14:39:03.078214+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T14:39:04.624733+03:00", "service": "csm_api", "action": "auth", "actor": "sistem", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T14:39:05.080209+03:00", "service": "csm_api", "action": "search_customer", "actor": "sistem", "status": "success", "detail": "mailer-daemon@googlemail.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T14:39:06.901007+03:00", "service": "csm_api", "action": "create_ticket", "actor": "sistem", "status": "success", "detail": "#101942323", "duration_ms": null}
+{"timestamp": "2026-08-24T14:54:04.179108+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T14:54:06.977726+03:00", "service": "csm_api", "action": "auth", "actor": "sistem", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T14:54:08.452379+03:00", "service": "csm_api", "action": "search_customer", "actor": "sistem", "status": "success", "detail": "mailer-daemon@googlemail.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T14:54:10.027093+03:00", "service": "csm_api", "action": "create_ticket", "actor": "sistem", "status": "success", "detail": "#101942409", "duration_ms": null}
+{"timestamp": "2026-08-24T15:09:04.883356+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T15:09:12.117373+03:00", "service": "csm_api", "action": "auth", "actor": "sistem", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T15:09:13.081477+03:00", "service": "csm_api", "action": "search_customer", "actor": "sistem", "status": "success", "detail": "passo@passo.com.tr: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T15:09:14.880693+03:00", "service": "csm_api", "action": "create_ticket", "actor": "sistem", "status": "failed", "detail": "HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T15:24:03.514935+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T15:39:03.742758+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T15:39:04.953630+03:00", "service": "csm_api", "action": "auth", "actor": "sistem", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T15:39:05.903653+03:00", "service": "csm_api", "action": "search_customer", "actor": "sistem", "status": "success", "detail": "oguz.karaguney@tatilbudur.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T15:39:07.335830+03:00", "service": "csm_api", "action": "create_ticket", "actor": "sistem", "status": "success", "detail": "#101942657", "duration_ms": null}
+{"timestamp": "2026-08-24T15:52:03.440463+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T15:52:03.447421+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T15:52:03.454942+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T15:52:03.463438+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T15:54:03.557538+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T15:54:05.157378+03:00", "service": "csm_api", "action": "auth", "actor": "sistem", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T15:54:05.609394+03:00", "service": "csm_api", "action": "search_customer", "actor": "sistem", "status": "success", "detail": "mailer-daemon@googlemail.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T15:54:07.732732+03:00", "service": "csm_api", "action": "create_ticket", "actor": "sistem", "status": "success", "detail": "#101942729", "duration_ms": null}
+{"timestamp": "2026-08-24T16:09:14.798578+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}

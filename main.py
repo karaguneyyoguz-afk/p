@@ -25,7 +25,7 @@ from validators import (
     is_vendor_finance_correspondence
 )
 from csm_api import CSMAPIClient, TicketPayloadBuilder
-from utils import clean_subject_line, clean_mailto_artifacts
+from utils import clean_subject_line, clean_mailto_artifacts, normalize_turkish_characters
 from logging_utils import record_mail_event
 
 
@@ -48,19 +48,45 @@ def process_email(
     subject, sender_email, sender_name, body = processor.extract_email_content(email_message)
     body = clean_mailto_artifacts(body)
 
-    # Read any image or PDF attachments (Vergi Levhası scan/export, kaşe
-    # photo) up front -- only fed into categorization if the mail body itself
-    # is missing invoice fields (see categorize's resolve_invoice_attributes).
-    attachment_fields = None
-    ocr_attachments = processor.extract_ocr_attachments(email_message)
-    if ocr_attachments:
-        from ocr_utils import extract_invoice_fields_from_attachments
-        attachment_fields = extract_invoice_fields_from_attachments(ocr_attachments)
-
     print("-" * 50)
     print(f"Gönderen: {sender_email} ({sender_name})")
     print(f"Konu: {subject}")
-    
+
+    # Bulk/newsletter mail (List-Unsubscribe header or unsubscribe-link
+    # boilerplate) never becomes a ticket and gets no automated reply --
+    # checked before anything else since it's the most unambiguous signal
+    # that this isn't a genuine customer message.
+    if processor.is_bulk_marketing_email(email_message, body):
+        print("📰 SONUÇ: Toplu pazarlama/haber bülteni maili tespit edildi, atlanıyor.")
+        record_mail_event(
+            event="email_processed",
+            status="skipped",
+            sender_email=sender_email,
+            subject=subject,
+            reason="Toplu pazarlama/haber bülteni maili (List-Unsubscribe/abonelik iptali tespit edildi)",
+            classification="bulk_marketing",
+            mail_body=body,
+        )
+        print("-" * 50 + "\n")
+        return
+
+    # Read any image or PDF attachments (Vergi Levhası scan/export, kaşe
+    # photo) up front -- only fed into categorization if the mail body itself
+    # is missing invoice fields (see categorize's resolve_invoice_attributes).
+    # Gated on invoice-context keywords so OCR doesn't run on unrelated PDF
+    # attachments (uçak/otobüs bileti vb.) -- those are routed to the right
+    # kırılım by subject/body keywords alone, no attribute extraction needed.
+    attachment_fields = None
+    normalized_for_ocr_gate = normalize_turkish_characters(f"{subject} {body}")
+    looks_invoice_related = any(
+        keyword in normalized_for_ocr_gate for keyword in EmailCategorizer.INVOICE_CONTEXT_KEYWORDS
+    )
+    if looks_invoice_related:
+        ocr_attachments = processor.extract_ocr_attachments(email_message)
+        if ocr_attachments:
+            from ocr_utils import extract_invoice_fields_from_attachments
+            attachment_fields = extract_invoice_fields_from_attachments(ocr_attachments)
+
     # Clean subject line
     clean_subject = clean_subject_line(subject)
     

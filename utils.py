@@ -4,8 +4,39 @@ Utilities Module
 Common utility functions for text processing, email handling, and data transformation.
 """
 
+import html as html_module
+import re
 from email.header import decode_header
 from typing import Tuple
+
+_HTML_SKIP_BLOCK_PATTERN = re.compile(r'<(script|style)\b[^>]*>.*?</\1>', re.IGNORECASE | re.DOTALL)
+_HTML_TAG_PATTERN = re.compile(r'<[^>]+>')
+_HTML_WHITESPACE_PATTERN = re.compile(r'[ \t]*\n[ \t]*\n[ \t\n]*')
+
+
+def html_to_text(html: str) -> str:
+    """
+    Strip an HTML email body down to its readable text.
+
+    Only used as a fallback for mail that has NO text/plain part (some
+    marketing/newsletter senders only send text/html, or send a single-part
+    HTML message) -- passing raw markup through as the ticket description or
+    into keyword-based classification is worse than a plain-text approximation:
+    tracking-pixel URLs and boilerplate ("Üyelikten Ayrıl" unsubscribe footers
+    etc.) can spuriously match classification keywords, and CSM's ticket API
+    rejects overly long/malformed descriptions (observed live: a 13KB raw-HTML
+    newsletter body got "ticket.description" HTTP 500 from CSM).
+    """
+    if not html:
+        return ""
+    text = _HTML_SKIP_BLOCK_PATTERN.sub(' ', html)
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</(p|div|tr|table|li|h[1-6])>', '\n', text, flags=re.IGNORECASE)
+    text = _HTML_TAG_PATTERN.sub(' ', text)
+    text = html_module.unescape(text)
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = _HTML_WHITESPACE_PATTERN.sub('\n\n', text)
+    return text.strip()
 
 
 def normalize_turkish_characters(text: str) -> str:

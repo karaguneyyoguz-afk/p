@@ -70,8 +70,8 @@ from config import (
     MAIL_CHARSET_FALLBACK
 )
 from utils import (
-    decode_email_header, extract_sender_info, 
-    clean_subject_line, normalize_turkish_characters
+    decode_email_header, extract_sender_info,
+    clean_subject_line, normalize_turkish_characters, html_to_text
 )
 from validators import (
     contains_profanity, extract_invoice_attributes, extract_payment_attributes,
@@ -129,6 +129,11 @@ def contains_thank_you_word(normalized_text: str) -> bool:
             return True
 
     return False
+
+
+BULK_UNSUBSCRIBE_KEYWORDS = [
+    "unsubscribe", "uyelikten ayril", "abonelikten cik", "listeden cik",
+]
 
 
 class EmailProcessor:
@@ -232,27 +237,62 @@ class EmailProcessor:
         raw_from = msg.get("From", "")
         sender_email, sender_name = extract_sender_info(raw_from)
         
+        def _decode_part(part) -> str:
+            charset = part.get_content_charset() or MAIL_CHARSET_DEFAULT
+            try:
+                return part.get_payload(decode=True).decode(charset, errors="ignore")
+            except Exception:
+                return part.get_payload(decode=True).decode(MAIL_CHARSET_FALLBACK, errors="ignore")
+
         body = ""
         if msg.is_multipart():
-            # Extract first text/plain part (ignore attachments)
+            # Extract first text/plain part (ignore attachments); if there is
+            # no text/plain alternative at all (some marketing senders only
+            # include text/html), fall back to the HTML part with tags
+            # stripped rather than leaving the body empty.
+            html_fallback = ""
             for part in msg.walk():
-                if part.get_content_type() == "text/plain":
-                    if "attachment" not in str(part.get("Content-Disposition", "")):
-                        charset = part.get_content_charset() or MAIL_CHARSET_DEFAULT
-                        try:
-                            body = part.get_payload(decode=True).decode(charset, errors="ignore")
-                        except Exception:
-                            body = part.get_payload(decode=True).decode(MAIL_CHARSET_FALLBACK, errors="ignore")
-                        break
+                content_type = part.get_content_type()
+                if "attachment" in str(part.get("Content-Disposition", "")):
+                    continue
+                if content_type == "text/plain":
+                    body = _decode_part(part)
+                    break
+                if content_type == "text/html" and not html_fallback:
+                    html_fallback = html_to_text(_decode_part(part))
+            if not body:
+                body = html_fallback
         else:
-            # Single part message
-            charset = msg.get_content_charset() or MAIL_CHARSET_DEFAULT
-            try:
-                body = msg.get_payload(decode=True).decode(charset, errors="ignore")
-            except Exception:
-                body = msg.get_payload(decode=True).decode(MAIL_CHARSET_FALLBACK, errors="ignore")
+            # Single part message -- strip tags if it's actually HTML (some
+            # senders send a single text/html part with no plain-text
+            # alternative at all).
+            raw_body = _decode_part(msg)
+            body = html_to_text(raw_body) if msg.get_content_type() == "text/html" else raw_body
         
         return subject, sender_email, sender_name, body
+
+    @staticmethod
+    def is_bulk_marketing_email(msg: email.message.Message, body: str) -> bool:
+        """Detect bulk/marketing/newsletter mail -- these should never become
+        a support ticket or get an automated reply (replying to a mass
+        mailing list is pointless and the "sender" often can't even receive
+        replies).
+
+        The List-Unsubscribe header (RFC 2369) is the industry-standard
+        signal virtually every legitimate marketing/newsletter platform sets;
+        checked first since it's unambiguous. Falls back to unsubscribe-link
+        boilerplate text for senders that skip the header.
+
+        Not a generic spam filter -- a real customer email asking to cancel
+        their own membership ("üyeliğimi iptal etmek istiyorum") doesn't
+        contain these markers and is unaffected. Added after a Passo
+        newsletter's "Üyelikten Ayrıl" footer collided with the
+        ONLINE_ISLEMLER classification keyword list and got miscategorized
+        as a membership-process ticket (observed live)."""
+        if msg.get("List-Unsubscribe"):
+            return True
+        normalized = normalize_turkish_characters(body)
+        return any(keyword in normalized for keyword in BULK_UNSUBSCRIBE_KEYWORDS)
 
     @staticmethod
     def extract_ocr_attachments(msg: email.message.Message) -> List[Tuple[bytes, str]]:
