@@ -499,3 +499,5 @@
 {"timestamp": "2026-08-24T15:54:05.609394+03:00", "service": "csm_api", "action": "search_customer", "actor": "sistem", "status": "success", "detail": "mailer-daemon@googlemail.com: boş yanıt", "duration_ms": null}
 {"timestamp": "2026-08-24T15:54:07.732732+03:00", "service": "csm_api", "action": "create_ticket", "actor": "sistem", "status": "success", "detail": "#101942729", "duration_ms": null}
 {"timestamp": "2026-08-24T16:09:14.798578+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T16:24:03.183162+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T16:37:07.478584+03:00", "service": "gmail_imap", "action": "connect", "actor": "cli", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
