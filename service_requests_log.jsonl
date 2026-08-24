@@ -413,3 +413,23 @@
 {"timestamp": "2026-08-24T12:09:44.530169+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
 {"timestamp": "2026-08-24T12:09:44.581515+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
 {"timestamp": "2026-08-24T12:09:44.589636+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T13:11:14.075846+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T13:11:16.466813+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T13:11:16.470586+03:00", "service": "csm_api", "action": "search_customer", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T13:11:17.008369+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T13:11:17.025649+03:00", "service": "csm_api", "action": "create_ticket", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T13:11:20.293685+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T13:11:20.295196+03:00", "service": "csm_api", "action": "search_customer", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T13:11:20.738164+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T13:11:20.740352+03:00", "service": "csm_api", "action": "create_ticket", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T13:11:23.738111+03:00", "service": "panel_api", "action": "POST /api/run", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-24T13:14:40.176589+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T13:14:41.508798+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T13:14:41.510773+03:00", "service": "csm_api", "action": "search_customer", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T13:14:42.257191+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T13:14:42.260106+03:00", "service": "csm_api", "action": "create_ticket", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T13:14:45.069995+03:00", "service": "panel_api", "action": "POST /api/run", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-24T13:15:43.568406+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T13:15:43.575244+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T13:15:43.627358+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T13:15:43.636221+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}

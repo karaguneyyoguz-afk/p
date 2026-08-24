@@ -20,6 +20,8 @@ _TESSDATA_DIR = os.path.join(_PROJECT_DIR, "tessdata")
 _TESSERACT_CMD = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 IMAGE_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/tiff", "image/bmp", "image/webp"}
+PDF_CONTENT_TYPES = {"application/pdf"}
+ATTACHMENT_CONTENT_TYPES = IMAGE_CONTENT_TYPES | PDF_CONTENT_TYPES
 
 
 def is_ocr_available() -> bool:
@@ -71,9 +73,47 @@ def extract_text_from_image(image_bytes: bytes) -> str:
             os.remove(tmp_path)
 
 
-def extract_text_from_images(image_bytes_list) -> str:
-    """OCR multiple attachments and join the results with blank lines between
-    them (kept separate so downstream per-document label parsing doesn't run
-    two unrelated documents' text together)."""
-    texts = [extract_text_from_image(b) for b in image_bytes_list]
+def extract_text_from_pdf(pdf_bytes: bytes) -> str:
+    """Get text out of a PDF attachment (Vergi Levhası is often sent as a PDF
+    export, not just a photo). Tries each page's embedded text layer first
+    (instant, exact -- covers PDFs generated digitally, e.g. from GİB's
+    e-devlet portal); only rasterizes and OCRs a page when it has no usable
+    text layer (a scanned/photographed page saved as PDF)."""
+    if not pdf_bytes:
+        return ""
+    try:
+        import pymupdf
+    except ImportError:
+        print("⚠️ OCR atlandı: pymupdf kurulu değil, PDF okunamıyor.")
+        return ""
+
+    texts = []
+    try:
+        with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
+            for page in doc:
+                page_text = page.get_text().strip()
+                if len(page_text) < 20:  # no meaningful text layer -- likely a scan
+                    pix = page.get_pixmap(dpi=300)
+                    page_text = extract_text_from_image(pix.tobytes("png"))
+                texts.append(page_text)
+    except Exception as e:
+        print(f"⚠️ PDF okunamadı: {e}")
+        return ""
+
+    return "\n\n".join(t for t in texts if t.strip())
+
+
+def extract_text_from_attachment(payload: bytes, content_type: str) -> str:
+    """Dispatch a single attachment's bytes to the right extractor by content type."""
+    if content_type in PDF_CONTENT_TYPES:
+        return extract_text_from_pdf(payload)
+    return extract_text_from_image(payload)
+
+
+def extract_text_from_attachments(attachments) -> str:
+    """OCR/read multiple attachments -- attachments: iterable of
+    (payload_bytes, content_type) tuples -- and join the results with blank
+    lines between them (kept separate so downstream per-document label
+    parsing doesn't run two unrelated documents' text together)."""
+    texts = [extract_text_from_attachment(payload, ctype) for payload, ctype in attachments]
     return "\n\n".join(t for t in texts if t.strip())

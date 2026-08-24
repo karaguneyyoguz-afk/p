@@ -255,28 +255,30 @@ class EmailProcessor:
         return subject, sender_email, sender_name, body
 
     @staticmethod
-    def extract_image_attachments(msg: email.message.Message) -> List[bytes]:
-        """Pull out raw bytes of any image attachments/inline images (customers
-        sometimes send a Vergi Levhası scan or a company kaşe photo instead of
-        typing the invoice info into the mail body -- see ocr_utils.py, which
-        OCRs these before invoice-attribute extraction)."""
-        from ocr_utils import IMAGE_CONTENT_TYPES
+    def extract_ocr_attachments(msg: email.message.Message) -> List[Tuple[bytes, str]]:
+        """Pull out raw bytes (+ content type) of any image/PDF attachments or
+        inline images (customers sometimes send a Vergi Levhası scan/export or
+        a company kaşe photo instead of typing the invoice info into the mail
+        body -- see ocr_utils.py, which reads these before invoice-attribute
+        extraction)."""
+        from ocr_utils import ATTACHMENT_CONTENT_TYPES
 
-        images: List[bytes] = []
+        attachments: List[Tuple[bytes, str]] = []
         if not msg.is_multipart():
-            return images
+            return attachments
 
         for part in msg.walk():
-            if part.get_content_type() not in IMAGE_CONTENT_TYPES:
+            content_type = part.get_content_type()
+            if content_type not in ATTACHMENT_CONTENT_TYPES:
                 continue
             try:
                 payload = part.get_payload(decode=True)
             except Exception:
                 continue
             if payload:
-                images.append(payload)
+                attachments.append((payload, content_type))
 
-        return images
+        return attachments
 
 
 class EmailCategorizer:

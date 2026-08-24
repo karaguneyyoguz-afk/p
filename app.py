@@ -257,10 +257,10 @@ def process_email_manual():
         subject, sender_email, sender_name, body = processor.extract_email_content(msg)
 
         attachment_text = ""
-        image_attachments = processor.extract_image_attachments(msg)
-        if image_attachments:
-            from ocr_utils import extract_text_from_images
-            attachment_text = extract_text_from_images(image_attachments)
+        ocr_attachments = processor.extract_ocr_attachments(msg)
+        if ocr_attachments:
+            from ocr_utils import extract_text_from_attachments
+            attachment_text = extract_text_from_attachments(ocr_attachments)
 
         # Check profanity
         if contains_profanity(f"{subject} {body}"):
