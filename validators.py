@@ -535,6 +535,20 @@ _VERGI_LEVHASI_LABEL_STOP = (
 )
 
 
+# Vergi/TC Kimlik No kutulari genelde bir barkod grafiginin hemen yaninda/
+# altinda basili kucuk rakamlar iceriyor -- OCR bu rakamlari harflerle
+# karistirabiliyor (0/O, 1/I/l gibi klasik OCR karisiklikari). Sadece rakam
+# alanlarinda (isim/adres gibi harf beklenen alanlarda DEGIL) bu karakterleri
+# rakama cevirerek "\D" ile atilip haneyi kisaltmalarini onluyoruz. Public
+# (underscore'suz) -- ocr_utils.py'nin PDF barkod-bolgesi OCR sonucunu
+# temizlerken de kullanmasi icin disari aciliyor.
+_OCR_DIGIT_CONFUSION_MAP = str.maketrans({"O": "0", "o": "0", "I": "1", "l": "1"})
+
+
+def normalize_ocr_digit_confusions(text: str) -> str:
+    return text.translate(_OCR_DIGIT_CONFUSION_MAP)
+
+
 def _vergi_levhasi_label_value(ocr_text: str, label_pattern: str) -> Optional[str]:
     match = re.search(
         label_pattern + r'\s*[:\-]?\s*(.+?)' + _VERGI_LEVHASI_LABEL_STOP,
@@ -547,7 +561,7 @@ def _vergi_levhasi_label_value(ocr_text: str, label_pattern: str) -> Optional[st
     return value or None
 
 
-def _extract_vergi_levhasi_fields(ocr_text: str) -> dict:
+def extract_vergi_levhasi_fields_from_text(ocr_text: str) -> dict:
     """Parse a 'VERGİ LEVHASI' (Turkish tax certificate) scan's OCR text into
     raw invoice fields. Returns a dict with any of person_name, company_name,
     tc_value, tax_value, tax_office, address that could be found -- missing
@@ -568,13 +582,13 @@ def _extract_vergi_levhasi_fields(ocr_text: str) -> dict:
 
     tax_value_raw = _vergi_levhasi_label_value(ocr_text, r'VERGİ\s*KİMLİK\s*NO')
     if tax_value_raw:
-        tax_digits = re.sub(r'\D', '', tax_value_raw)
+        tax_digits = re.sub(r'\D', '', normalize_ocr_digit_confusions(tax_value_raw))
         if len(tax_digits) == 10:
             fields["tax_value"] = tax_digits
 
     tc_value_raw = _vergi_levhasi_label_value(ocr_text, r'TC\s*KİMLİK\s*NO')
     if tc_value_raw:
-        tc_digits = re.sub(r'\D', '', tc_value_raw)
+        tc_digits = re.sub(r'\D', '', normalize_ocr_digit_confusions(tc_value_raw))
         if len(tc_digits) == 11:
             fields["tc_value"] = tc_digits
 
@@ -597,7 +611,7 @@ _COMPANY_SUFFIX_PATTERN = re.compile(
 )
 
 
-def _extract_kase_fields(ocr_text: str) -> dict:
+def extract_kase_fields_from_text(ocr_text: str) -> dict:
     """Parse a company kaşe (rubber stamp) photo's OCR text: company name,
     address, and a '<Vergi Dairesi> V.D.: <VKN>' line.
 
@@ -639,9 +653,9 @@ def _extract_kase_fields(ocr_text: str) -> dict:
     return fields
 
 
-def _build_invoice_attributes_from_fields(fields: dict, sender_email: str) -> Tuple[List[dict], List[str]]:
+def build_invoice_attributes_from_fields(fields: dict, sender_email: str) -> Tuple[List[dict], List[str]]:
     """Shared attribute-list builder used by the OCR extraction path
-    (_extract_vergi_levhasi_fields / _extract_kase_fields feed into this).
+    (extract_vergi_levhasi_fields_from_text / extract_kase_fields_from_text feed into this).
     Mirrors the attribute id scheme extract_invoice_attributes uses for
     body-text extraction, so tickets look identical regardless of source."""
     attribute_list: List[dict] = []
@@ -726,22 +740,6 @@ def _build_invoice_attributes_from_fields(fields: dict, sender_email: str) -> Tu
     })
 
     return attribute_list, missing_fields
-
-
-def extract_invoice_attributes_from_attachment(ocr_text: str, sender_email: str) -> Tuple[List[dict], List[str]]:
-    """Extract invoice attributes from OCR'd attachment text (Vergi Levhası
-    scan or kaşe/stamp photo). Tries the Vergi Levhası label parser first
-    since it's the more structured/reliable source; falls back to the kaşe
-    parser, merging in anything the first pass missed."""
-    if not ocr_text or not ocr_text.strip():
-        return [], ["Şirket Adı veya Şahıs Adı", "TC Kimlik Numarası veya VKN", "Fatura Adresi"]
-
-    fields = _extract_vergi_levhasi_fields(ocr_text)
-    kase_fields = _extract_kase_fields(ocr_text)
-    for key, value in kase_fields.items():
-        fields.setdefault(key, value)
-
-    return _build_invoice_attributes_from_fields(fields, sender_email)
 
 
 _INVOICE_SLOT_CODES = [

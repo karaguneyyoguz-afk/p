@@ -48,14 +48,14 @@ def process_email(
     subject, sender_email, sender_name, body = processor.extract_email_content(email_message)
     body = clean_mailto_artifacts(body)
 
-    # OCR/read any image or PDF attachments (Vergi Levhası scan/export, kaşe
+    # Read any image or PDF attachments (Vergi Levhası scan/export, kaşe
     # photo) up front -- only fed into categorization if the mail body itself
     # is missing invoice fields (see categorize's resolve_invoice_attributes).
-    attachment_text = ""
+    attachment_fields = None
     ocr_attachments = processor.extract_ocr_attachments(email_message)
     if ocr_attachments:
-        from ocr_utils import extract_text_from_attachments
-        attachment_text = extract_text_from_attachments(ocr_attachments)
+        from ocr_utils import extract_invoice_fields_from_attachments
+        attachment_fields = extract_invoice_fields_from_attachments(ocr_attachments)
 
     print("-" * 50)
     print(f"Gönderen: {sender_email} ({sender_name})")
@@ -106,7 +106,7 @@ def process_email(
         return
 
     # Categorize email
-    categorization = categorizer.categorize(clean_subject, body, sender_email, attachment_text)
+    categorization = categorizer.categorize(clean_subject, body, sender_email, attachment_fields)
     print(f"📌 Sınıflandırma: {categorization['classification']}")
 
     # Not: kirilim ne olursa olsun, mailde "acil"/"opsiyon" gibi aciliyet

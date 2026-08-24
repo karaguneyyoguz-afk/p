@@ -75,7 +75,7 @@ from utils import (
 )
 from validators import (
     contains_profanity, extract_invoice_attributes, extract_payment_attributes,
-    extract_option_deadline, extract_invoice_attributes_from_attachment,
+    extract_option_deadline, build_invoice_attributes_from_fields,
     merge_invoice_attribute_results
 )
 from service_log import record_service_event
@@ -292,7 +292,7 @@ class EmailCategorizer:
     INVOICE_KEYWORDS = ["fatura", "efatura", "e-fatura"]
 
     INVOICE_MODIFICATION_KEYWORDS = [
-        "degisiklik", "duzeltme", "revize", "onay",
+        "degisiklik", "degistir", "duzeltme", "revize", "onay",
         "yeniden duzenle", "yeniden kes", "bu bilgilere kes",
         "dogrusu bu sekildedir", "bilgilere kesil"
     ]
@@ -972,7 +972,7 @@ class EmailCategorizer:
     ]
 
     @staticmethod
-    def categorize(subject: str, body: str, sender_email: str, attachment_text: str = "") -> Dict:
+    def categorize(subject: str, body: str, sender_email: str, attachment_fields: Optional[dict] = None) -> Dict:
         """
         Categorize email and determine ticket type/category.
 
@@ -980,9 +980,11 @@ class EmailCategorizer:
             subject: Email subject line
             body: Email body content
             sender_email: Sender's email address
-            attachment_text: OCR'd text from image attachments (Vergi Levhası
-                scan, kaşe photo), if any -- see ocr_utils.py. Used to fill
-                invoice attribute fields the mail body itself didn't provide.
+            attachment_fields: Invoice fields (company_name/person_name/
+                tax_office/tax_value/tc_value/address) already extracted from
+                image/PDF attachments -- see
+                ocr_utils.extract_invoice_fields_from_attachments(). Used to
+                fill in whatever the mail body itself didn't provide.
 
         Returns:
             Dictionary containing ticket categorization info
@@ -991,10 +993,10 @@ class EmailCategorizer:
 
         def resolve_invoice_attributes(text: str) -> Tuple[List[dict], List[str]]:
             """extract_invoice_attributes() on the mail body, with any fields
-            it couldn't find filled in from an OCR'd attachment (if present)."""
+            it couldn't find filled in from an attachment (if present)."""
             result = extract_invoice_attributes(text, sender_email)
-            if result[1] and attachment_text.strip():
-                attachment_result = extract_invoice_attributes_from_attachment(attachment_text, sender_email)
+            if result[1] and attachment_fields:
+                attachment_result = build_invoice_attributes_from_fields(attachment_fields, sender_email)
                 result = merge_invoice_attribute_results(result, attachment_result)
             return result
         normalized_text = normalize_turkish_characters(combined_text)
