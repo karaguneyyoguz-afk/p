@@ -255,7 +255,13 @@ def process_email_manual():
         
         msg = processor.fetch_email(email_id.encode())
         subject, sender_email, sender_name, body = processor.extract_email_content(msg)
-        
+
+        attachment_text = ""
+        image_attachments = processor.extract_image_attachments(msg)
+        if image_attachments:
+            from ocr_utils import extract_text_from_images
+            attachment_text = extract_text_from_images(image_attachments)
+
         # Check profanity
         if contains_profanity(f"{subject} {body}"):
             record_mail_event(
@@ -275,7 +281,7 @@ def process_email_manual():
         
         # Categorize
         categorizer = EmailCategorizer()
-        categorization = categorizer.categorize(subject, body, sender_email)
+        categorization = categorizer.categorize(subject, body, sender_email, attachment_text)
         
         # Check missing fields
         if categorization.get('missing_fields'):

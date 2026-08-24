@@ -60,3 +60,6 @@ frontend/.vite/
 ENIGMA_PLAN.md
 # Runtime session storage
 flask_session/
+
+# Tesseract OCR language data (downloaded, not source)
+tessdata/

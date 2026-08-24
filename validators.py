@@ -6,7 +6,7 @@ and email content validation.
 """
 
 import re
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 from config import PROFANITY_WORDS
 from utils import normalize_turkish_characters
 
@@ -519,6 +519,274 @@ def extract_invoice_attributes(
         })
     
     return attribute_list, missing_fields
+
+
+# Vergi Levhası'nın sabit kutu etiketleri -- musteri fatura bilgisini duz
+# metin yerine bu resmi belgenin taramasini ekleyerek gonderdiginde, OCR
+# ciktisindaki (buyuk harfli, iki sutunlu duzenden gelen) etiketleri arar.
+# Her etiketin degeri, bir SONRAKI bilinen etiket baslayana kadar olan metin
+# olarak yakalanir -- OCR satir/sutun sirasini karistirsa bile (iki sutunlu
+# tablo duzeni nedeniyle mumkun), her etiket kendi degerine bagimsiz olarak
+# aranır.
+_VERGI_LEVHASI_LABEL_STOP = (
+    r'(?=TİCARET\s*ÜNVANI|ADI\s*SOYADI|VERGİ\s*DAİRESİ|VERGİ\s*KİMLİK\s*NO|'
+    r'TC\s*KİMLİK\s*NO|İŞ\s*YERİ\s*ADRESİ|VERGİ\s*TÜRÜ|İŞE\s*BAŞLAMA|'
+    r'ANA\s*FAALİYET|MÜKELLEFİN|\n\s*\n|$)'
+)
+
+
+def _vergi_levhasi_label_value(ocr_text: str, label_pattern: str) -> Optional[str]:
+    match = re.search(
+        label_pattern + r'\s*[:\-]?\s*(.+?)' + _VERGI_LEVHASI_LABEL_STOP,
+        ocr_text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if not match:
+        return None
+    value = re.sub(r'\s+', ' ', match.group(1)).strip(" :-\n")
+    return value or None
+
+
+def _extract_vergi_levhasi_fields(ocr_text: str) -> dict:
+    """Parse a 'VERGİ LEVHASI' (Turkish tax certificate) scan's OCR text into
+    raw invoice fields. Returns a dict with any of person_name, company_name,
+    tc_value, tax_value, tax_office, address that could be found -- missing
+    keys are simply absent, callers treat this as best-effort."""
+    fields: dict = {}
+
+    company_name = _vergi_levhasi_label_value(ocr_text, r'TİCARET\s*ÜNVANI')
+    if company_name and not _is_placeholder_value(company_name):
+        fields["company_name"] = company_name
+    else:
+        person_name = _vergi_levhasi_label_value(ocr_text, r'ADI\s*SOYADI')
+        if person_name and not _is_placeholder_value(person_name):
+            fields["person_name"] = person_name
+
+    tax_office = _vergi_levhasi_label_value(ocr_text, r'VERGİ\s*DAİRESİ')
+    if tax_office and not _is_placeholder_value(tax_office):
+        fields["tax_office"] = re.sub(r'\s*MÜDÜRLÜĞÜ\s*$', '', tax_office, flags=re.IGNORECASE).strip()
+
+    tax_value_raw = _vergi_levhasi_label_value(ocr_text, r'VERGİ\s*KİMLİK\s*NO')
+    if tax_value_raw:
+        tax_digits = re.sub(r'\D', '', tax_value_raw)
+        if len(tax_digits) == 10:
+            fields["tax_value"] = tax_digits
+
+    tc_value_raw = _vergi_levhasi_label_value(ocr_text, r'TC\s*KİMLİK\s*NO')
+    if tc_value_raw:
+        tc_digits = re.sub(r'\D', '', tc_value_raw)
+        if len(tc_digits) == 11:
+            fields["tc_value"] = tc_digits
+
+    address = _vergi_levhasi_label_value(ocr_text, r'İŞ\s*YERİ\s*ADRESİ')
+    if address and not _is_placeholder_value(address) and len(address) > 5:
+        fields["address"] = address
+
+    return fields
+
+
+# Kase/damga formatinda genelde: ilk satir(lar) sirket unvani, sonraki
+# satir(lar) adres, en altta "<Vergi Dairesi Adi> V.D.: <10 haneli VKN>"
+# kalibi. Musteriler "faturayi bu adrese kesmeyiniz/kesmeniz ricadir" gibi
+# bir metinle birlikte bu kase fotografini gonderiyor.
+_KASE_VD_PATTERN = re.compile(
+    r'([A-ZÇĞİÖŞÜa-zçğıöşü][A-ZÇĞİÖŞÜa-zçğıöşü\s]{1,40}?)\s*V\.?\s*D\.?\s*[:.]?\s*(\d{10})\b'
+)
+_COMPANY_SUFFIX_PATTERN = re.compile(
+    r'\b(?:A\.?Ş\.?|LTD\.?|ŞTİ\.?|TİC\.?|TURİZM|TAŞIMACILIK|SEYAHAT)\b', re.IGNORECASE
+)
+
+
+def _extract_kase_fields(ocr_text: str) -> dict:
+    """Parse a company kaşe (rubber stamp) photo's OCR text: company name,
+    address, and a '<Vergi Dairesi> V.D.: <VKN>' line.
+
+    Matched line-by-line (not against the whole blob) -- searching the whole
+    text at once lets the non-greedy-but-whitespace-tolerant name capture in
+    _KASE_VD_PATTERN jump backwards across an EARLIER line that happens to
+    also start with an uppercase letter, swallowing unrelated address text
+    into the "tax office" capture."""
+    fields: dict = {}
+    lines = [ln.strip() for ln in ocr_text.splitlines() if ln.strip()]
+
+    vd_line_idx = None
+    for idx, line in enumerate(lines):
+        vd_match = _KASE_VD_PATTERN.search(line)
+        if vd_match:
+            vd_line_idx = idx
+            tax_office = vd_match.group(1).strip()
+            if tax_office and not _is_placeholder_value(tax_office):
+                fields["tax_office"] = tax_office
+            fields["tax_value"] = vd_match.group(2)
+            break
+
+    # Company name usually spans the line(s) before the legal-suffix line
+    # (ör. "TATİLİMÖNEMLİ" \n "TURİZM TAŞIMACILIK LTD. ŞTİ." -- brand name on
+    # its own line, legal form below it), so everything up to AND INCLUDING
+    # the first suffix-bearing line is treated as the name; whatever's left
+    # between that and the V.D. line is the address.
+    body_lines = lines[:vd_line_idx] if vd_line_idx is not None else lines
+    suffix_idx = next(
+        (i for i, line in enumerate(body_lines) if _COMPANY_SUFFIX_PATTERN.search(line)),
+        None,
+    )
+    if suffix_idx is not None:
+        fields["company_name"] = " ".join(body_lines[:suffix_idx + 1]).strip()
+        address = " ".join(body_lines[suffix_idx + 1:]).strip()
+        if len(address) > 5:
+            fields["address"] = address
+
+    return fields
+
+
+def _build_invoice_attributes_from_fields(fields: dict, sender_email: str) -> Tuple[List[dict], List[str]]:
+    """Shared attribute-list builder used by the OCR extraction path
+    (_extract_vergi_levhasi_fields / _extract_kase_fields feed into this).
+    Mirrors the attribute id scheme extract_invoice_attributes uses for
+    body-text extraction, so tickets look identical regardless of source."""
+    attribute_list: List[dict] = []
+    missing_fields: List[str] = []
+
+    person_name = fields.get("person_name")
+    company_name = fields.get("company_name")
+    selected_type = None
+
+    if company_name:
+        selected_type = "company"
+        attribute_list.append({
+            "attribute": {"id": 100054902, "shortCode": "SIRKET_ADI_SAHIS_ADI"},
+            "lovItem": {"id": 100000070, "name": "Şirket Adı", "shortCode": "SIRKET_ADI"},
+        })
+        attribute_list.append({
+            "attribute": {"id": 100000238, "shortCode": "SIRKET_ADI"},
+            "textValue": company_name,
+        })
+    elif person_name:
+        selected_type = "person"
+        attribute_list.append({
+            "attribute": {"id": 100054902, "shortCode": "SIRKET_ADI_SAHIS_ADI"},
+            "lovItem": {"id": 100054903, "name": "Şahıs Adı", "shortCode": "SAHIS_ADI"},
+        })
+        attribute_list.append({
+            "attribute": {"id": 100000237, "shortCode": "SAHIS_ADI"},
+            "textValue": person_name,
+        })
+    else:
+        missing_fields.append("Şirket Adı veya Şahıs Adı")
+
+    tc_value = fields.get("tc_value") if selected_type != "company" else None
+    tax_value = fields.get("tax_value") if selected_type != "person" else None
+
+    if tc_value and is_valid_turkish_id(tc_value):
+        attribute_list.append({
+            "attribute": {"id": 100054901, "shortCode": "VERGI_NUMARASI_TC_NUMARASI"},
+            "lovItem": {"id": 100054900, "name": "TC Kimlik Numarası", "shortCode": "TC_KIMLIK_NUMARASI"},
+        })
+        attribute_list.append({
+            "attribute": {"id": 100000236, "shortCode": "TC_KIMLIK_NUMARASI"},
+            "textValue": int(tc_value),
+        })
+    elif tax_value and is_valid_tax_id(tax_value):
+        attribute_list.append({
+            "attribute": {"id": 100054901, "shortCode": "VERGI_NUMARASI_TC_NUMARASI"},
+            "lovItem": {"id": 100000066, "name": "Vergi Kimlik Numarası", "shortCode": "VERGI_KIMLIK_NUMARASI"},
+        })
+        attribute_list.append({
+            "attribute": {"id": 100000235, "shortCode": "VERGI_KIMLIK_NUMARASI"},
+            "textValue": int(tax_value),
+        })
+    elif selected_type == "person":
+        missing_fields.append("TC Kimlik Numarası")
+    elif selected_type == "company":
+        missing_fields.append("Vergi Kimlik Numarası (VKN)")
+    else:
+        missing_fields.append("TC Kimlik Numarası veya VKN")
+
+    tax_office = fields.get("tax_office")
+    if tax_office:
+        attribute_list.append({
+            "attribute": {"id": 100000232, "shortCode": "VERGI_DAIRESI"},
+            "textValue": tax_office,
+        })
+    elif tax_value:
+        missing_fields.append("Vergi Dairesi")
+
+    address = fields.get("address")
+    if address:
+        attribute_list.append({
+            "attribute": {"id": 100000233, "shortCode": "FATURA_ADRESI"},
+            "textValue": address,
+        })
+    else:
+        missing_fields.append("Fatura Adresi")
+
+    attribute_list.append({
+        "attribute": {"id": 100000234, "shortCode": "E-_POSTA"},
+        "textValue": sender_email,
+    })
+
+    return attribute_list, missing_fields
+
+
+def extract_invoice_attributes_from_attachment(ocr_text: str, sender_email: str) -> Tuple[List[dict], List[str]]:
+    """Extract invoice attributes from OCR'd attachment text (Vergi Levhası
+    scan or kaşe/stamp photo). Tries the Vergi Levhası label parser first
+    since it's the more structured/reliable source; falls back to the kaşe
+    parser, merging in anything the first pass missed."""
+    if not ocr_text or not ocr_text.strip():
+        return [], ["Şirket Adı veya Şahıs Adı", "TC Kimlik Numarası veya VKN", "Fatura Adresi"]
+
+    fields = _extract_vergi_levhasi_fields(ocr_text)
+    kase_fields = _extract_kase_fields(ocr_text)
+    for key, value in kase_fields.items():
+        fields.setdefault(key, value)
+
+    return _build_invoice_attributes_from_fields(fields, sender_email)
+
+
+_INVOICE_SLOT_CODES = [
+    ({"SIRKET_ADI", "SAHIS_ADI"}, ("Şirket Adı veya Şahıs Adı",)),
+    (
+        {"VERGI_KIMLIK_NUMARASI", "TC_KIMLIK_NUMARASI"},
+        (
+            "TC Kimlik Numarası", "Vergi Kimlik Numarası (VKN)", "TC Kimlik Numarası veya VKN",
+            "Lütfen geçerli bir TC Kimlik Numarası giriniz",
+            "Lütfen geçerli bir Vergi Kimlik Numarası (VKN) giriniz",
+        ),
+    ),
+    ({"VERGI_DAIRESI"}, ("Vergi Dairesi",)),
+    ({"FATURA_ADRESI"}, ("Fatura Adresi",)),
+]
+
+
+def merge_invoice_attribute_results(
+    body_result: Tuple[List[dict], List[str]],
+    attachment_result: Tuple[List[dict], List[str]],
+) -> Tuple[List[dict], List[str]]:
+    """Fill gaps left by body-text invoice extraction with whatever an
+    attachment (Vergi Levhası/kaşe OCR) extraction found, without overwriting
+    anything the email body already provided."""
+    body_attrs, body_missing = body_result
+    attach_attrs, _ = attachment_result
+
+    body_codes = {a["attribute"]["shortCode"] for a in body_attrs}
+    merged_attrs = list(body_attrs)
+    merged_missing = list(body_missing)
+
+    for slot_codes, missing_labels in _INVOICE_SLOT_CODES:
+        if body_codes & slot_codes:
+            continue
+        slot_filled = False
+        for a in attach_attrs:
+            code = a["attribute"]["shortCode"]
+            lov_code = a.get("lovItem", {}).get("shortCode")
+            if code in slot_codes or lov_code in slot_codes:
+                merged_attrs.append(a)
+                slot_filled = True
+        if slot_filled:
+            merged_missing = [m for m in merged_missing if m not in missing_labels]
+
+    return merged_attrs, merged_missing
 
 
 def extract_payment_attributes(text: str, required: bool = False) -> Tuple[List[dict], List[str]]:

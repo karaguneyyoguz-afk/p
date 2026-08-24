@@ -6,10 +6,12 @@ desktop RPA script (task/rpa_otomasyon.py, task/rpa.txt) into the Enigma
 panel so it runs through the web UI instead of a local Python script with a
 hardcoded bearer token and hardcoded reporter identity.
 
-Environment: currently PRE-PROD ONLY (see BULK_SHIFT_ENV). The original
-script's pre-prod category/channel/ticketType ids are NOT valid in
-production — PROD_MAPPINGS must be filled in with verified production ids,
-and BULK_SHIFT_ENV switched to 'prod', before this can create real tickets.
+Environment: defaults to PRE-PROD (see BULK_SHIFT_ENV). PROD_MAPPINGS now
+carries the same category/channel/ticketType ids as PREPROD_MAPPINGS —
+cross-checked against config.py's production category ids (identical) — but
+this has not yet been confirmed end-to-end with a real production request.
+Verify with one row before trusting it for a full batch, then set
+BULK_SHIFT_ENV=prod to actually target production.
 """
 
 import os
@@ -123,8 +125,35 @@ PREPROD_MAPPINGS = {
     },
 }
 
-# Fill these in with verified PRODUCTION ids before setting BULK_SHIFT_ENV=prod.
-PROD_MAPPINGS: Dict[str, Dict[str, Any]] = {}
+# Same category/channel/ticketType ids as PREPROD_MAPPINGS above — cross-checked
+# against config.py's CATEGORY_SHIFT/SUB_CATEGORY_SHIFT_*/TICKET_TYPE_RESERVATION/
+# CATEGORY_OTHER_OPERATIONS/SUB_CATEGORY_OTHER_OPERATIONS_PAYMENT_COMPLETION, which
+# are the ids the main app already uses when creating real tickets against
+# tatilbudur-api.cloudcsmetiya.com (production). They match exactly, and the
+# priorityLevel uuid in build_bulk_ticket_payload also matches the one csm_api.py
+# uses in production — so this tenant's category/channel/priority reference data
+# is shared between preprod and production. Not yet confirmed end-to-end with a
+# real production request — verify with one row before relying on this.
+PROD_MAPPINGS: Dict[str, Dict[str, Any]] = {
+    "OPERASYON_KAYNAKLI": {
+        "channel": {"shortCode": "CAGRI_MERKEZI", "name": "Çağrı Merkezi", "id": 100000041, "uuid": "9a4dd8ef-045a-4f57-8c2c-8b0fc209d367"},
+        "ticketType": {"shortCode": "REZERVASYON_ISLEMLERI", "name": "Backoffice İşlemleri", "id": 100000059, "uuid": "654c901c-40c2-46c1-8a00-925009dde46e"},
+        "category": {"shortCode": "KAYDIRMA", "name": "Kaydırma", "id": 100000143, "uuid": "f3a9a508-0732-4410-82d7-847867fc616f"},
+        "subCategory": {"shortCode": "OPERASYON_KAYNAKLI", "name": "Operasyon Kaynaklı", "id": 100000671, "uuid": "089de3d8-b26d-42da-88e6-f062cae187f3"},
+    },
+    "OTEL_KAYNAKLI": {
+        "channel": {"shortCode": "CAGRI_MERKEZI", "name": "Çağrı Merkezi", "id": 100000041, "uuid": "9a4dd8ef-045a-4f57-8c2c-8b0fc209d367"},
+        "ticketType": {"shortCode": "REZERVASYON_ISLEMLERI", "name": "Backoffice İşlemleri", "id": 100000059, "uuid": "654c901c-40c2-46c1-8a00-925009dde46e"},
+        "category": {"shortCode": "KAYDIRMA", "name": "Kaydırma", "id": 100000143, "uuid": "f3a9a508-0732-4410-82d7-847867fc616f"},
+        "subCategory": {"shortCode": "OTEL_KAYNAKLI", "name": "Otel Kaynaklı", "id": 100000669, "uuid": "089de3d8-b26d-42da-88e6-f062cae187f3"},
+    },
+    "ODEME_TAMAMLAMA": {
+        "channel": {"shortCode": "CAGRI_MERKEZI", "name": "Çağrı Merkezi", "id": 100000041, "uuid": "9a4dd8ef-045a-4f57-8c2c-8b0fc209d367"},
+        "ticketType": {"shortCode": "REZERVASYON_ISLEMLERI", "name": "Backoffice İşlemleri", "id": 100000059, "uuid": "654c901c-40c2-46c1-8a00-925009dde46e"},
+        "category": {"shortCode": "DIGER_ISLEMLER", "name": "Diğer İşlemler", "id": 100000172, "uuid": "f3a9a508-0732-4410-82d7-847867fc616f"},
+        "subCategory": {"shortCode": "ODEME_TAMAMLAMA", "name": "Ödeme Tamamlama", "id": 100000554, "uuid": "089de3d8-b26d-42da-88e6-f062cae187f3"},
+    },
+}
 
 _cached_token: Optional[str] = None
 

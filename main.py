@@ -48,6 +48,15 @@ def process_email(
     subject, sender_email, sender_name, body = processor.extract_email_content(email_message)
     body = clean_mailto_artifacts(body)
 
+    # OCR any image attachments (Vergi Levhası scan, kaşe photo) up front --
+    # only fed into categorization if the mail body itself is missing
+    # invoice fields (see EmailCategorizer.categorize's resolve_invoice_attributes).
+    attachment_text = ""
+    image_attachments = processor.extract_image_attachments(email_message)
+    if image_attachments:
+        from ocr_utils import extract_text_from_images
+        attachment_text = extract_text_from_images(image_attachments)
+
     print("-" * 50)
     print(f"Gönderen: {sender_email} ({sender_name})")
     print(f"Konu: {subject}")
@@ -97,7 +106,7 @@ def process_email(
         return
 
     # Categorize email
-    categorization = categorizer.categorize(clean_subject, body, sender_email)
+    categorization = categorizer.categorize(clean_subject, body, sender_email, attachment_text)
     print(f"📌 Sınıflandırma: {categorization['classification']}")
 
     # Not: kirilim ne olursa olsun, mailde "acil"/"opsiyon" gibi aciliyet

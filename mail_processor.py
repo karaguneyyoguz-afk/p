@@ -75,7 +75,8 @@ from utils import (
 )
 from validators import (
     contains_profanity, extract_invoice_attributes, extract_payment_attributes,
-    extract_option_deadline
+    extract_option_deadline, extract_invoice_attributes_from_attachment,
+    merge_invoice_attribute_results
 )
 from service_log import record_service_event
 
@@ -252,6 +253,30 @@ class EmailProcessor:
                 body = msg.get_payload(decode=True).decode(MAIL_CHARSET_FALLBACK, errors="ignore")
         
         return subject, sender_email, sender_name, body
+
+    @staticmethod
+    def extract_image_attachments(msg: email.message.Message) -> List[bytes]:
+        """Pull out raw bytes of any image attachments/inline images (customers
+        sometimes send a Vergi Levhası scan or a company kaşe photo instead of
+        typing the invoice info into the mail body -- see ocr_utils.py, which
+        OCRs these before invoice-attribute extraction)."""
+        from ocr_utils import IMAGE_CONTENT_TYPES
+
+        images: List[bytes] = []
+        if not msg.is_multipart():
+            return images
+
+        for part in msg.walk():
+            if part.get_content_type() not in IMAGE_CONTENT_TYPES:
+                continue
+            try:
+                payload = part.get_payload(decode=True)
+            except Exception:
+                continue
+            if payload:
+                images.append(payload)
+
+        return images
 
 
 class EmailCategorizer:
@@ -945,19 +970,31 @@ class EmailCategorizer:
     ]
 
     @staticmethod
-    def categorize(subject: str, body: str, sender_email: str) -> Dict:
+    def categorize(subject: str, body: str, sender_email: str, attachment_text: str = "") -> Dict:
         """
         Categorize email and determine ticket type/category.
-        
+
         Args:
             subject: Email subject line
             body: Email body content
             sender_email: Sender's email address
-            
+            attachment_text: OCR'd text from image attachments (Vergi Levhası
+                scan, kaşe photo), if any -- see ocr_utils.py. Used to fill
+                invoice attribute fields the mail body itself didn't provide.
+
         Returns:
             Dictionary containing ticket categorization info
         """
         combined_text = f"{subject} {body}"
+
+        def resolve_invoice_attributes(text: str) -> Tuple[List[dict], List[str]]:
+            """extract_invoice_attributes() on the mail body, with any fields
+            it couldn't find filled in from an OCR'd attachment (if present)."""
+            result = extract_invoice_attributes(text, sender_email)
+            if result[1] and attachment_text.strip():
+                attachment_result = extract_invoice_attributes_from_attachment(attachment_text, sender_email)
+                result = merge_invoice_attribute_results(result, attachment_result)
+            return result
         normalized_text = normalize_turkish_characters(combined_text)
 
         # Not: Uçak bileti değişikliği/iptali kontrolleri kasıtlı olarak fonksiyonun
@@ -1298,7 +1335,7 @@ class EmailCategorizer:
             and any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_COMPLAINT_KEYWORDS)
             and "fatura fiyati" not in normalized_text
         ):
-            attributes, missing_fields = extract_invoice_attributes(combined_text, sender_email)
+            attributes, missing_fields = resolve_invoice_attributes(combined_text)
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_COMPLAINT,
@@ -1888,7 +1925,7 @@ class EmailCategorizer:
             any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_CONTEXT_KEYWORDS)
             and any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_MODIFICATION_KEYWORDS)
         ):
-            attributes, missing_fields = extract_invoice_attributes(combined_text, sender_email)
+            attributes, missing_fields = resolve_invoice_attributes(combined_text)
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
@@ -1907,7 +1944,7 @@ class EmailCategorizer:
             keyword in normalized_text
             for keyword in ["dogrusu bu sekildedir", "bilgilere kesilmesi rica"]
         ):
-            attributes, missing_fields = extract_invoice_attributes(combined_text, sender_email)
+            attributes, missing_fields = resolve_invoice_attributes(combined_text)
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_INFO_REQUEST,
@@ -1924,7 +1961,7 @@ class EmailCategorizer:
 
         # Check for invoice requests
         if any(keyword in normalized_text for keyword in EmailCategorizer.INVOICE_KEYWORDS):
-            attributes, missing_fields = extract_invoice_attributes(combined_text, sender_email)
+            attributes, missing_fields = resolve_invoice_attributes(combined_text)
             return {
                 "channel_id": CHANNEL_ID,
                 "ticket_type_id": TICKET_TYPE_INFO_REQUEST,

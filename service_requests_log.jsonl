@@ -253,3 +253,163 @@
 {"timestamp": "2026-08-23T20:36:33.979344+03:00", "service": "csm_api", "action": "search_customer", "actor": "cli", "status": "success", "detail": "oguz.karaguney@tatilbudur.com: boş yanıt", "duration_ms": null}
 {"timestamp": "2026-08-23T20:36:34.847933+03:00", "service": "csm_api", "action": "search_product", "actor": "cli", "status": "success", "detail": "553044193: 1 kayıt", "duration_ms": null}
 {"timestamp": "2026-08-23T20:36:36.003774+03:00", "service": "csm_api", "action": "create_ticket", "actor": "cli", "status": "success", "detail": "#101940302", "duration_ms": null}
+{"timestamp": "2026-08-23T20:40:47.798276+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-23T22:27:48.981545+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T00:53:32.879725+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T00:53:34.665517+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T00:53:34.668867+03:00", "service": "panel_api", "action": "POST /api/token/refresh", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-24T00:53:34.997527+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T00:53:37.872910+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T00:53:37.879532+03:00", "service": "panel_api", "action": "POST /api/token/refresh", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-24T00:53:38.200342+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "failed", "detail": "Token alınamadı. Status Code: 418", "duration_ms": null}
+{"timestamp": "2026-08-24T01:15:30.946512+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T10:53:47.441458+03:00", "service": "gmail_imap", "action": "connect", "actor": "cli", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T10:54:15.228432+03:00", "service": "csm_api", "action": "auth", "actor": "cli", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T10:54:15.682548+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T10:54:17.247144+03:00", "service": "csm_api", "action": "search_customer", "actor": "cli", "status": "success", "detail": "oguz.karaguney@tatilbudur.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T10:54:18.316042+03:00", "service": "csm_api", "action": "auth", "actor": "sistem", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T10:54:21.422636+03:00", "service": "csm_api", "action": "create_ticket", "actor": "cli", "status": "success", "detail": "#101941147", "duration_ms": null}
+{"timestamp": "2026-08-24T10:54:21.858894+03:00", "service": "csm_api", "action": "search_customer", "actor": "sistem", "status": "success", "detail": "oguz.karaguney@tatilbudur.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T10:54:23.883784+03:00", "service": "csm_api", "action": "create_ticket", "actor": "sistem", "status": "success", "detail": "#101941148", "duration_ms": null}
+{"timestamp": "2026-08-24T10:54:27.527946+03:00", "service": "csm_api", "action": "search_customer", "actor": "cli", "status": "success", "detail": "oguz.karaguney@tatilbudur.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T10:54:29.467728+03:00", "service": "csm_api", "action": "create_ticket", "actor": "cli", "status": "success", "detail": "#101941149", "duration_ms": null}
+{"timestamp": "2026-08-24T11:01:01.763311+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:36.497178+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "success", "detail": "[PREPROD] Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:40.798634+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:41.699187+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:42.498119+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:45.299767+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:46.298609+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:47.089999+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:49.330427+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:50.088594+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:50.702695+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:53.083949+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:53.817946+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:54.864149+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:57.398536+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:58.098412+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:02:58.699766+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:01.111708+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:01.991702+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:02.506088+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:04.986365+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:05.824487+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:06.786579+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:09.293711+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:09.898769+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:10.714443+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:11.302754+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:13.495161+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:14.106313+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:14.723604+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:17.095941+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:18.001370+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:18.795820+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:21.100387+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:21.988646+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:22.710367+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:25.789117+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:26.401193+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:27.876552+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:30.887720+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:31.802690+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:32.440642+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:33.272956+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:35.891099+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:36.596743+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:37.754419+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:40.588701+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:42.861519+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:46.281784+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:48.051430+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:50.298295+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:50.989512+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:51.888360+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:55.121648+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:56.489940+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:57.191669+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:03:59.669699+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:00.444522+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:01.093475+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:01.795072+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:04.189089+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:04.905842+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:05.925460+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:08.592846+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:09.298812+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:10.004521+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:12.419888+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:13.489678+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:14.594200+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:16.908484+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:17.813934+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:18.408504+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:20.637242+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:21.190378+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:21.757719+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:24.009214+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:24.807622+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:25.805819+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:26.768776+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:29.086669+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:30.379972+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:30.996514+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:33.299677+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:33.906674+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:34.806150+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:37.701611+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:38.527693+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:39.289825+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:41.614292+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:42.310362+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:43.017269+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:45.303448+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:45.889788+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:46.690466+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:48.918203+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:51.452206+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:52.105952+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:54.405619+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:55.194404+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:55.894957+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:58.289282+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:59.101818+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:04:59.991958+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:05:02.212324+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:05:02.993497+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:05:03.598445+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:05:04.395578+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:05:04.398756+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-24T11:10:44.651766+03:00", "service": "csm_api", "action": "auth", "actor": "sistem", "status": "success", "detail": "[PREPROD] Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T11:10:51.894259+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "sistem", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:10:56.460520+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "sistem", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:10:56.991450+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "sistem", "status": "failed", "detail": "[PREPROD] HTTP 500", "duration_ms": null}
+{"timestamp": "2026-08-24T11:18:22.642312+03:00", "service": "gmail_imap", "action": "connect", "actor": "cli", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T11:18:23.786120+03:00", "service": "csm_api", "action": "auth", "actor": "cli", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T11:18:24.382615+03:00", "service": "csm_api", "action": "search_customer", "actor": "cli", "status": "success", "detail": "oguz.karaguney@tatilbudur.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T11:18:25.742091+03:00", "service": "csm_api", "action": "create_ticket", "actor": "cli", "status": "success", "detail": "#101941260", "duration_ms": null}
+{"timestamp": "2026-08-24T11:20:16.731884+03:00", "service": "gmail_imap", "action": "connect", "actor": "cli", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-24T11:20:18.321642+03:00", "service": "csm_api", "action": "auth", "actor": "cli", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T11:20:18.956664+03:00", "service": "csm_api", "action": "search_customer", "actor": "cli", "status": "success", "detail": "oguz.karaguney@tatilbudur.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-24T11:20:20.457908+03:00", "service": "csm_api", "action": "create_ticket", "actor": "cli", "status": "success", "detail": "#101941272", "duration_ms": null}
+{"timestamp": "2026-08-24T11:21:07.927044+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "success", "detail": "[PROD] Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T11:21:09.855421+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "success", "detail": "[PROD] #101941280", "duration_ms": null}
+{"timestamp": "2026-08-24T11:21:11.432567+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "success", "detail": "[PROD] #101941281", "duration_ms": null}
+{"timestamp": "2026-08-24T11:21:12.529565+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PROD] HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T11:21:15.307615+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "success", "detail": "[PROD] #101941283", "duration_ms": null}
+{"timestamp": "2026-08-24T11:21:15.311126+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-24T11:28:11.002929+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "success", "detail": "[PROD] Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-24T11:28:13.731451+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "success", "detail": "[PROD] #101941328", "duration_ms": null}
+{"timestamp": "2026-08-24T11:28:15.522293+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "success", "detail": "[PROD] #101941329", "duration_ms": null}
+{"timestamp": "2026-08-24T11:28:16.739836+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "failed", "detail": "[PROD] HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T11:28:18.356819+03:00", "service": "csm_api", "action": "create_bulk_ticket", "actor": "panel", "status": "success", "detail": "[PROD] #101941330", "duration_ms": null}
+{"timestamp": "2026-08-24T11:28:18.360826+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-24T12:04:52.496652+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T12:04:52.503571+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T12:04:52.557311+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T12:04:52.565954+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T12:09:44.523720+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T12:09:44.530169+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T12:09:44.581515+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-24T12:09:44.589636+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
