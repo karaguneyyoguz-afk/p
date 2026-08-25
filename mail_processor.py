@@ -2840,7 +2840,11 @@ def send_bulk_kaydirma_summary_email(recipient_email: str, subject: str, summary
         message['To'] = recipient_email
         message['Subject'] = f"Re: {subject} - Sonuç ({summary['success_count']}/{summary['total']} başarılı)"
 
+        success_rows = [r for r in summary['results'] if r['success']]
         failed_rows = [r for r in summary['results'] if not r['success']]
+        success_lines = "\n".join(
+            f"  • {r['reservation_no']}: #{r.get('ticket_id', '—')}" for r in success_rows[:50]
+        )
         failed_lines = "\n".join(
             f"  • {r['reservation_no']}: {r.get('error', 'bilinmeyen hata')}" for r in failed_rows[:20]
         )
@@ -2852,6 +2856,8 @@ def send_bulk_kaydirma_summary_email(recipient_email: str, subject: str, summary
             f"Başarılı: {summary['success_count']}\n"
             f"Başarısız: {summary['failed_count']}\n"
         )
+        if success_lines:
+            formatted_body += f"\nOluşturulan ticket'lar:\n{success_lines}\n"
         if failed_lines:
             formatted_body += f"\nBaşarısız olan rezervasyonlar:\n{failed_lines}\n"
         formatted_body += "\nSaygılarımızla,\nMüşteri Hizmetleri Ekibi"

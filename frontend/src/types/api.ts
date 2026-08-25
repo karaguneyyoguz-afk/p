@@ -23,6 +23,13 @@ export interface TicketDetails {
   sub_category?: number
   sub_category_code?: string
   body_preview?: string
+  // Toplu kaydırma (mail-tetikli) özet alanları -- bulk_shift.process_rows'un
+  // döndürdüğü summary dict'i bu şekle sahip.
+  environment?: string
+  total?: number
+  success_count?: number
+  failed_count?: number
+  results?: BulkShiftResultRow[]
 }
 
 export type Actor = 'sistem' | 'panel' | 'cli' | string

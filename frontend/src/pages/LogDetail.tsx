@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Badge, StatusBadge } from '@/components/ui/Badge'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { ExportCsvButton } from '@/components/ui/ExportCsvButton'
 import { useMailLogDetail } from '@/api/hooks'
 import { categoryLabel, actorLabel, actorTone, eventLabel } from '@/lib/reportUtils'
 import { ApiError } from '@/api/client'
@@ -111,6 +112,63 @@ export function LogDetail() {
                   {log.ticket_details?.sub_category_code && (
                     <Field label="Alt Kategori Kodu" value={log.ticket_details.sub_category_code} />
                   )}
+                </CardBody>
+              </Card>
+            )}
+
+            {log.ticket_details?.results && (
+              <Card className="lg:col-span-2">
+                <CardHeader
+                  title="Toplu Kaydırma Sonuçları"
+                  subtitle={`${log.ticket_details.total} kayıt · ${log.ticket_details.success_count} başarılı · ${log.ticket_details.failed_count} hatalı`}
+                  action={
+                    <ExportCsvButton
+                      filename="toplu-kaydirma-sonuclar.csv"
+                      rows={[
+                        ['Rezervasyon No', 'Kaydırma Tipi', 'Durum', 'Ticket ID', 'Hata'],
+                        ...log.ticket_details.results.map((r) => [
+                          r.reservation_no,
+                          r.shift_type,
+                          r.success ? 'Başarılı' : 'Hatalı',
+                          r.ticket_id ?? '',
+                          r.error ?? '',
+                        ]),
+                      ]}
+                    />
+                  }
+                />
+                <CardBody>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-enigma-border text-xs uppercase tracking-wider text-enigma-text-muted">
+                          <th className="pb-2 pr-4 font-medium">Rezervasyon No</th>
+                          <th className="pb-2 pr-4 font-medium">Kaydırma Tipi</th>
+                          <th className="pb-2 pr-4 font-medium">Durum</th>
+                          <th className="pb-2 pr-4 font-medium">Ticket / Hata</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {log.ticket_details.results.map((row, index) => (
+                          <tr
+                            key={`${row.reservation_no}-${index}`}
+                            className="border-b border-enigma-border/60 last:border-0"
+                          >
+                            <td className="py-2.5 pr-4 font-medium text-enigma-text">
+                              {row.reservation_no}
+                            </td>
+                            <td className="py-2.5 pr-4 text-enigma-text-muted">{row.shift_type}</td>
+                            <td className="py-2.5 pr-4">
+                              <StatusBadge status={row.success ? 'success' : 'failed'} />
+                            </td>
+                            <td className="max-w-xs truncate py-2.5 pr-4 text-enigma-text-muted">
+                              {row.success ? `#${row.ticket_id}` : row.error}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </CardBody>
               </Card>
             )}
