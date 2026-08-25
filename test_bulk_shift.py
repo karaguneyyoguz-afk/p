@@ -7,10 +7,19 @@ gercek istek atmadan test edilebilecek her sey buradadir).
 """
 
 import io
+import os
 import sys
+import tempfile
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+# Temp SQLite DB for the login below -- must be set before `from app import
+# app` (app.py reads DATABASE_URL at import time). Never touches the real
+# instance/enigma.db.
+_tmp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+_tmp_db.close()
+os.environ["DATABASE_URL"] = f"sqlite:///{_tmp_db.name}"
 
 from openpyxl import Workbook
 
@@ -21,6 +30,7 @@ from bulk_shift import (
     MAX_ROWS,
 )
 from app import app
+from dev_test_helpers import login_test_client
 
 passed = 0
 failed = 0
@@ -156,11 +166,13 @@ except ValueError as e:
 # Endpoint dogrulama (Flask test client) -- gercek CSM cagrisi yapilmayan yollar
 # ==========================================================
 client = app.test_client()
+csrf_token = login_test_client(app, client)
+csrf_headers = {"X-CSRF-Token": csrf_token}
 
 resp = client.get("/api/bulk-shift/env")
 check("GET /api/bulk-shift/env -> 200 + environment alani", resp.status_code == 200 and "environment" in resp.get_json())
 
-resp = client.post("/api/bulk-shift/upload", data={})
+resp = client.post("/api/bulk-shift/upload", data={}, headers=csrf_headers)
 check("POST upload: dosya yoksa 400", resp.status_code == 400 and "dosya" in resp.get_json().get("error", "").lower())
 
 # openpyxl (read_only=True) closes the stream it's given once parsed, so each
@@ -169,6 +181,7 @@ resp = client.post(
     "/api/bulk-shift/upload",
     data={"file": (make_excel([("553044193", "Otel Kaynaklı", "Alt 1", "")]), "test.xlsx")},
     content_type="multipart/form-data",
+    headers=csrf_headers,
 )
 check(
     "POST upload: satirda parentTicketUUID yok VE form'da yedek de yoksa 400",
@@ -183,6 +196,7 @@ resp = client.post(
         "parent_ticket_uuid": "abc",
     },
     content_type="multipart/form-data",
+    headers=csrf_headers,
 )
 check(
     "POST upload: yanlis sutunlu Excel icin 400 (Rezervasyon No bulunamadi)",

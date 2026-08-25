@@ -6,6 +6,7 @@ noktalarinin sozlesmesini dogrular. Ag baglantisi gerektirmez.
 
 import os
 import sys
+import tempfile
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -17,6 +18,26 @@ _TEST_LOG_FILE = os.path.join(os.path.dirname(__file__), "_test_service_requests
 service_log.LOG_FILE = _TEST_LOG_FILE
 if os.path.exists(_TEST_LOG_FILE):
     os.remove(_TEST_LOG_FILE)
+
+# Temp SQLite DB for the login below -- must be set before `from app import
+# app` (app.py reads DATABASE_URL at import time). Never touches the real
+# instance/enigma.db.
+_tmp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+_tmp_db.close()
+os.environ["DATABASE_URL"] = f"sqlite:///{_tmp_db.name}"
+
+from app import app  # noqa: E402  (once test dosya yolu override edilmeli)
+from dev_test_helpers import login_test_client  # noqa: E402
+
+# Girisin kendi audit-trail POST'u da service_log'a yazilir -- asagidaki
+# testler sifirdan saydigi icin onu hemen temizliyoruz.
+client = app.test_client()
+csrf_token = login_test_client(app, client)
+service_log.clear_service_events()
+# app.py itself calls set_actor('panel') at import time (see app.py) -- reset
+# back to the module's real default so the "varsayilan" check below still
+# tests what it says it tests, unaffected by having imported app up here.
+service_log.set_actor("sistem")
 
 passed = 0
 failed = 0
@@ -65,15 +86,11 @@ check("clear_service_events: temizledikten sonra bos liste doner", service_log.r
 # Endpoint sozlesmesi (Flask test client) -- birkac farkli kayit uretip
 # filtrelerin gercekten daralttigini dogrular.
 # ==========================================================
-from app import app  # noqa: E402  (once test dosya yolu override edilmeli)
-
 service_log.set_actor("panel")
 service_log.record_service_event("csm_api", "create_ticket", "success", detail="#1")
 service_log.record_service_event("csm_api", "create_ticket", "failed", detail="HTTP 500")
 service_log.set_actor("sistem")
 service_log.record_service_event("gmail_imap", "connect", "success", detail="ok")
-
-client = app.test_client()
 
 resp = client.get("/api/service-logs?limit=2")
 check("GET /api/service-logs?limit=2 -> 200", resp.status_code == 200, resp.status_code)
@@ -116,7 +133,7 @@ check(
     summary["services"]["csm_api"],
 )
 
-resp = client.post("/api/service-logs/clear")
+resp = client.post("/api/service-logs/clear", headers={"X-CSRF-Token": csrf_token})
 check("POST /api/service-logs/clear -> success", resp.status_code == 200 and resp.get_json().get("success") is True)
 # Not: app.py'nin after_request audit-trail'i POST /api/service-logs/clear'in
 # KENDİSİNİ de bir panel_api kaydi olarak loglar (clear_service_events()

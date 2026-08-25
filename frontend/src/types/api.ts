@@ -216,3 +216,49 @@ export interface BulkShiftUploadResponse {
   failed_count: number
   results: BulkShiftResultRow[]
 }
+
+// ==========================================================
+// Auth / kullanıcı yönetimi
+// ==========================================================
+
+export type Role = 'admin' | 'yonetici' | 'operator' | 'izleyici'
+
+export type ScreenKey =
+  | 'dashboard'
+  | 'reports'
+  | 'monitoring'
+  | 'logs'
+  | 'emails'
+  | 'tickets'
+  | 'bulk_shift'
+  | 'settings'
+  | 'users'
+
+export interface ScreenOverride {
+  screen_key: ScreenKey
+  allow: boolean
+}
+
+export interface User {
+  id: number
+  email: string
+  role: Role
+  is_active: boolean
+  created_at: string | null
+}
+
+/** Response shape for /api/auth/me AND /api/auth/login (same payload). */
+export interface CurrentUser extends User {
+  role_screens: ScreenKey[]
+  effective_screens: ScreenKey[]
+  overrides: ScreenOverride[]
+  csrf_token: string
+}
+
+/** Response shape for /api/users/<id>/overrides (GET and PUT). */
+export interface ScreensPayload {
+  role: Role
+  role_screens: ScreenKey[]
+  effective_screens: ScreenKey[]
+  overrides: ScreenOverride[]
+}

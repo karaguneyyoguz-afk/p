@@ -10,31 +10,35 @@ import {
   Activity,
   ScrollText,
   FileSpreadsheet,
+  Users as UsersIcon,
 } from 'lucide-react'
 import clsx from 'clsx'
+import { useAuth } from '@/contexts/AuthContext'
+import type { ScreenKey } from '@/types/api'
 
 const navGroups = [
   {
     label: 'Genel',
     items: [
-      { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-      { to: '/reports', label: 'Raporlar', icon: BarChart3 },
+      { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true, screen: 'dashboard' as ScreenKey },
+      { to: '/reports', label: 'Raporlar', icon: BarChart3, screen: 'reports' as ScreenKey },
     ],
   },
   {
     label: 'İzleme',
     items: [
-      { to: '/monitoring', label: 'Monitoring', icon: Activity },
-      { to: '/logs', label: 'Loglar', icon: ScrollText },
+      { to: '/monitoring', label: 'Monitoring', icon: Activity, screen: 'monitoring' as ScreenKey },
+      { to: '/logs', label: 'Loglar', icon: ScrollText, screen: 'logs' as ScreenKey },
     ],
   },
   {
     label: 'İşlemler',
     items: [
-      { to: '/emails', label: 'E-postalar', icon: Mail },
-      { to: '/tickets', label: 'Talepler', icon: Ticket },
-      { to: '/bulk-shift', label: 'Toplu Kaydırma', icon: FileSpreadsheet },
-      { to: '/settings', label: 'Ayarlar', icon: Settings },
+      { to: '/emails', label: 'E-postalar', icon: Mail, screen: 'emails' as ScreenKey },
+      { to: '/tickets', label: 'Talepler', icon: Ticket, screen: 'tickets' as ScreenKey },
+      { to: '/bulk-shift', label: 'Toplu Kaydırma', icon: FileSpreadsheet, screen: 'bulk_shift' as ScreenKey },
+      { to: '/settings', label: 'Ayarlar', icon: Settings, screen: 'settings' as ScreenKey },
+      { to: '/users', label: 'Kullanıcılar', icon: UsersIcon, screen: 'users' as ScreenKey },
     ],
   },
 ]
@@ -45,6 +49,11 @@ interface SidebarProps {
 }
 
 export function Sidebar({ open, onClose }: SidebarProps) {
+  const { hasScreen } = useAuth()
+  const visibleGroups = navGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => hasScreen(item.screen)) }))
+    .filter((group) => group.items.length > 0)
+
   return (
     <aside
       className={clsx(
@@ -73,7 +82,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       </div>
 
       <nav className="mt-2 flex-1 space-y-1 px-3">
-        {navGroups.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.label}>
             <p className="px-3 pb-2 pt-3 text-xs font-semibold uppercase tracking-wider text-enigma-sidebar-text/70">
               {group.label}

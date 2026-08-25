@@ -18,7 +18,8 @@ if sys.stderr.encoding and sys.stderr.encoding.lower() != "utf-8":
 from mail_processor import (
     EmailProcessor, EmailCategorizer, send_notification_email,
     send_ticket_confirmation_email, send_rejection_email,
-    send_missing_fields_email, send_vendor_redirect_email
+    send_missing_fields_email, send_vendor_redirect_email,
+    send_bulk_kaydirma_summary_email,
 )
 from validators import (
     contains_profanity, extract_reservation_number, detect_priority_level,
@@ -27,6 +28,104 @@ from validators import (
 from csm_api import CSMAPIClient, TicketPayloadBuilder
 from utils import clean_subject_line, clean_mailto_artifacts, normalize_turkish_characters
 from logging_utils import record_mail_event
+
+
+def _process_bulk_kaydirma_email(
+    processor: EmailProcessor,
+    email_message,
+    sender_email: str,
+    subject: str,
+    body: str,
+) -> None:
+    """Handles the "toplu kaydırma" mail-trigger branch of process_email --
+    split out since it's a fundamentally different shape of work (many
+    linked tickets from one Excel, not one ticket from the mail body)."""
+    import io
+    from bulk_shift import parse_excel_rows, process_rows
+
+    excel_bytes = processor.extract_excel_attachment(email_message)
+    if excel_bytes is None:
+        print("⚠️ Toplu kaydırma maili ama Excel eki bulunamadı, atlanıyor.")
+        record_mail_event(
+            event="email_processed",
+            status="failed",
+            sender_email=sender_email,
+            subject=subject,
+            reason="Toplu kaydırma maili tespit edildi ama Excel eki bulunamadı",
+            classification="bulk_kaydirma_no_attachment",
+            mail_body=body,
+        )
+        return
+
+    try:
+        rows = parse_excel_rows(io.BytesIO(excel_bytes))
+    except ValueError as e:
+        print(f"⚠️ Toplu kaydırma Excel'i okunamadı: {e}")
+        record_mail_event(
+            event="email_processed",
+            status="failed",
+            sender_email=sender_email,
+            subject=subject,
+            reason=f"Toplu kaydırma Excel'i okunamadı: {e}",
+            classification="bulk_kaydirma_excel_error",
+            mail_body=body,
+        )
+        return
+
+    if not rows:
+        print("⚠️ Toplu kaydırma Excel'inde işlenecek satır bulunamadı.")
+        record_mail_event(
+            event="email_processed",
+            status="failed",
+            sender_email=sender_email,
+            subject=subject,
+            reason="Toplu kaydırma Excel'inde işlenecek satır bulunamadı",
+            classification="bulk_kaydirma_empty",
+            mail_body=body,
+        )
+        return
+
+    missing_parent_rows = [r["reservation_no"] for r in rows if not r["parent_ticket_uuid"]]
+    if missing_parent_rows:
+        print(f"⚠️ parentTicketUUID eksik: {', '.join(missing_parent_rows[:10])}")
+        record_mail_event(
+            event="email_processed",
+            status="failed",
+            sender_email=sender_email,
+            subject=subject,
+            reason=f"parentTicketUUID eksik satırlar: {', '.join(missing_parent_rows[:10])}",
+            classification="bulk_kaydirma_missing_parent",
+            mail_body=body,
+        )
+        return
+
+    try:
+        summary = process_rows(rows)
+    except RuntimeError as e:
+        print(f"❌ Toplu kaydırma: bearer token alınamadı: {e}")
+        record_mail_event(
+            event="email_processed",
+            status="failed",
+            sender_email=sender_email,
+            subject=subject,
+            reason=f"CSM token alınamadı: {e}",
+            classification="bulk_kaydirma_token_error",
+            mail_body=body,
+        )
+        return
+
+    print(f"📊 Toplu kaydırma: {summary['success_count']}/{summary['total']} başarılı")
+    record_mail_event(
+        event="ticket_created" if summary["success_count"] > 0 else "ticket_not_created",
+        status="success" if summary["failed_count"] == 0 else "failed",
+        sender_email=sender_email,
+        subject=subject,
+        reason=f"Toplu kaydırma: {summary['success_count']}/{summary['total']} ilişkili ticket oluşturuldu",
+        classification="bulk_kaydirma",
+        ticket_details=summary,
+        mail_body=body,
+    )
+    send_bulk_kaydirma_summary_email(sender_email, subject, summary)
 
 
 def process_email(
@@ -85,6 +184,18 @@ def process_email(
             classification="bulk_marketing",
             mail_body=body,
         )
+        print("-" * 50 + "\n")
+        return
+
+    # Mail-triggered Toplu Kaydırma (bulk reservation shift): "toplu
+    # kaydırma" in the subject + an .xlsx attachment creates one CSM
+    # "ilişkili ticket" (LINKED_TICKET) per row via bulk_shift.py -- the same
+    # PROD flow the panel's Toplu Kaydırma page uses. Checked before the
+    # normal profanity/vendor/categorize path since this isn't a single-
+    # ticket request at all.
+    if processor.is_bulk_kaydirma_email(subject):
+        print("📊 SONUÇ: Toplu kaydırma maili tespit edildi.")
+        _process_bulk_kaydirma_email(processor, email_message, sender_email, subject, body)
         print("-" * 50 + "\n")
         return
 

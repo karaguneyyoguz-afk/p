@@ -357,6 +357,39 @@ class EmailProcessor:
 
         return attachments
 
+    @staticmethod
+    def is_bulk_kaydirma_email(subject: str) -> bool:
+        """"toplu kaydırma" in the subject is the signal iş birimi uses for
+        this flow (confirmed live, see bulk_shift.py) -- checked on subject
+        only, not body, matching the real example."""
+        return "toplu kaydirma" in normalize_turkish_characters(subject or "")
+
+    @staticmethod
+    def extract_excel_attachment(msg: email.message.Message) -> Optional[bytes]:
+        """First .xlsx attachment's raw bytes, or None. Bulk-kaydırma mails
+        are expected to carry exactly one Excel export (see
+        bulk_shift.parse_excel_rows for the required columns)."""
+        if not msg.is_multipart():
+            return None
+
+        for part in msg.walk():
+            content_type = part.get_content_type()
+            filename = (part.get_filename() or "").lower()
+            is_excel = (
+                content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                or filename.endswith(".xlsx")
+            )
+            if not is_excel:
+                continue
+            try:
+                payload = part.get_payload(decode=True)
+            except Exception:
+                continue
+            if payload:
+                return payload
+
+        return None
+
 
 class EmailCategorizer:
     """Categorizes emails and determines ticket routing."""
@@ -2790,9 +2823,50 @@ def send_ticket_confirmation_email(recipient_email: str, subject: str, ticket_id
         server.quit()
         
         print(f"✉️ [TICKET ONAY MAİLİ GÖNDERİLDİ] Ticket #{ticket_id} -> {recipient_email}")
-    
+
     except Exception as e:
         print(f"❌ Ticket onay maili gönderilirken hata: {e}")
+
+
+def send_bulk_kaydirma_summary_email(recipient_email: str, subject: str, summary: dict) -> None:
+    """Mail-triggered Toplu Kaydırma sonucunu iş birimine bildirir -- her
+    satır için ayrı bir onay maili göndermek yerine (100+ satırlık bir
+    Excel'de bu spam olur), tek bir özet mail yeterli. Panel yüklemesinde
+    (UI zaten bir sonuç tablosu gösterdiği için) bu mail gönderilmiyor,
+    sadece mail-tetikli akışta kullanılıyor."""
+    try:
+        message = MIMEMultipart()
+        message['From'] = EMAIL_USER
+        message['To'] = recipient_email
+        message['Subject'] = f"Re: {subject} - Sonuç ({summary['success_count']}/{summary['total']} başarılı)"
+
+        failed_rows = [r for r in summary['results'] if not r['success']]
+        failed_lines = "\n".join(
+            f"  • {r['reservation_no']}: {r.get('error', 'bilinmeyen hata')}" for r in failed_rows[:20]
+        )
+
+        formatted_body = (
+            f"Merhabalar,\n\n"
+            f"Gönderdiğiniz toplu kaydırma dosyası işlendi.\n\n"
+            f"Toplam: {summary['total']}\n"
+            f"Başarılı: {summary['success_count']}\n"
+            f"Başarısız: {summary['failed_count']}\n"
+        )
+        if failed_lines:
+            formatted_body += f"\nBaşarısız olan rezervasyonlar:\n{failed_lines}\n"
+        formatted_body += "\nSaygılarımızla,\nMüşteri Hizmetleri Ekibi"
+
+        message.attach(MIMEText(formatted_body, 'plain', 'utf-8'))
+
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, recipient_email, message.as_string())
+        server.quit()
+
+        print(f"✉️ [TOPLU KAYDIRMA ÖZET MAİLİ GÖNDERİLDİ] {summary['success_count']}/{summary['total']} -> {recipient_email}")
+
+    except Exception as e:
+        print(f"❌ Toplu kaydırma özet maili gönderilirken hata: {e}")
 
 
 def send_rejection_email(recipient_email: str, subject: str, customer_name: str) -> None:

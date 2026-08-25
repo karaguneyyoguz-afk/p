@@ -330,3 +330,41 @@ def create_bulk_ticket(payload: Dict[str, Any], token: str) -> Dict[str, Any]:
     except requests.RequestException as e:
         record_service_event("csm_api", "create_bulk_ticket", "failed", detail=f"[{BULK_SHIFT_ENV.upper()}] {e}")
         return {"success": False, "error": str(e)}
+
+
+def process_rows(rows: List[ExcelRow], fallback_parent_ticket_uuid: str = "") -> Dict[str, Any]:
+    """Resolves a bearer token once, then creates one linked ticket per row.
+    Shared by the panel's /api/bulk-shift/upload endpoint and the
+    mail-triggered flow (main.py's process_email, "toplu kaydırma" subject +
+    Excel attachment) so both go through the exact same CSM call logic."""
+    token = get_bulk_shift_token()
+
+    results = []
+    success_count = 0
+    for row in rows:
+        parent_ticket_uuid = row["parent_ticket_uuid"] or fallback_parent_ticket_uuid
+        payload = build_bulk_ticket_payload(
+            reservation_no=row["reservation_no"],
+            shift_type_label=row["shift_type"],
+            alternative_text=row["alternative"],
+            parent_ticket_uuid=parent_ticket_uuid,
+        )
+        outcome = create_bulk_ticket(payload, token)
+        if outcome["success"]:
+            success_count += 1
+        results.append({
+            "reservation_no": row["reservation_no"],
+            "shift_type": row["shift_type"],
+            "shift_type_code": classify_shift_type(row["shift_type"]),
+            "success": outcome["success"],
+            "ticket_id": outcome.get("ticket_id"),
+            "error": outcome.get("error"),
+        })
+
+    return {
+        "environment": BULK_SHIFT_ENV,
+        "total": len(results),
+        "success_count": success_count,
+        "failed_count": len(results) - success_count,
+        "results": results,
+    }

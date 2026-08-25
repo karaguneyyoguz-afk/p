@@ -68,3 +68,6 @@ tessdata/
 scheduled_mail_check.log
 watch_mail.log
 backend_server.log
+
+# SQLite database (user accounts) -- local dev data, not source
+instance/

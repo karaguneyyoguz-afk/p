@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiGet, apiPost, apiPostForm } from './client'
+import { apiGet, apiPost, apiPostForm, apiPatch, apiPut, apiDelete, setCsrfToken, ApiError } from './client'
 import type {
   StatusResponse,
   StatisticsResponse,
@@ -22,6 +22,11 @@ import type {
   ServiceLogsSummaryResponse,
   BulkShiftEnvResponse,
   BulkShiftUploadResponse,
+  CurrentUser,
+  User,
+  Role,
+  ScreenKey,
+  ScreensPayload,
 } from '@/types/api'
 
 function toQueryString(params: object) {
@@ -339,5 +344,108 @@ export function useUploadBulkShift() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['service-logs'] })
     },
+  })
+}
+
+// ==========================================================
+// Auth / kullanıcı yönetimi
+// ==========================================================
+
+/** /api/auth/me: 401 (henüz giriş yapılmamış) bir hata DEĞİL, sadece
+ * "kullanıcı yok" anlamına gelir -- useAuth bunu normal bir durum olarak
+ * ele alır, RequireAuth bu durumda /login'e yönlendirir. */
+export function useCurrentUser() {
+  return useQuery<CurrentUser | null>({
+    queryKey: ['auth', 'me'],
+    queryFn: async () => {
+      try {
+        const user = await apiGet<CurrentUser>('/api/auth/me')
+        setCsrfToken(user.csrf_token)
+        return user
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) {
+          setCsrfToken(null)
+          return null
+        }
+        throw e
+      }
+    },
+    retry: false,
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useLogin() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { email: string; password: string }) =>
+      apiPost<CurrentUser>('/api/auth/login', input),
+    onSuccess: (user) => {
+      setCsrfToken(user.csrf_token)
+      queryClient.setQueryData(['auth', 'me'], user)
+    },
+  })
+}
+
+export function useLogout() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiPost('/api/auth/logout'),
+    onSuccess: () => {
+      setCsrfToken(null)
+      queryClient.setQueryData(['auth', 'me'], null)
+      queryClient.clear()
+    },
+  })
+}
+
+export function useUsers() {
+  return useQuery<{ users: User[] }>({
+    queryKey: ['users'],
+    queryFn: () => apiGet('/api/users'),
+  })
+}
+
+export function useCreateUser() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { email: string; password: string; role: Role }) =>
+      apiPost<User>('/api/users', input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+  })
+}
+
+export function useUpdateUser() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...input }: { id: number; role?: Role; is_active?: boolean; password?: string }) =>
+      apiPatch<User>(`/api/users/${id}`, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+  })
+}
+
+export function useDeactivateUser() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => apiDelete(`/api/users/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+  })
+}
+
+export function useUserOverrides(userId: number | null) {
+  return useQuery<ScreensPayload>({
+    queryKey: ['users', userId, 'overrides'],
+    queryFn: () => apiGet(`/api/users/${userId}/overrides`),
+    enabled: userId !== null,
+  })
+}
+
+export function useSetUserOverrides() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, overrides }: { userId: number; overrides: Record<ScreenKey, boolean | null> }) =>
+      apiPut<ScreensPayload>(`/api/users/${userId}/overrides`, { overrides }),
+    onSuccess: (_data, { userId }) =>
+      queryClient.invalidateQueries({ queryKey: ['users', userId, 'overrides'] }),
   })
 }

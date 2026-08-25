@@ -6,6 +6,7 @@ Flask-based web interface for managing email automation and ticket creation.
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_session import Session
+from flask_migrate import Migrate
 from datetime import datetime, timedelta
 from collections import Counter, OrderedDict
 import json
@@ -34,11 +35,11 @@ from service_log import (
 from bulk_shift import (
     BULK_SHIFT_ENV,
     parse_excel_rows,
-    classify_shift_type,
-    build_bulk_ticket_payload,
-    create_bulk_ticket,
-    get_bulk_shift_token,
+    process_rows,
 )
+from models import db
+from accounts import require_screen, get_csrf_token, current_user
+from accounts_routes import accounts_bp
 
 # Load environment variables
 load_dotenv()
@@ -55,7 +56,47 @@ FRONTEND_DIST = os.path.join(os.path.dirname(__file__), 'frontend', 'dist')
 app = Flask(__name__, static_folder=None)
 app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['SESSION_TYPE'] = 'filesystem'
+# Same-origin architecture (Vite dev proxy / Flask serving the built SPA in
+# prod, see FRONTEND_DIST below) means there's no cross-site cookie exposure
+# to worry about -- SameSite=Lax + Secure-in-prod is enough CSRF-adjacent
+# protection here without a heavier framework; a belt-and-suspenders CSRF
+# token check for mutating requests is still applied below.
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') == 'production'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
 Session(app)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///enigma.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db.init_app(app)
+Migrate(app, db)
+app.register_blueprint(accounts_bp)
+
+
+@app.before_request
+def _check_csrf():
+    """Double-submit CSRF check for mutating /api/* requests. The token is
+    handed to the client at login (see accounts.log_in_session /
+    accounts_routes._me_payload) and must be echoed back via the
+    X-CSRF-Token header -- an attacker's cross-site form/script can make the
+    browser send the session cookie automatically, but can't read the token
+    out of it to also send that header."""
+    if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        return None
+    if not request.path.startswith('/api/'):
+        return None
+    if request.path == '/api/auth/login':
+        return None
+
+    expected = get_csrf_token()
+    if expected is None:
+        # Not logged in yet -- the route's own require_login/require_screen
+        # decorator will correctly answer 401, not this hook's job.
+        return None
+    provided = request.headers.get('X-CSRF-Token')
+    if provided != expected:
+        return jsonify({'error': 'Geçersiz CSRF token.'}), 403
+    return None
 
 # Global variables for storing system state
 system_state = {
@@ -105,6 +146,7 @@ def get_token_info():
 
 
 @app.route('/api/status')
+@require_screen("dashboard")
 def get_status():
     """Get system status."""
     logs = read_mail_events(limit=1000)
@@ -127,6 +169,7 @@ def get_status():
 
 
 @app.route('/api/run', methods=['POST'])
+@require_screen("dashboard")
 def run_email_processor():
     """Process unread emails from the dashboard and persist the results."""
     if system_state['is_running']:
@@ -185,6 +228,7 @@ def run_email_processor():
 
 
 @app.route('/api/emails')
+@require_screen("emails")
 def get_emails():
     """Get email list from server."""
     try:
@@ -218,6 +262,7 @@ def get_emails():
 
 
 @app.route('/api/token/refresh', methods=['POST'])
+@require_screen("settings")
 def refresh_token():
     """Refresh authentication token."""
     try:
@@ -233,6 +278,7 @@ def refresh_token():
 
 
 @app.route('/api/token/info')
+@require_screen("settings")
 def token_info_endpoint():
     """Get current token information."""
     try:
@@ -243,6 +289,7 @@ def token_info_endpoint():
 
 
 @app.route('/api/process-email', methods=['POST'])
+@require_screen("emails")
 def process_email_manual():
     """Manually process an email."""
     try:
@@ -378,6 +425,7 @@ def process_email_manual():
 
 
 @app.route('/api/mail-logs')
+@require_screen("logs")
 def get_mail_logs():
     """Return persistent email/ticket processing logs, paginated and filterable.
 
@@ -428,6 +476,7 @@ def get_mail_logs():
 
 
 @app.route('/api/mail-logs/detail/<timestamp>')
+@require_screen("logs")
 def get_mail_log_detail(timestamp):
     """Return a single processing-log record by its exact timestamp (unique
     at microsecond precision — logs have no other stable identifier).
@@ -445,6 +494,7 @@ def get_mail_log_detail(timestamp):
 
 
 @app.route('/api/tickets')
+@require_screen("tickets")
 def get_created_tickets():
     """Return successful ticket records, paginated and filterable by date
     range, sender, top-level classification, and/or a free-text search."""
@@ -490,6 +540,7 @@ def get_created_tickets():
 
 
 @app.route('/api/tickets/<ticket_id>')
+@require_screen("tickets")
 def get_ticket_detail(ticket_id):
     """Return a single ticket record by its CSM ticket id, with full detail
     (mail body, classification breadcrumb, raw CSM category ids)."""
@@ -500,6 +551,7 @@ def get_ticket_detail(ticket_id):
 
 
 @app.route('/api/mail-logs/clear', methods=['POST'])
+@require_screen("logs")
 def clear_mail_logs():
     """Clear persistent processing logs."""
     clear_mail_events()
@@ -507,6 +559,7 @@ def clear_mail_logs():
 
 
 @app.route('/api/validate/turkish-id', methods=['POST'])
+@require_screen("settings")
 def validate_turkish_id():
     """Validate Turkish ID number."""
     try:
@@ -519,6 +572,7 @@ def validate_turkish_id():
 
 
 @app.route('/api/validate/tax-id', methods=['POST'])
+@require_screen("settings")
 def validate_tax_id():
     """Validate Tax ID number."""
     try:
@@ -531,6 +585,7 @@ def validate_tax_id():
 
 
 @app.route('/api/profanity-check', methods=['POST'])
+@require_screen("settings")
 def check_profanity():
     """Check text for profanity."""
     try:
@@ -543,6 +598,7 @@ def check_profanity():
 
 
 @app.route('/api/errors')
+@require_screen("dashboard")
 def get_errors():
     """Get system errors."""
     persistent_errors = [
@@ -562,6 +618,7 @@ def get_errors():
 
 
 @app.route('/api/statistics')
+@require_screen("dashboard")
 def get_statistics():
     """Get system statistics."""
     return jsonify({
@@ -619,6 +676,7 @@ def _apply_report_filters(events, sender=None, classification=None, since_iso=No
 
 
 @app.route('/api/reports/timeseries')
+@require_screen("reports")
 def reports_timeseries():
     """Zaman bazlı işlenen e-posta hacmi (gün veya saat kırılımında), başarı/hata kırılımıyla."""
     n, unit = _parse_range(request.args.get('range'), 14, 'd')
@@ -667,6 +725,7 @@ def reports_timeseries():
 
 
 @app.route('/api/reports/by-classification')
+@require_screen("reports")
 def reports_by_classification():
     """Oluşturulan ticket'ların üst seviye sınıflandırmaya göre dağılımı."""
     events = _apply_report_filters(
@@ -690,6 +749,7 @@ def reports_by_classification():
 
 
 @app.route('/api/reports/by-sender')
+@require_screen("reports")
 def reports_by_sender():
     """Gönderen bazlı e-posta hacmi (en çok yazan N adres)."""
     try:
@@ -720,6 +780,7 @@ def reports_by_sender():
 
 
 @app.route('/api/clear-errors', methods=['POST'])
+@require_screen("dashboard")
 def clear_errors():
     """Clear error log."""
     system_state['errors'] = []
@@ -728,6 +789,7 @@ def clear_errors():
 
 
 @app.route('/api/service-logs')
+@require_screen("monitoring")
 def get_service_logs():
     """Return outbound service-call records (CSM API, Gmail IMAP, panel API),
     paginated and filterable by service, actor, status, and date range."""
@@ -765,6 +827,7 @@ def get_service_logs():
 
 
 @app.route('/api/service-logs/summary')
+@require_screen("monitoring")
 def get_service_logs_summary():
     """Per-service health snapshot: last success/failure timestamp and totals.
     Powers the Monitoring page's status cards without shipping the full log."""
@@ -791,6 +854,7 @@ def get_service_logs_summary():
 
 
 @app.route('/api/service-logs/clear', methods=['POST'])
+@require_screen("monitoring")
 def clear_service_logs():
     """Clear the outbound service-call log."""
     clear_service_events()
@@ -798,12 +862,14 @@ def clear_service_logs():
 
 
 @app.route('/api/bulk-shift/env')
+@require_screen("bulk_shift")
 def get_bulk_shift_env():
     """Which CSM environment bulk-shift tickets currently go to (preprod/prod)."""
     return jsonify({'environment': BULK_SHIFT_ENV})
 
 
 @app.route('/api/bulk-shift/upload', methods=['POST'])
+@require_screen("bulk_shift")
 def upload_bulk_shift():
     """Parse an uploaded reservation-shift Excel export and create one CSM
     "ilişkili ticket" (LINKED_TICKET) per row, linked to that row's own
@@ -840,38 +906,11 @@ def upload_bulk_shift():
         }), 400
 
     try:
-        token = get_bulk_shift_token()
+        summary = process_rows(rows, fallback_parent_ticket_uuid=fallback_parent_ticket_uuid)
     except RuntimeError as e:
         return jsonify({'error': str(e)}), 502
 
-    results = []
-    success_count = 0
-    for row in rows:
-        payload = build_bulk_ticket_payload(
-            reservation_no=row['reservation_no'],
-            shift_type_label=row['shift_type'],
-            alternative_text=row['alternative'],
-            parent_ticket_uuid=row['parent_ticket_uuid'] or fallback_parent_ticket_uuid,
-        )
-        outcome = create_bulk_ticket(payload, token)
-        if outcome['success']:
-            success_count += 1
-        results.append({
-            'reservation_no': row['reservation_no'],
-            'shift_type': row['shift_type'],
-            'shift_type_code': classify_shift_type(row['shift_type']),
-            'success': outcome['success'],
-            'ticket_id': outcome.get('ticket_id'),
-            'error': outcome.get('error'),
-        })
-
-    return jsonify({
-        'environment': BULK_SHIFT_ENV,
-        'total': len(results),
-        'success_count': success_count,
-        'failed_count': len(results) - success_count,
-        'results': results,
-    })
+    return jsonify(summary)
 
 
 @app.route('/', defaults={'path': ''})

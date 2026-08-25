@@ -6,13 +6,23 @@ sozlesmesini (response sekli, limit/offset/filtre davranisi) dogrular.
 Ag baglantisi gerektirmez — sadece yerel mail_processing_log.jsonl okunur.
 """
 
+import os
 import sys
+import tempfile
 from datetime import datetime, timedelta
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# Temp SQLite DB for the login below -- must be set before `from app import
+# app` (app.py reads DATABASE_URL at import time). Never touches the real
+# instance/enigma.db.
+_tmp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+_tmp_db.close()
+os.environ["DATABASE_URL"] = f"sqlite:///{_tmp_db.name}"
+
 from app import app, _parse_range, _cutoff_from_range, _apply_report_filters
+from dev_test_helpers import login_test_client
 
 passed = 0
 failed = 0
@@ -98,6 +108,7 @@ check(
 # Endpoint sozlesmesi (Flask test client — ag baglantisi yok)
 # ==========================================================
 client = app.test_client()
+login_test_client(app, client)
 
 resp = client.get("/api/reports/timeseries?range=7d")
 check("GET /api/reports/timeseries?range=7d -> 200", resp.status_code == 200, resp.status_code)

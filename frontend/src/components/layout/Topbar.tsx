@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Moon, Sun, Menu } from 'lucide-react'
+import { Search, Moon, Sun, Menu, LogOut } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
+import { useAuth } from '@/contexts/AuthContext'
+import { ROLE_LABELS } from '@/lib/screens'
 import { NotificationBell } from './NotificationBell'
 import { WeatherStrip } from './WeatherStrip'
 
@@ -11,8 +13,14 @@ interface TopbarProps {
 
 export function Topbar({ onMenuClick }: TopbarProps) {
   const { theme, toggle } = useTheme()
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault()
@@ -59,12 +67,21 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
         <div className="flex items-center gap-3 border-l border-enigma-border pl-2 sm:pl-4">
           <div className="hidden text-right sm:block">
-            <p className="text-sm font-medium text-enigma-text">Enigma Admin</p>
-            <p className="text-xs text-enigma-text-muted">Yönetici</p>
+            <p className="text-sm font-medium text-enigma-text">{user?.email ?? '—'}</p>
+            <p className="text-xs text-enigma-text-muted">{user ? ROLE_LABELS[user.role] : ''}</p>
           </div>
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-enigma-primary-light text-sm font-semibold text-enigma-primary">
-            M
+            {user?.email?.[0]?.toUpperCase() ?? '?'}
           </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            aria-label="Çıkış yap"
+            title="Çıkış yap"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-enigma-text-muted hover:bg-enigma-bg hover:text-enigma-danger"
+          >
+            <LogOut className="h-4.5 w-4.5" />
+          </button>
         </div>
       </div>
     </header>
