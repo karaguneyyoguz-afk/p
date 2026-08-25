@@ -516,3 +516,34 @@
 {"timestamp": "2026-08-24T18:08:17.152253+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
 {"timestamp": "2026-08-24T18:17:00.887534+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
 {"timestamp": "2026-08-24T18:19:35.461331+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-25T09:20:23.947723+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:20:39.091426+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:20:54.462935+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:21:09.477318+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:21:24.501063+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:21:39.515653+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:21:54.542333+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:22:09.834428+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:22:24.870532+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:22:39.905417+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:22:54.952473+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:23:09.993125+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:23:25.032650+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:23:40.038036+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:23:55.055337+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:24:10.069233+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:24:25.078470+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:24:40.087287+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:24:55.100785+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:25:10.110902+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:25:25.186935+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:25:40.242237+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:25:58.425610+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:26:13.613803+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:26:28.734249+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:26:43.739606+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:26:58.748904+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:27:13.757240+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:27:28.765297+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:27:43.774603+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:28:00.556102+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
