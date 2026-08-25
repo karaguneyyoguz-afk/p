@@ -1,17 +1,20 @@
 """Toplu Kaydırma (Bulk Reservation Shift) module.
 
-Creates CSM sub-tickets in bulk, linked to a parent ticket, from an uploaded
-Excel export of reservations that need a date shift. Ported from a standalone
-desktop RPA script (task/rpa_otomasyon.py, task/rpa.txt) into the Enigma
-panel so it runs through the web UI instead of a local Python script with a
-hardcoded bearer token and hardcoded reporter identity.
+Creates CSM "ilişkili ticket" (LINKED_TICKET) entries in bulk, one per
+reservation row, linked to an existing main ("Onay Kaydırma") ticket, from an
+uploaded Excel export of reservations that need a date shift.
 
-Environment: defaults to PRE-PROD (see BULK_SHIFT_ENV). PROD_MAPPINGS now
-carries the same category/channel/ticketType ids as PREPROD_MAPPINGS —
-cross-checked against config.py's production category ids (identical) — but
-this has not yet been confirmed end-to-end with a real production request.
-Verify with one row before trusting it for a full batch, then set
-BULK_SHIFT_ENV=prod to actually target production.
+Payload shape verified against a real, successful production request
+(captured from the CSM web UI's Network tab, 2026-08-25, ticket #101944819,
+HTTP 200) -- see build_bulk_ticket_payload for the exact fields. Two things
+about that captured example that are NOT obvious from CSM's UI:
+  1. The link to the main ticket is two top-level fields on the payload
+     (parentTicketUUID + relationType: "LINKED_TICKET") -- NOT an entry in
+     ticketRelationList (which stays empty, unlike the parent-child relation
+     this module used before).
+  2. The reporter/"raporlayan kişi" for every linked ticket is a fixed,
+     pre-existing anonymous CSM contact ("Onay Kaydırma", onay@tatilbudur.com)
+     -- not the individual mail sender, and not something collected via a form.
 """
 
 import os
@@ -29,6 +32,7 @@ COLUMN_ALIASES = {
     "reservation_no": ("Rezervasyon No",),
     "shift_type": ("Kaydırma Tipi",),
     "alternative": ("Alternatif 1",),
+    "parent_ticket_uuid": ("parentTicketUUID",),
 }
 
 
@@ -36,6 +40,7 @@ class ExcelRow(TypedDict):
     reservation_no: str
     shift_type: str
     alternative: str
+    parent_ticket_uuid: str
 
 
 def parse_excel_rows(file_stream: BinaryIO) -> List[ExcelRow]:
@@ -65,6 +70,7 @@ def parse_excel_rows(file_stream: BinaryIO) -> List[ExcelRow]:
         column_positions[field] = header_index[match]
 
     rows: List[ExcelRow] = []
+    last_parent_ticket_uuid = ""
     for row in sheet.iter_rows(min_row=2, values_only=True):
         if row is None or all(cell is None for cell in row):
             continue
@@ -80,11 +86,19 @@ def parse_excel_rows(file_stream: BinaryIO) -> List[ExcelRow]:
         if not reservation_no:
             continue
 
+        # parentTicketUUID is typically only filled on the first row of each
+        # WorkGroup/Ticket ID group in the source export (observed live) --
+        # carry the last non-empty value forward for rows that leave it blank.
+        parent_ticket_uuid = cell("parent_ticket_uuid") or last_parent_ticket_uuid
+        if parent_ticket_uuid:
+            last_parent_ticket_uuid = parent_ticket_uuid
+
         rows.append(
             ExcelRow(
                 reservation_no=reservation_no,
                 shift_type=cell("shift_type") or "Operasyon Kaynaklı",
                 alternative=cell("alternative") or "Toplu Kaydırma İşlemi",
+                parent_ticket_uuid=parent_ticket_uuid,
             )
         )
 
@@ -103,49 +117,55 @@ _ENV_URLS = {
     },
 }
 
-# Verified against the pre-prod CSM environment (source: task/rpa_otomasyon.py).
-PREPROD_MAPPINGS = {
-    "OPERASYON_KAYNAKLI": {
-        "channel": {"shortCode": "CAGRI_MERKEZI", "name": "Çağrı Merkezi", "id": 100000041, "uuid": "9a4dd8ef-045a-4f57-8c2c-8b0fc209d367"},
-        "ticketType": {"shortCode": "REZERVASYON_ISLEMLERI", "name": "Backoffice İşlemleri", "id": 100000059, "uuid": "654c901c-40c2-46c1-8a00-925009dde46e"},
-        "category": {"shortCode": "KAYDIRMA", "name": "Kaydırma", "id": 100000143, "uuid": "f3a9a508-0732-4410-82d7-847867fc616f"},
-        "subCategory": {"shortCode": "OPERASYON_KAYNAKLI", "name": "Operasyon Kaynaklı", "id": 100000671, "uuid": "089de3d8-b26d-42da-88e6-f062cae187f3"},
+# The fixed "Onay Kaydırma" anonymous contact every linked ticket is reported
+# by (verified real party role id -- reusing it keeps CSM from accumulating
+# more near-duplicate "onay kaydırma"-ish contacts, several of which already
+# exist from past manual use).
+ONAY_KAYDIRMA_PARTY_ROLE = {
+    "id": 100239153,
+    "party": {
+        "firstName": "Onay",
+        "lastName": "Kaydırma",
+        "nationalityId": None,
+        "partyType": "INDIVIDUAL",
+        "fullName": "Onay Kaydırma",
     },
-    "OTEL_KAYNAKLI": {
-        "channel": {"shortCode": "CAGRI_MERKEZI", "name": "Çağrı Merkezi", "id": 100000041, "uuid": "9a4dd8ef-045a-4f57-8c2c-8b0fc209d367"},
-        "ticketType": {"shortCode": "REZERVASYON_ISLEMLERI", "name": "Backoffice İşlemleri", "id": 100000059, "uuid": "654c901c-40c2-46c1-8a00-925009dde46e"},
-        "category": {"shortCode": "KAYDIRMA", "name": "Kaydırma", "id": 100000143, "uuid": "f3a9a508-0732-4410-82d7-847867fc616f"},
-        "subCategory": {"shortCode": "OTEL_KAYNAKLI", "name": "Otel Kaynaklı", "id": 100000669, "uuid": "089de3d8-b26d-42da-88e6-f062cae187f3"},
+    "partyRoleType": {
+        "id": 1000022,
+        "uuid": "4b7fc8ce-289c-476f-92d0-9279e7199983",
+        "shortCode": "ANONYMOUS",
+        "ownerType": True,
     },
-    "ODEME_TAMAMLAMA": {
-        "channel": {"shortCode": "CAGRI_MERKEZI", "name": "Çağrı Merkezi", "id": 100000041, "uuid": "9a4dd8ef-045a-4f57-8c2c-8b0fc209d367"},
-        "ticketType": {"shortCode": "REZERVASYON_ISLEMLERI", "name": "Backoffice İşlemleri", "id": 100000059, "uuid": "654c901c-40c2-46c1-8a00-925009dde46e"},
-        "category": {"shortCode": "DIGER_ISLEMLER", "name": "Diğer İşlemler", "id": 100000172, "uuid": "f3a9a508-0732-4410-82d7-847867fc616f"},
-        "subCategory": {"shortCode": "ODEME_TAMAMLAMA", "name": "Ödeme Tamamlama", "id": 100000554, "uuid": "089de3d8-b26d-42da-88e6-f062cae187f3"},
-    },
+    "externalId": None,
+    "attributeValueList": [],
+    "contactMediumList": [
+        {
+            "contactMediumType": {"id": 10000005, "uuid": "c38936ac-7e2c-46e7-aacc-deca59e132bf", "shortCode": "EMAIL"},
+            "val": "onay@tatilbudur.com",
+            "isPrimary": True,
+            "externalId": None,
+        }
+    ],
 }
 
-# Same category/channel/ticketType ids as PREPROD_MAPPINGS above — cross-checked
-# against config.py's CATEGORY_SHIFT/SUB_CATEGORY_SHIFT_*/TICKET_TYPE_RESERVATION/
-# CATEGORY_OTHER_OPERATIONS/SUB_CATEGORY_OTHER_OPERATIONS_PAYMENT_COMPLETION, which
-# are the ids the main app already uses when creating real tickets against
-# tatilbudur-api.cloudcsmetiya.com (production). They match exactly, and the
-# priorityLevel uuid in build_bulk_ticket_payload also matches the one csm_api.py
-# uses in production — so this tenant's category/channel/priority reference data
-# is shared between preprod and production. Not yet confirmed end-to-end with a
-# real production request — verify with one row before relying on this.
-PROD_MAPPINGS: Dict[str, Dict[str, Any]] = {
-    "OPERASYON_KAYNAKLI": {
-        "channel": {"shortCode": "CAGRI_MERKEZI", "name": "Çağrı Merkezi", "id": 100000041, "uuid": "9a4dd8ef-045a-4f57-8c2c-8b0fc209d367"},
-        "ticketType": {"shortCode": "REZERVASYON_ISLEMLERI", "name": "Backoffice İşlemleri", "id": 100000059, "uuid": "654c901c-40c2-46c1-8a00-925009dde46e"},
-        "category": {"shortCode": "KAYDIRMA", "name": "Kaydırma", "id": 100000143, "uuid": "f3a9a508-0732-4410-82d7-847867fc616f"},
-        "subCategory": {"shortCode": "OPERASYON_KAYNAKLI", "name": "Operasyon Kaynaklı", "id": 100000671, "uuid": "089de3d8-b26d-42da-88e6-f062cae187f3"},
-    },
+# Channel/ticketType/category/subCategory per "Kaydırma Tipi" classification
+# (kullanıcı tarafından doğrulandı, 2026-08-25). The relation to the main
+# ticket (top-level parentTicketUUID + relationType, see build_bulk_ticket_payload)
+# and the fixed "Onay Kaydırma" reporter are shared across all three; only the
+# kırılım (category path) differs by shift type. Add more entries here as new
+# kırılımlar are confirmed.
+SHIFT_TYPE_FIELDS: Dict[str, Dict[str, Any]] = {
     "OTEL_KAYNAKLI": {
         "channel": {"shortCode": "CAGRI_MERKEZI", "name": "Çağrı Merkezi", "id": 100000041, "uuid": "9a4dd8ef-045a-4f57-8c2c-8b0fc209d367"},
         "ticketType": {"shortCode": "REZERVASYON_ISLEMLERI", "name": "Backoffice İşlemleri", "id": 100000059, "uuid": "654c901c-40c2-46c1-8a00-925009dde46e"},
         "category": {"shortCode": "KAYDIRMA", "name": "Kaydırma", "id": 100000143, "uuid": "f3a9a508-0732-4410-82d7-847867fc616f"},
         "subCategory": {"shortCode": "OTEL_KAYNAKLI", "name": "Otel Kaynaklı", "id": 100000669, "uuid": "089de3d8-b26d-42da-88e6-f062cae187f3"},
+    },
+    "OPERASYON_KAYNAKLI": {
+        "channel": {"shortCode": "CAGRI_MERKEZI", "name": "Çağrı Merkezi", "id": 100000041, "uuid": "9a4dd8ef-045a-4f57-8c2c-8b0fc209d367"},
+        "ticketType": {"shortCode": "REZERVASYON_ISLEMLERI", "name": "Backoffice İşlemleri", "id": 100000059, "uuid": "654c901c-40c2-46c1-8a00-925009dde46e"},
+        "category": {"shortCode": "KAYDIRMA", "name": "Kaydırma", "id": 100000143, "uuid": "f3a9a508-0732-4410-82d7-847867fc616f"},
+        "subCategory": {"shortCode": "OPERASYON_KAYNAKLI", "name": "Operasyon Kaynaklı", "id": 100000671, "uuid": "089de3d8-b26d-42da-88e6-f062cae187f3"},
     },
     "ODEME_TAMAMLAMA": {
         "channel": {"shortCode": "CAGRI_MERKEZI", "name": "Çağrı Merkezi", "id": 100000041, "uuid": "9a4dd8ef-045a-4f57-8c2c-8b0fc209d367"},
@@ -158,26 +178,10 @@ PROD_MAPPINGS: Dict[str, Dict[str, Any]] = {
 _cached_token: Optional[str] = None
 
 
-class Reporter(TypedDict):
-    first_name: str
-    last_name: str
-    phone: str
-    email: str
-
-
-def _mappings_for_env() -> Dict[str, Dict[str, Any]]:
-    if BULK_SHIFT_ENV == "prod":
-        if not PROD_MAPPINGS:
-            raise RuntimeError(
-                "PROD_MAPPINGS henüz doldurulmadı — BULK_SHIFT_ENV='prod' için "
-                "doğrulanmış production kategori/kanal/ticketType ID'leri gerekli."
-            )
-        return PROD_MAPPINGS
-    return PREPROD_MAPPINGS
-
-
 def classify_shift_type(kaydirma_tipi: str) -> str:
-    """Mirrors the original script's keyword-based classification."""
+    """Mirrors the original script's keyword-based classification -- selects
+    which SHIFT_TYPE_FIELDS entry (channel/category/subCategory/ticketType)
+    a row's ticket uses."""
     text = (kaydirma_tipi or "").strip()
     if "Otel" in text:
         return "OTEL_KAYNAKLI"
@@ -189,23 +193,25 @@ def classify_shift_type(kaydirma_tipi: str) -> str:
 def get_bulk_shift_token(force_refresh: bool = False) -> str:
     """Get a bearer token for the configured environment (BULK_SHIFT_ENV).
 
-    Reuses the same CSM_USERNAME/CSM_PASSWORD as the main app (matching the
-    original script's behavior) — just against the pre-prod auth URL.
+    Uses the dedicated RPA_OTOMASYON_USERNAME/PASSWORD system account (falls
+    back to CSM_USERNAME/CSM_PASSWORD if that account isn't provisioned yet)
+    so linked tickets show "Oluşturan: rpa_otomasyon" in CSM rather than a
+    personal account.
     """
     global _cached_token
     if _cached_token and not force_refresh:
         return _cached_token
 
-    from config import CSM_USERNAME, CSM_PASSWORD
+    from config import RPA_OTOMASYON_USERNAME, RPA_OTOMASYON_PASSWORD
 
-    if not CSM_USERNAME or not CSM_PASSWORD:
-        raise RuntimeError("CSM_USERNAME / CSM_PASSWORD ortam değişkenleri ayarlanmamış.")
+    if not RPA_OTOMASYON_USERNAME or not RPA_OTOMASYON_PASSWORD:
+        raise RuntimeError("RPA_OTOMASYON_USERNAME / RPA_OTOMASYON_PASSWORD (veya CSM_USERNAME / CSM_PASSWORD) ayarlanmamış.")
 
     auth_url = _ENV_URLS[BULK_SHIFT_ENV]["auth"]
     try:
         response = requests.post(
             auth_url,
-            json={"userName": CSM_USERNAME, "password": CSM_PASSWORD},
+            json={"userName": RPA_OTOMASYON_USERNAME, "password": RPA_OTOMASYON_PASSWORD},
             headers={"Content-Type": "application/json", "Accept": "application/json"},
         )
         if response.status_code != 200:
@@ -242,79 +248,33 @@ def build_bulk_ticket_payload(
     shift_type_label: str,
     alternative_text: str,
     parent_ticket_uuid: str,
-    reporter: Reporter,
 ) -> Dict[str, Any]:
-    mapping = _mappings_for_env()[classify_shift_type(shift_type_label)]
-    full_name = f"{reporter['first_name']} {reporter['last_name']}".strip()
-
-    contact_medium_list = [
-        {
-            "contactMediumType": {"id": 10000004, "uuid": "dd61771d-02d2-46e5-9b4d-7cbd568ed84c", "shortCode": "GSM"},
-            "val": reporter["phone"],
-            "isPrimary": True,
-            "externalId": None,
-        },
-        {
-            "contactMediumType": {"id": 10000005, "uuid": "c38936ac-7e2c-46e7-aacc-deca59e132bf", "shortCode": "EMAIL"},
-            "val": reporter["email"],
-            "isPrimary": True,
-            "externalId": None,
-        },
-    ]
-
-    party_role = {
-        "party": {
-            "firstName": reporter["first_name"],
-            "lastName": reporter["last_name"],
-            "nationalityId": None,
-            "partyType": "INDIVIDUAL",
-            "fullName": full_name,
-            "preferredLanguage": {
-                "country": None,
-                "createDate": "2021-06-23T20:39:15.028Z",
-                "displayLanguage": "Türkçe",
-                "id": 1000001,
-                "language": "tr",
-                "rtl": None,
-                "status": 1,
-                "updateDate": None,
-            },
-        },
-        "partyRoleType": {
-            "id": 1000022,
-            "uuid": "4b7fc8ce-289c-476f-92d0-9279e7199983",
-            "shortCode": "ANONYMOUS",
-            "ownerType": True,
-        },
-        "externalId": None,
-        "attributeValueList": [],
-        "contactMediumList": contact_medium_list,
-    }
+    party_role = ONAY_KAYDIRMA_PARTY_ROLE
+    fields = SHIFT_TYPE_FIELDS[classify_shift_type(shift_type_label)]
 
     return {
         "contactParties": [
             {
                 "partyRole": party_role,
                 "contactMediumList": [
-                    {"contactMedium": contact_medium_list[0], "isPreferred": True},
-                    {"contactMedium": contact_medium_list[1], "isPreferred": True},
+                    {"contactMedium": party_role["contactMediumList"][0], "isPreferred": True},
                 ],
                 "isPreferred": True,
-                "preferredContactChannelList": ["SMS", "EMAIL"],
+                "preferredContactChannelList": ["EMAIL"],
             }
         ],
         "attributeList": [],
         "attributeSetList": [],
-        "ticketRelationList": [{"parentTicketUUID": parent_ticket_uuid}],
+        "ticketRelationList": [],
         "subTicketList": [],
         "availableOperations": [],
         "stage": {"shortCode": "START"},
         "partyRole": party_role,
-        "description": f"<p>Toplu Kaydırma - Rezervasyon: {reservation_no} - {alternative_text}</p>",
-        "channel": mapping["channel"],
-        "subCategory": mapping["subCategory"],
-        "category": mapping["category"],
-        "ticketType": mapping["ticketType"],
+        "description": f"<p>Toplu Kaydırma - Rezervasyon: {reservation_no} - {shift_type_label} - {alternative_text}</p>",
+        "channel": fields["channel"],
+        "subCategory": fields["subCategory"],
+        "category": fields["category"],
+        "ticketType": fields["ticketType"],
         "priorityLevel": {
             "shortCode": "NORMAL",
             "name": "Normal",
@@ -328,9 +288,11 @@ def build_bulk_ticket_payload(
         },
         "isResolved": False,
         "isProactive": False,
-        "isParent": False,
+        "isParent": True,
         "reminders": [],
         "detectedLanguage": "",
+        "parentTicketUUID": parent_ticket_uuid,
+        "relationType": "LINKED_TICKET",
         "relatedProduct": {"serviceNumber": str(reservation_no)},
     }
 

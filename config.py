@@ -26,6 +26,13 @@ SMTP_PORT = 465
 CSM_USERNAME = os.getenv("CSM_USERNAME", "")
 CSM_PASSWORD = os.getenv("CSM_PASSWORD", "")
 
+# Dedicated system account for mail-triggered Toplu Kaydırma (bulk
+# reservation shift) tickets -- so those tickets show "Oluşturan:
+# rpa_otomasyon" in CSM instead of a personal account. Falls back to
+# CSM_USERNAME/CSM_PASSWORD if not set (not yet provisioned).
+RPA_OTOMASYON_USERNAME = os.getenv("RPA_OTOMASYON_USERNAME") or CSM_USERNAME
+RPA_OTOMASYON_PASSWORD = os.getenv("RPA_OTOMASYON_PASSWORD") or CSM_PASSWORD
+
 # ==========================================
 # CSM API ENDPOINTS
 # ==========================================

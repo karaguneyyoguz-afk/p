@@ -319,11 +319,10 @@ export function useBulkShiftEnv() {
 
 export interface BulkShiftUploadInput {
   file: File
-  parentTicketUuid: string
-  reporterFirstName: string
-  reporterLastName: string
-  reporterPhone: string
-  reporterEmail: string
+  /** Optional -- only used as a fallback for rows whose own parentTicketUUID
+   * column (in the Excel) is blank. Reporter is always the fixed "Onay
+   * Kaydırma" CSM contact, not collected here. */
+  parentTicketUuid?: string
 }
 
 export function useUploadBulkShift() {
@@ -332,11 +331,9 @@ export function useUploadBulkShift() {
     mutationFn: (input: BulkShiftUploadInput) => {
       const formData = new FormData()
       formData.append('file', input.file)
-      formData.append('parent_ticket_uuid', input.parentTicketUuid)
-      formData.append('reporter_first_name', input.reporterFirstName)
-      formData.append('reporter_last_name', input.reporterLastName)
-      formData.append('reporter_phone', input.reporterPhone)
-      formData.append('reporter_email', input.reporterEmail)
+      if (input.parentTicketUuid) {
+        formData.append('parent_ticket_uuid', input.parentTicketUuid)
+      }
       return apiPostForm<BulkShiftUploadResponse>('/api/bulk-shift/upload', formData)
     },
     onSuccess: () => {

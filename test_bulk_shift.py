@@ -54,29 +54,45 @@ check("classify: bos string -> varsayilan OPERASYON_KAYNAKLI", classify_shift_ty
 # ==========================================================
 # build_bulk_ticket_payload
 # ==========================================================
-reporter = {"first_name": "Test", "last_name": "Kullanici", "phone": "+905000000000", "email": "test@example.com"}
 payload = build_bulk_ticket_payload(
     reservation_no="123456",
     shift_type_label="Otel Kaynaklı",
     alternative_text="Toplu Kaydırma İşlemi",
     parent_ticket_uuid="parent-uuid-123",
-    reporter=reporter,
 )
 check(
-    "payload: parent ticket UUID dogru yerlestirilmis",
-    payload["ticketRelationList"][0]["parentTicketUUID"] == "parent-uuid-123",
+    "payload: parent ticket UUID + relationType ust seviyede dogru yerlestirilmis (LINKED_TICKET)",
+    payload["parentTicketUUID"] == "parent-uuid-123" and payload["relationType"] == "LINKED_TICKET",
+    {"parentTicketUUID": payload.get("parentTicketUUID"), "relationType": payload.get("relationType")},
+)
+check(
+    "payload: ticketRelationList BOS (parent-child DEGIL, iliskili ticket)",
+    payload["ticketRelationList"] == [],
     payload["ticketRelationList"],
 )
 check(
-    "payload: reporter bilgisi partyRole'e yansimis (hardcoded degil)",
-    payload["partyRole"]["party"]["firstName"] == "Test"
-    and payload["partyRole"]["party"]["fullName"] == "Test Kullanici",
+    "payload: raporlayan sabit 'Onay Kaydırma' kontagi (mail gonderenden degil)",
+    payload["partyRole"]["party"]["fullName"] == "Onay Kaydırma"
+    and payload["partyRole"]["contactMediumList"][0]["val"] == "onay@tatilbudur.com",
     payload["partyRole"]["party"],
 )
 check(
-    "payload: OTEL_KAYNAKLI mapping'i kullanilmis",
-    payload["subCategory"]["shortCode"] == "OTEL_KAYNAKLI",
-    payload["subCategory"],
+    "payload: Otel Kaynakli kirilimi (KAYDIRMA > OTEL_KAYNAKLI) kullanilmis",
+    payload["category"]["shortCode"] == "KAYDIRMA" and payload["subCategory"]["shortCode"] == "OTEL_KAYNAKLI",
+    {"category": payload["category"], "subCategory": payload["subCategory"]},
+)
+
+odeme_payload = build_bulk_ticket_payload(
+    reservation_no="999",
+    shift_type_label="Ödeme Tamamlama",
+    alternative_text="x",
+    parent_ticket_uuid="parent-uuid-123",
+)
+check(
+    "payload: Odeme Tamamlama kirilimi (DIGER_ISLEMLER > ODEME_TAMAMLAMA) kullanilmis",
+    odeme_payload["category"]["shortCode"] == "DIGER_ISLEMLER"
+    and odeme_payload["subCategory"]["shortCode"] == "ODEME_TAMAMLAMA",
+    {"category": odeme_payload["category"], "subCategory": odeme_payload["subCategory"]},
 )
 check(
     "payload: relatedProduct.serviceNumber rezervasyon no'yu tasiyor",
@@ -86,7 +102,7 @@ check(
 # ==========================================================
 # parse_excel_rows
 # ==========================================================
-def make_excel(rows, headers=("Rezervasyon No", "Kaydırma Tipi", "Alternatif 1")):
+def make_excel(rows, headers=("Rezervasyon No", "Kaydırma Tipi", "Alternatif 1", "parentTicketUUID")):
     wb = Workbook()
     ws = wb.active
     ws.append(list(headers))
@@ -100,16 +116,21 @@ def make_excel(rows, headers=("Rezervasyon No", "Kaydırma Tipi", "Alternatif 1"
 
 good_excel = make_excel(
     [
-        ("553044193", "Otel Kaynaklı", "Alt 1"),
-        ("358109758", "Operasyon Kaynaklı", "Alt 2"),
-        ("", "Boş satır atlanmalı", "x"),
+        ("553044193", "Otel Kaynaklı", "Alt 1", "parent-uuid-abc"),
+        ("358109758", "Operasyon Kaynaklı", "Alt 2", ""),
+        ("", "Boş satır atlanmalı", "x", ""),
     ]
 )
 parsed = parse_excel_rows(good_excel)
 check("parse_excel_rows: 2 gecerli satir donuyor (bos satir atlaniyor)", len(parsed) == 2, parsed)
 check("parse_excel_rows: ilk satirin alanlari dogru okunmus", parsed[0]["reservation_no"] == "553044193", parsed[0])
+check(
+    "parse_excel_rows: bos parentTicketUUID onceki dolu degerden devralinir",
+    parsed[1]["parent_ticket_uuid"] == "parent-uuid-abc",
+    parsed[1],
+)
 
-missing_alt_excel = make_excel([("111", "Otel Kaynaklı", "")])
+missing_alt_excel = make_excel([("111", "Otel Kaynaklı", "", "uuid-1")])
 parsed2 = parse_excel_rows(missing_alt_excel)
 check(
     "parse_excel_rows: bos 'Alternatif 1' icin varsayilan metin kullanilir",
@@ -117,14 +138,14 @@ check(
     parsed2,
 )
 
-bad_columns_excel = make_excel([("x", "y", "z")], headers=("Yanlis", "Sutunlar", "Burada"))
+bad_columns_excel = make_excel([("x", "y", "z", "w")], headers=("Yanlis", "Sutunlar", "Burada", "Da"))
 try:
     parse_excel_rows(bad_columns_excel)
     check("parse_excel_rows: eksik sutun ValueError firlatir", False, "hata firlatmadi")
 except ValueError as e:
     check("parse_excel_rows: eksik sutun ValueError firlatir", "Rezervasyon No" in str(e), str(e))
 
-too_many_excel = make_excel([(str(i), "Otel Kaynaklı", "x") for i in range(MAX_ROWS + 5)])
+too_many_excel = make_excel([(str(i), "Otel Kaynaklı", "x", "uuid-1") for i in range(MAX_ROWS + 5)])
 try:
     parse_excel_rows(too_many_excel)
     check(f"parse_excel_rows: {MAX_ROWS} satir sinirini asinca ValueError firlatir", False, "hata firlatmadi")
@@ -146,38 +167,20 @@ check("POST upload: dosya yoksa 400", resp.status_code == 400 and "dosya" in res
 # upload needs its own fresh buffer rather than seeking/reusing one.
 resp = client.post(
     "/api/bulk-shift/upload",
-    data={"file": (make_excel([("553044193", "Otel Kaynaklı", "Alt 1")]), "test.xlsx")},
+    data={"file": (make_excel([("553044193", "Otel Kaynaklı", "Alt 1", "")]), "test.xlsx")},
     content_type="multipart/form-data",
 )
 check(
-    "POST upload: parent_ticket_uuid yoksa 400",
-    resp.status_code == 400 and "üst ticket" in resp.get_json().get("error", "").lower(),
+    "POST upload: satirda parentTicketUUID yok VE form'da yedek de yoksa 400",
+    resp.status_code == 400 and "parentticketuuid" in resp.get_json().get("error", "").lower(),
     resp.get_json(),
 )
 
 resp = client.post(
     "/api/bulk-shift/upload",
     data={
-        "file": (make_excel([("553044193", "Otel Kaynaklı", "Alt 1")]), "test.xlsx"),
+        "file": (make_excel([("x", "y", "z", "w")], headers=("Yanlis", "Sutunlar", "Burada", "Da")), "bad.xlsx"),
         "parent_ticket_uuid": "abc",
-    },
-    content_type="multipart/form-data",
-)
-check(
-    "POST upload: reporter alanlari eksikse 400",
-    resp.status_code == 400 and "raporlayan" in resp.get_json().get("error", "").lower(),
-    resp.get_json(),
-)
-
-resp = client.post(
-    "/api/bulk-shift/upload",
-    data={
-        "file": (make_excel([("x", "y", "z")], headers=("Yanlis", "Sutunlar", "Burada")), "bad.xlsx"),
-        "parent_ticket_uuid": "abc",
-        "reporter_first_name": "T",
-        "reporter_last_name": "K",
-        "reporter_phone": "1",
-        "reporter_email": "a@b.com",
     },
     content_type="multipart/form-data",
 )

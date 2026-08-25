@@ -21,21 +21,11 @@ export function BulkShift() {
 
   const [file, setFile] = useState<File | null>(null)
   const [parentTicketUuid, setParentTicketUuid] = useState('')
-  const [reporterFirstName, setReporterFirstName] = useState('')
-  const [reporterLastName, setReporterLastName] = useState('')
-  const [reporterPhone, setReporterPhone] = useState('')
-  const [reporterEmail, setReporterEmail] = useState('')
   const [result, setResult] = useState<BulkShiftUploadResponse | null>(null)
 
   const isPreprod = (envInfo?.environment ?? 'preprod') === 'preprod'
 
-  const canSubmit =
-    file &&
-    parentTicketUuid.trim() &&
-    reporterFirstName.trim() &&
-    reporterLastName.trim() &&
-    reporterPhone.trim() &&
-    reporterEmail.trim()
+  const canSubmit = Boolean(file)
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -44,11 +34,7 @@ export function BulkShift() {
     upload.mutate(
       {
         file,
-        parentTicketUuid: parentTicketUuid.trim(),
-        reporterFirstName: reporterFirstName.trim(),
-        reporterLastName: reporterLastName.trim(),
-        reporterPhone: reporterPhone.trim(),
-        reporterEmail: reporterEmail.trim(),
+        parentTicketUuid: parentTicketUuid.trim() || undefined,
       },
       {
         onSuccess: (data) => {
@@ -89,7 +75,7 @@ export function BulkShift() {
       <Card className="mb-4">
         <CardHeader
           title="Yükleme"
-          subtitle='Excel sütunları: "Rezervasyon No", "Kaydırma Tipi", "Alternatif 1"'
+          subtitle='Excel sütunları: "Rezervasyon No", "Kaydırma Tipi", "Alternatif 1", "parentTicketUUID"'
         />
         <CardBody>
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -115,44 +101,18 @@ export function BulkShift() {
             </div>
 
             <div>
-              <label className={labelClass}>Üst Ticket UUID</label>
+              <label className={labelClass}>Üst Ticket UUID (opsiyonel)</label>
               <input
                 className={`${inputClass} mt-1`}
                 value={parentTicketUuid}
                 onChange={(e) => setParentTicketUuid(e.target.value)}
                 placeholder="örn. db61fbfd-7ee8-485b-9370-c1ecac291379"
               />
-            </div>
-
-            <div>
-              <p className={labelClass}>Raporlayan Kişi</p>
-              <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <input
-                  className={inputClass}
-                  value={reporterFirstName}
-                  onChange={(e) => setReporterFirstName(e.target.value)}
-                  placeholder="Ad"
-                />
-                <input
-                  className={inputClass}
-                  value={reporterLastName}
-                  onChange={(e) => setReporterLastName(e.target.value)}
-                  placeholder="Soyad"
-                />
-                <input
-                  className={inputClass}
-                  value={reporterPhone}
-                  onChange={(e) => setReporterPhone(e.target.value)}
-                  placeholder="Telefon (+90...)"
-                />
-                <input
-                  className={inputClass}
-                  type="email"
-                  value={reporterEmail}
-                  onChange={(e) => setReporterEmail(e.target.value)}
-                  placeholder="E-posta"
-                />
-              </div>
+              <p className="mt-1 text-xs text-enigma-text-muted">
+                Excel'deki <code>parentTicketUUID</code> sütunu zaten her satırın üst ticket'ını
+                taşır — burası sadece o sütun boş kalan satırlar için yedek değerdir. Raporlayan
+                kişi her zaman sabit "Onay Kaydırma" kontağıdır, ayrıca girilmez.
+              </p>
             </div>
 
             <button

@@ -547,3 +547,22 @@
 {"timestamp": "2026-08-25T09:27:28.765297+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
 {"timestamp": "2026-08-25T09:27:43.774603+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
 {"timestamp": "2026-08-25T09:28:00.556102+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-25T09:42:26.516464+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-25T09:48:04.831822+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "failed", "detail": "[Errno 11001] getaddrinfo failed", "duration_ms": null}
+{"timestamp": "2026-08-25T09:48:22.201889+03:00", "service": "gmail_imap", "action": "connect", "actor": "sistem", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-25T09:48:34.243521+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-25T09:48:34.549098+03:00", "service": "panel_api", "action": "POST /api/run", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-25T10:53:47.449430+03:00", "service": "gmail_imap", "action": "connect", "actor": "panel", "status": "success", "detail": "karaguneyyoguz@gmail.com", "duration_ms": null}
+{"timestamp": "2026-08-25T10:53:51.768770+03:00", "service": "csm_api", "action": "auth", "actor": "panel", "status": "success", "detail": "Token alındı", "duration_ms": null}
+{"timestamp": "2026-08-25T10:53:52.990542+03:00", "service": "csm_api", "action": "search_customer", "actor": "panel", "status": "success", "detail": "oguz.karaguney@tatilbudur.com: boş yanıt", "duration_ms": null}
+{"timestamp": "2026-08-25T10:53:54.935700+03:00", "service": "csm_api", "action": "create_ticket", "actor": "panel", "status": "success", "detail": "#101944728", "duration_ms": null}
+{"timestamp": "2026-08-25T10:53:58.126996+03:00", "service": "panel_api", "action": "POST /api/run", "actor": "panel", "status": "success", "detail": "HTTP 200", "duration_ms": null}
+{"timestamp": "2026-08-25T11:27:05.943794+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-25T11:27:05.953140+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-25T11:27:05.961840+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-25T11:34:53.749573+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-25T11:34:53.760996+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-25T11:34:53.770284+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-25T11:45:54.149429+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-25T11:45:54.158790+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}
+{"timestamp": "2026-08-25T11:45:54.171098+03:00", "service": "panel_api", "action": "POST /api/bulk-shift/upload", "actor": "panel", "status": "failed", "detail": "HTTP 400", "duration_ms": null}

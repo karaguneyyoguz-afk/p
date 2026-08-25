@@ -38,7 +38,6 @@ from bulk_shift import (
     build_bulk_ticket_payload,
     create_bulk_ticket,
     get_bulk_shift_token,
-    Reporter,
 )
 
 # Load environment variables
@@ -807,23 +806,16 @@ def get_bulk_shift_env():
 @app.route('/api/bulk-shift/upload', methods=['POST'])
 def upload_bulk_shift():
     """Parse an uploaded reservation-shift Excel export and create one CSM
-    sub-ticket per row, linked to the given parent ticket. Runs synchronously
-    (one HTTP call per row) — see bulk_shift.MAX_ROWS for the row cap."""
+    "ilişkili ticket" (LINKED_TICKET) per row, linked to that row's own
+    parentTicketUUID column (an optional form parent_ticket_uuid fills in for
+    rows the export left that column blank on). Reporter is always the fixed
+    "Onay Kaydırma" system contact -- not collected from the form. Runs
+    synchronously (one HTTP call per row) — see bulk_shift.MAX_ROWS for the
+    row cap."""
     if 'file' not in request.files:
         return jsonify({'error': 'Excel dosyası bulunamadı (file alanı boş)'}), 400
 
-    parent_ticket_uuid = (request.form.get('parent_ticket_uuid') or '').strip()
-    if not parent_ticket_uuid:
-        return jsonify({'error': 'Üst ticket UUID\'si gerekli'}), 400
-
-    reporter: Reporter = {
-        'first_name': (request.form.get('reporter_first_name') or '').strip(),
-        'last_name': (request.form.get('reporter_last_name') or '').strip(),
-        'phone': (request.form.get('reporter_phone') or '').strip(),
-        'email': (request.form.get('reporter_email') or '').strip(),
-    }
-    if not all(reporter.values()):
-        return jsonify({'error': 'Raporlayan kişi için ad, soyad, telefon ve e-posta gerekli'}), 400
+    fallback_parent_ticket_uuid = (request.form.get('parent_ticket_uuid') or '').strip()
 
     try:
         rows = parse_excel_rows(request.files['file'].stream)
@@ -834,6 +826,18 @@ def upload_bulk_shift():
 
     if not rows:
         return jsonify({'error': 'Excel dosyasında işlenecek satır bulunamadı'}), 400
+
+    missing_parent_rows = [
+        row['reservation_no'] for row in rows
+        if not (row['parent_ticket_uuid'] or fallback_parent_ticket_uuid)
+    ]
+    if missing_parent_rows:
+        return jsonify({
+            'error': (
+                "Şu rezervasyonlarda parentTicketUUID bulunamadı ve form'da da "
+                f"yedek bir üst ticket UUID'si verilmedi: {', '.join(missing_parent_rows[:10])}"
+            )
+        }), 400
 
     try:
         token = get_bulk_shift_token()
@@ -847,8 +851,7 @@ def upload_bulk_shift():
             reservation_no=row['reservation_no'],
             shift_type_label=row['shift_type'],
             alternative_text=row['alternative'],
-            parent_ticket_uuid=parent_ticket_uuid,
-            reporter=reporter,
+            parent_ticket_uuid=row['parent_ticket_uuid'] or fallback_parent_ticket_uuid,
         )
         outcome = create_bulk_ticket(payload, token)
         if outcome['success']:

@@ -369,7 +369,14 @@ class EmailCategorizer:
     INVOICE_KEYWORDS = ["fatura", "efatura", "e-fatura"]
 
     INVOICE_MODIFICATION_KEYWORDS = [
-        "degisiklik", "degistir", "duzeltme", "revize", "onay",
+        # Not: "degisiklig" (k->g yumusamasi, ör. "değişikliğini", "değişikliğine")
+        # "degisiklik" ayrica gerekiyor -- Turkce'de "-lik" ile biten kelimeler
+        # unlu ile baslayan bir ek aldiginda son "k" harfi "g"ye yumusuyor, bu
+        # yuzden coklu ek almis haller bare "degisiklik" kokunu ICERMIYOR
+        # (canli ortamda gozlemlendi: "Fatura bilgilerimin değişikliğini talep
+        # ederim" hicbir modification keyword'e takilmayip yanlislikla
+        # MISAFIR_FATURASI'na dustu).
+        "degisiklik", "degisiklig", "degistir", "duzeltme", "revize", "onay",
         "yeniden duzenle", "yeniden kes", "bu bilgilere kes",
         "dogrusu bu sekildedir", "bilgilere kesil"
     ]
