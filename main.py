@@ -52,6 +52,24 @@ def process_email(
     print(f"Gönderen: {sender_email} ({sender_name})")
     print(f"Konu: {subject}")
 
+    # Automated bounce/delivery-failure notification (mailer-daemon, not a
+    # person) -- never a ticket, never a reply (replying to mailer-daemon is
+    # a no-op at best, a bounce loop at worst). Checked first: the most
+    # unambiguous "this isn't a customer" signal there is.
+    if processor.is_bounce_notification(email_message, subject):
+        print("📪 SONUÇ: Teslim edilemedi bildirimi (bounce) tespit edildi, atlanıyor.")
+        record_mail_event(
+            event="email_processed",
+            status="skipped",
+            sender_email=sender_email,
+            subject=subject,
+            reason="Otomatik teslim edilemedi bildirimi (mailer-daemon) -- ticket oluşturulmadı",
+            classification="bounce_notification",
+            mail_body=body,
+        )
+        print("-" * 50 + "\n")
+        return
+
     # Bulk/newsletter mail (List-Unsubscribe header or unsubscribe-link
     # boilerplate) never becomes a ticket and gets no automated reply --
     # checked before anything else since it's the most unambiguous signal

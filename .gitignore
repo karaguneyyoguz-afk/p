@@ -66,3 +66,5 @@ tessdata/
 
 # Scheduled mail-check task output
 scheduled_mail_check.log
+watch_mail.log
+backend_server.log

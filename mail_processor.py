@@ -295,6 +295,43 @@ class EmailProcessor:
         return any(keyword in normalized for keyword in BULK_UNSUBSCRIBE_KEYWORDS)
 
     @staticmethod
+    def is_bounce_notification(msg: email.message.Message, subject: str) -> bool:
+        """Detect an automated bounce/delivery-failure notification (a "your
+        message could not be delivered" report from a mail SERVER, not a
+        person) -- these must never become a ticket or get an automated
+        reply, since replying to mailer-daemon is a no-op at best and a
+        bounce loop at worst: observed live, a rejection email the system
+        itself sent to marketing@github.com got blocked by Google's policy,
+        the resulting bounce notification landed back in the inbox, and THAT
+        got processed as if it were a new customer email and turned into its
+        own ticket.
+
+        multipart/report with report-type=delivery-status (RFC 3462) is the
+        structural, unambiguous signal mail servers use for this; falls back
+        to the conventional mailer-daemon/postmaster sender address and
+        "Delivery Status Notification"-style subject wording for servers
+        that don't set the RFC 3462 content type."""
+        content_type = msg.get_content_type()
+        if content_type == "multipart/report" and "delivery-status" in (msg.get_param("report-type") or "").lower():
+            return True
+
+        # Covers both the address local-part ("mailer-daemon@...") and the
+        # display name ("Mail Delivery Subsystem <mailer-daemon@...>") in one
+        # check -- checking the raw From header text rather than the already
+        # parsed-out sender_email/name separately.
+        from_header = str(msg.get("From", "")).lower()
+        if any(marker in from_header for marker in ("mailer-daemon", "postmaster", "mail delivery subsystem")):
+            return True
+
+        normalized_subject = normalize_turkish_characters(subject or "")
+        bounce_subject_markers = (
+            "delivery status notification", "delivery status notification (failure)",
+            "undelivered mail returned to sender", "mail delivery failed",
+            "returned mail", "teslim edilemedi",
+        )
+        return any(marker in normalized_subject for marker in bounce_subject_markers)
+
+    @staticmethod
     def extract_ocr_attachments(msg: email.message.Message) -> List[Tuple[bytes, str]]:
         """Pull out raw bytes (+ content type) of any image/PDF attachments or
         inline images (customers sometimes send a Vergi Levhası scan/export or
