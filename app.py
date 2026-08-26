@@ -19,7 +19,8 @@ from dotenv import load_dotenv
 from mail_processor import EmailProcessor, EmailCategorizer, send_notification_email
 from csm_api import CSMAPIClient, TicketPayloadBuilder
 from auth import get_bearer_token, invalidate_token_cache
-from validators import contains_profanity, is_valid_turkish_id, is_valid_tax_id
+from validators import is_valid_turkish_id, is_valid_tax_id
+from content_moderation import check_content, create_flagged_mail
 from utils import normalize_turkish_characters
 from logging_utils import (
     clear_mail_error_events,
@@ -43,6 +44,7 @@ from bulk_shift import (
 from models import db
 from accounts import require_screen, get_csrf_token, current_user
 from accounts_routes import accounts_bp
+from content_rules_routes import content_rules_bp
 
 # Load environment variables
 load_dotenv()
@@ -86,6 +88,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 Migrate(app, db)
 app.register_blueprint(accounts_bp)
+app.register_blueprint(content_rules_bp)
 
 
 @app.before_request
@@ -335,22 +338,28 @@ def process_email_manual():
                 from ocr_utils import extract_invoice_fields_from_attachments
                 attachment_fields = extract_invoice_fields_from_attachments(ocr_attachments)
 
-        # Check profanity
-        if contains_profanity(f"{subject} {body}"):
+        # Uygunsuz içerik denetimi -- bkz. content_moderation.py. main.py'nin
+        # process_email'iyle AYNI mekanizma: ticket akışına doğrudan girmez,
+        # FlaggedMail olarak operatör onayına düşer (otomatik reddedilmez).
+        moderation_match = check_content(f"{subject} {body}")
+        if moderation_match:
+            flagged_id = create_flagged_mail(sender_email, sender_name, subject, body, moderation_match)
             record_mail_event(
                 event="email_processed",
-                status="rejected",
+                status="pending_review",
                 sender_email=sender_email,
                 subject=subject,
-                reason="Uygunsuz ifade veya hakaret tespit edildi",
-                classification="rejected_content",
+                reason=f"Uygunsuz içerik şüphesi ({moderation_match.category}) -- operatör onayı bekleniyor",
+                details=f"flagged_mail_id={flagged_id}",
+                classification="flagged_content",
                 mail_body=body,
             )
             processor.disconnect()
             return jsonify({
                 'success': False,
-                'message': 'Email contains profanity/hate speech'
-            }), 400
+                'message': 'Uygunsuz içerik şüphesiyle işaretlendi, operatör onayı bekleniyor',
+                'flagged_mail_id': flagged_id,
+            }), 202
         
         # Categorize
         categorizer = EmailCategorizer()
@@ -606,12 +615,22 @@ def validate_tax_id():
 @app.route('/api/profanity-check', methods=['POST'])
 @require_screen("settings")
 def check_profanity():
-    """Check text for profanity."""
+    """Bir metni content_moderation motoruna (config listesi + panelden
+    eklenen aktif kurallar) karşı test eder -- kural eklerken/düzenlerken
+    hemen deneyebilmek için."""
     try:
         data = request.json
         text = data.get('text', '')
-        has_profanity = contains_profanity(text)
-        return jsonify({'text_preview': text[:50], 'has_profanity': has_profanity})
+        match = check_content(text)
+        return jsonify({
+            'text_preview': text[:50],
+            'has_profanity': match is not None,
+            'match': {
+                'category': match.category,
+                'rule_source': match.rule_source,
+                'rule_id': match.rule_id,
+            } if match else None,
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

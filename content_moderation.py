@@ -35,7 +35,7 @@ from config import PROFANITY_WORDS
 from models import ContentRule, FlaggedMail
 from utils import normalize_turkish_characters
 
-REGEX_TIMEOUT_SECONDS = 1.0
+REGEX_TIMEOUT_SECONDS = 2.0
 MAX_PATTERN_LENGTH = 300
 # Kaydedilmeden önce her regex bu string'lere karşı denenir -- klasik
 # catastrophic-backtracking tetikleyicileri (uzun tekrar + son karakterin

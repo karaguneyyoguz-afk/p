@@ -5,6 +5,7 @@ Orchestrates email retrieval, validation, and CSM ticket creation.
 """
 
 import sys
+from typing import Optional
 
 # Not: Windows'ta konsol varsayilan olarak cp1254 (Turkce ANSI) kullanabiliyor,
 # bu da print() icindeki emoji karakterlerinde UnicodeEncodeError'a yol aciyor
@@ -17,16 +18,17 @@ if sys.stderr.encoding and sys.stderr.encoding.lower() != "utf-8":
 
 from mail_processor import (
     EmailProcessor, EmailCategorizer, send_notification_email,
-    send_ticket_confirmation_email, send_rejection_email,
+    send_ticket_confirmation_email,
     send_missing_fields_email, send_vendor_redirect_email,
     send_bulk_kaydirma_summary_email, send_unclear_request_email,
 )
 from validators import (
-    contains_profanity, extract_reservation_number, detect_priority_level,
+    extract_reservation_number, detect_priority_level,
     is_vendor_finance_correspondence
 )
 from csm_api import CSMAPIClient, TicketPayloadBuilder
 from phishing_check import analyze_mail
+from content_moderation import check_content, create_flagged_mail
 from utils import clean_subject_line, clean_mailto_artifacts, normalize_turkish_characters
 from logging_utils import record_mail_event
 
@@ -258,27 +260,51 @@ def process_email(
 
     # Clean subject line
     clean_subject = clean_subject_line(subject)
-    
-    # Check for profanity/hate speech
-    if contains_profanity(f"{clean_subject} {body}"):
-        print("❌ SONUÇ: E-posta küfür/hakaret içeriyor!")
-        print("❌ Ticket oluşturulamadı.")
-        
-        send_rejection_email(sender_email, subject, sender_name)
+
+    # Uygunsuz içerik (küfür/hakaret/spam/tehdit -- bkz. content_moderation.py):
+    # eskiden burada doğrudan reddedilip mail kapatılıyordu. Artık ticket
+    # akışına GİRMİYOR ama otomatik de reddedilmiyor -- FlaggedMail olarak
+    # kaydedilip operatör onayına/incelemesine bırakılıyor (kullanıcının
+    # "otomatik biletleştirme akışına doğrudan girmemeli" isteği).
+    moderation_match = check_content(f"{clean_subject} {body}")
+    if moderation_match:
+        print(f"🚩 SONUÇ: Uygunsuz içerik şüphesi ({moderation_match.category}), operatör onayına bırakılıyor.")
+        flagged_id = create_flagged_mail(sender_email, sender_name, subject, body, moderation_match)
         record_mail_event(
             event="email_processed",
-            status="rejected",
+            status="pending_review",
             sender_email=sender_email,
             subject=subject,
-            reason="Uygunsuz ifade veya hakaret tespit edildi",
-            classification="rejected_content",
+            reason=f"Uygunsuz içerik şüphesi ({moderation_match.category}) -- operatör onayı bekleniyor",
+            details=f"flagged_mail_id={flagged_id}",
+            classification="flagged_content",
             mail_body=body,
         )
         print("-" * 50 + "\n")
         return
-    
+
     print("✅ SONUÇ: İçerik temiz.")
 
+    _continue_after_content_check(sender_email, sender_name, subject, clean_subject, body, attachment_fields, categorizer, csm_client)
+    print("-" * 50 + "\n")
+
+
+def _continue_after_content_check(
+    sender_email: str,
+    sender_name: str,
+    subject: str,
+    clean_subject: str,
+    body: str,
+    attachment_fields: Optional[dict],
+    categorizer: EmailCategorizer,
+    csm_client: CSMAPIClient,
+) -> None:
+    """process_email'in içerik denetiminden (küfür/hakaret vb.) SONRAKİ
+    kısmı -- ayrı bir fonksiyona çıkarıldı çünkü iki farklı yerden çağrılıyor:
+    normal akışta (içerik temizse) ve panelden bir FlaggedMail onaylandığında
+    (bkz. content_rules_routes.py). attachment_fields, onaylama durumunda
+    her zaman None olur -- orijinal e-postanın OCR'lanmış ek dosyaları
+    FlaggedMail'de saklanmıyor, sadece metin (bkz. models.FlaggedMail)."""
     # Otel/tedarikci muhasebe birimlerinin gonderdigi ekstre/mutabakat/cari
     # hesap yazismalari -- bu kutunun ilgilenmedigi bir konu, ticket
     # OLUSTURULMAZ, sadece dogru adreslere yonlendirme maili gonderilir
@@ -297,7 +323,6 @@ def process_email(
             classification="vendor_finance_redirect",
             mail_body=body,
         )
-        print("-" * 50 + "\n")
         return
 
     # Categorize email
@@ -321,7 +346,6 @@ def process_email(
             classification="unclear_request",
             mail_body=body,
         )
-        print("-" * 50 + "\n")
         return
 
     # Not: kirilim ne olursa olsun, mailde "acil"/"opsiyon" gibi aciliyet
@@ -341,7 +365,7 @@ def process_email(
         missing_fields_str = "\n".join([f"- {field}" for field in missing_fields])
         print(f"⚠️ EKSİK VEYA HATALI BİLGİ TESPİT EDİLDİ! Ticket oluşturulamayacak.")
         print(f"Eksik Alanlar:\n{missing_fields_str}")
-        
+
         send_missing_fields_email(sender_email, subject, missing_fields, sender_name)
         record_mail_event(
             event="ticket_not_created",
@@ -353,12 +377,11 @@ def process_email(
             classification=categorization.get("classification", ""),
             mail_body=body,
         )
-        print("-" * 50 + "\n")
         return
-    
+
     # Create CSM ticket
     print("🔄 CSM sistemi'nde ticket oluşturuluyor...")
-    
+
     # Search for customer in database
     print("🔍 Müşteri veritabanında aranıyor...")
     customer_info = csm_client.search_customer_by_email(sender_email)
@@ -368,7 +391,7 @@ def process_email(
         print(f"✅ Kayıtlı müşteri bulundu. ID: {customer_id}")
     else:
         print(f"🆕 Müşteri bulunamadı - Potansiyel müşteri olarak kaydedilecek")
-    
+
     # Not: kirilim ne olursa olsun, mailde bir rezervasyon numarasi geciyorsa
     # CSM/Etiya'dan ilgili urun kaydi cekilip ticket'a gomuluyor -- aksi
     # halde backoffice ekibi ticket icinde ilgili rezervasyona/urune
@@ -395,9 +418,9 @@ def process_email(
         customer_id=customer_id,
         related_product=related_product
     )
-    
+
     ticket_id = csm_client.create_ticket(payload)
-    
+
     if ticket_id:
         print(f"📧 Müşteriye onay maili gönderiliyor...")
         send_ticket_confirmation_email(sender_email, subject, ticket_id, sender_name)
@@ -435,8 +458,6 @@ def process_email(
             classification=categorization.get("classification", ""),
             mail_body=body,
         )
-    
-    print("-" * 50 + "\n")
 
 
 def main() -> None:
