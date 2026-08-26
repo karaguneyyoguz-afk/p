@@ -1,8 +1,15 @@
 """Toplu Kaydırma (Bulk Reservation Shift) module.
 
-Creates CSM "ilişkili ticket" (LINKED_TICKET) entries in bulk, one per
-reservation row, linked to an existing main ("Onay Kaydırma") ticket, from an
-uploaded Excel export of reservations that need a date shift.
+Creates CSM tickets in bulk, one per reservation row, from an uploaded Excel
+export of reservations that need a date shift. Two iş birimi usage patterns,
+both driven by a single per-row rule -- NOT a role/team toggle:
+  - Eos / wtatil: every row's parentTicketUUID column is filled in -> each
+    row becomes an "ilişkili ticket" (LINKED_TICKET) hanging off that main
+    ticket.
+  - BO / YÇM: parentTicketUUID is left blank (their export doesn't even have
+    that column) -> each row becomes its own standalone, independent main
+    ticket ("ana ticket") -- no relation, no parent.
+A single upload can freely mix both (row-by-row), see build_bulk_ticket_payload.
 
 Payload shape verified against a real, successful production request
 (captured from the CSM web UI's Network tab, 2026-08-25, ticket #101944819,
@@ -11,10 +18,12 @@ about that captured example that are NOT obvious from CSM's UI:
   1. The link to the main ticket is two top-level fields on the payload
      (parentTicketUUID + relationType: "LINKED_TICKET") -- NOT an entry in
      ticketRelationList (which stays empty, unlike the parent-child relation
-     this module used before).
-  2. The reporter/"raporlayan kişi" for every linked ticket is a fixed,
-     pre-existing anonymous CSM contact ("Onay Kaydırma", onay@tatilbudur.com)
-     -- not the individual mail sender, and not something collected via a form.
+     this module used before). For a standalone "ana ticket" both fields are
+     simply omitted -- same kırılım/reporter otherwise (kullanıcı tarafından
+     onaylandı, 2026-08-26), only the relation is different.
+  2. The reporter/"raporlayan kişi" for every ticket is a fixed, pre-existing
+     anonymous CSM contact ("Onay Kaydırma", onay@tatilbudur.com) -- not the
+     individual mail sender, and not something collected via a form.
 """
 
 import html
@@ -29,13 +38,30 @@ from service_log import record_service_event
 MAX_ROWS = 500
 MAX_EXCEL_BYTES = 5 * 1024 * 1024  # 500 satırlık gerçek bir dosya birkaç yüz KB'dir
 
-# Original script's column names (Turkish, exact match from the source Excel export).
-COLUMN_ALIASES = {
+# Required columns -- exact match from the source Excel export (Eos/wtatil
+# AND BO/YÇM templates both use these same three names).
+REQUIRED_COLUMN_ALIASES = {
     "reservation_no": ("Rezervasyon No",),
     "shift_type": ("Kaydırma Tipi",),
-    "alternative": ("Alternatif 1",),
-    "parent_ticket_uuid": ("parentTicketUUID",),
 }
+# Optional columns -- absent entirely in some templates (ör. BO/YÇM'nin
+# parentTicketUUID sütunu hiç yok), tolerated as empty/"" per row.
+OPTIONAL_COLUMN_ALIASES = {
+    "parent_ticket_uuid": ("parentTicketUUID",),
+    "hotel": ("Otel",),
+    "room_type": ("Oda Tipi",),
+}
+# Result columns some templates (BO/YÇM) expect filled back in and returned
+# as a downloadable file -- see generate_result_workbook.
+RESULT_COLUMN_ALIASES = {
+    "ticket_id": ("Yeni Ticket ID",),
+    "status": ("Servis Durumu",),
+    "message": ("Servis Mesajı",),
+}
+# "Alternatif 1"/"Alternatif 2"/"Alternatif 3", or several bare "Alternatif"
+# columns (both observed live) -- ANY header starting with this (case-
+# insensitive) is collected, in column order, and joined for the description.
+ALTERNATIVE_HEADER_PREFIX = "alternatif"
 
 
 class ExcelRow(TypedDict):
@@ -43,12 +69,19 @@ class ExcelRow(TypedDict):
     shift_type: str
     alternative: str
     parent_ticket_uuid: str
+    hotel: str
+    room_type: str
+    excel_row_index: int
+
+
+def _normalized_headers(header_row) -> List[str]:
+    return [str(cell).strip() if cell is not None else "" for cell in header_row]
 
 
 def parse_excel_rows(file_stream: BinaryIO) -> List[ExcelRow]:
     """Read the uploaded Excel export into plain dicts.
 
-    Raises ValueError if required columns are missing or the sheet has more
+    Raises ValueError if a required column is missing or the sheet has more
     than MAX_ROWS data rows (a hard cap — this endpoint processes rows
     synchronously, one HTTP request per row to CSM, so an unbounded upload
     would tie up a request/worker for an unbounded amount of time). Also
@@ -72,27 +105,36 @@ def parse_excel_rows(file_stream: BinaryIO) -> List[ExcelRow]:
     if not header_row:
         raise ValueError("Excel dosyası boş görünüyor.")
 
-    header_index = {
-        str(cell).strip(): idx for idx, cell in enumerate(header_row) if cell is not None
-    }
+    headers = _normalized_headers(header_row)
 
     column_positions: Dict[str, int] = {}
-    for field, aliases in COLUMN_ALIASES.items():
-        match = next((a for a in aliases if a in header_index), None)
-        if match is None:
+    for field, aliases in REQUIRED_COLUMN_ALIASES.items():
+        idx = next((i for i, h in enumerate(headers) if h in aliases), None)
+        if idx is None:
             raise ValueError(f"Beklenen sütun bulunamadı: '{aliases[0]}'")
-        column_positions[field] = header_index[match]
+        column_positions[field] = idx
+
+    for field, aliases in OPTIONAL_COLUMN_ALIASES.items():
+        idx = next((i for i, h in enumerate(headers) if h in aliases), None)
+        if idx is not None:
+            column_positions[field] = idx
+
+    alternative_indices = [
+        i for i, h in enumerate(headers) if h.lower().startswith(ALTERNATIVE_HEADER_PREFIX)
+    ]
 
     rows: List[ExcelRow] = []
     last_parent_ticket_uuid = ""
-    for row in sheet.iter_rows(min_row=2, values_only=True):
+    for excel_row_index, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
         if row is None or all(cell is None for cell in row):
             continue
         if len(rows) >= MAX_ROWS:
             raise ValueError(f"Excel dosyası {MAX_ROWS} satırdan fazla içeriyor — daha küçük parçalara bölün.")
 
         def cell(field: str) -> str:
-            pos = column_positions[field]
+            pos = column_positions.get(field)
+            if pos is None:
+                return ""
             value = row[pos] if pos < len(row) else None
             return "" if value is None else str(value).strip()
 
@@ -100,9 +142,18 @@ def parse_excel_rows(file_stream: BinaryIO) -> List[ExcelRow]:
         if not reservation_no:
             continue
 
+        alternative_parts = []
+        for idx in alternative_indices:
+            value = row[idx] if idx < len(row) else None
+            if value is not None and str(value).strip():
+                alternative_parts.append(str(value).strip())
+
         # parentTicketUUID is typically only filled on the first row of each
         # WorkGroup/Ticket ID group in the source export (observed live) --
         # carry the last non-empty value forward for rows that leave it blank.
+        # Templates with no parentTicketUUID column at all (BO/YÇM) simply
+        # never populate this -- every row's parent_ticket_uuid stays "",
+        # which build_bulk_ticket_payload treats as "standalone ana ticket".
         parent_ticket_uuid = cell("parent_ticket_uuid") or last_parent_ticket_uuid
         if parent_ticket_uuid:
             last_parent_ticket_uuid = parent_ticket_uuid
@@ -111,12 +162,73 @@ def parse_excel_rows(file_stream: BinaryIO) -> List[ExcelRow]:
             ExcelRow(
                 reservation_no=reservation_no,
                 shift_type=cell("shift_type") or "Operasyon Kaynaklı",
-                alternative=cell("alternative") or "Toplu Kaydırma İşlemi",
+                alternative=" / ".join(alternative_parts) or "Toplu Kaydırma İşlemi",
                 parent_ticket_uuid=parent_ticket_uuid,
+                hotel=cell("hotel"),
+                room_type=cell("room_type"),
+                excel_row_index=excel_row_index,
             )
         )
 
     return rows
+
+
+def find_result_columns(file_stream: BinaryIO) -> Optional[Dict[str, int]]:
+    """Whether the uploaded template has the BO/YÇM result columns ("Yeni
+    Ticket ID" / "Servis Durumu" / "Servis Mesajı") -- if all three are
+    present, generate_result_workbook can fill them in and the caller should
+    offer the filled-in file back as a download/attachment. Returns None
+    (nothing to fill in) for templates missing any of the three, e.g. the
+    plain Eos/wtatil template."""
+    file_stream.seek(0)
+    workbook = load_workbook(filename=file_stream, data_only=True, read_only=True)
+    sheet = workbook.active
+    header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), None)
+    file_stream.seek(0)
+    if not header_row:
+        return None
+
+    headers = _normalized_headers(header_row)
+    positions: Dict[str, int] = {}
+    for field, aliases in RESULT_COLUMN_ALIASES.items():
+        idx = next((i for i, h in enumerate(headers) if h in aliases), None)
+        if idx is None:
+            return None
+        positions[field] = idx
+    return positions
+
+
+def generate_result_workbook(
+    original_bytes: bytes, rows: List[ExcelRow], results: List[Dict[str, Any]]
+) -> Optional[bytes]:
+    """Writes each row's outcome back into the ORIGINAL uploaded file's "Yeni
+    Ticket ID" / "Servis Durumu" / "Servis Mesajı" columns (BO/YÇM template)
+    and returns the updated file's bytes -- or None if that template's
+    columns aren't present (nothing to fill in, e.g. Eos/wtatil's simpler
+    template). Matches rows by their exact worksheet row number
+    (ExcelRow.excel_row_index), NOT by reservation_no -- the same
+    reservation number can legitimately repeat across multiple rows
+    (observed live, different room/shift entries under one reservation)."""
+    import io
+
+    result_columns = find_result_columns(io.BytesIO(original_bytes))
+    if result_columns is None:
+        return None
+
+    workbook = load_workbook(filename=io.BytesIO(original_bytes))
+    sheet = workbook.active
+
+    for row, outcome in zip(rows, results):
+        excel_row = row["excel_row_index"]
+        sheet.cell(row=excel_row, column=result_columns["ticket_id"] + 1).value = outcome.get("ticket_id") or ""
+        sheet.cell(row=excel_row, column=result_columns["status"] + 1).value = (
+            "Başarılı" if outcome.get("success") else "Hatalı"
+        )
+        sheet.cell(row=excel_row, column=result_columns["message"] + 1).value = outcome.get("error") or ""
+
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
 
 BULK_SHIFT_ENV = os.getenv("BULK_SHIFT_ENV", "preprod")
 
@@ -262,11 +374,28 @@ def build_bulk_ticket_payload(
     shift_type_label: str,
     alternative_text: str,
     parent_ticket_uuid: str,
+    hotel: str = "",
+    room_type: str = "",
 ) -> Dict[str, Any]:
+    """parent_ticket_uuid empty ("") -> standalone "ana ticket" (BO/YÇM):
+    parentTicketUUID/relationType are omitted entirely, nothing to link to.
+    parent_ticket_uuid set -> "ilişkili ticket" (Eos/wtatil), same as before.
+    Kırılım (channel/category/subCategory/ticketType) and reporter are
+    IDENTICAL either way (kullanıcı tarafından onaylandı, 2026-08-26) --
+    only the relation to a parent differs."""
     party_role = ONAY_KAYDIRMA_PARTY_ROLE
     fields = SHIFT_TYPE_FIELDS[classify_shift_type(shift_type_label)]
 
-    return {
+    description_parts = [
+        f"Toplu Kaydırma - Rezervasyon: {html.escape(str(reservation_no))} - "
+        f"{html.escape(shift_type_label)} - {html.escape(alternative_text)}"
+    ]
+    if hotel:
+        description_parts.append(f"Otel: {html.escape(hotel)}")
+    if room_type:
+        description_parts.append(f"Oda Tipi: {html.escape(room_type)}")
+
+    payload: Dict[str, Any] = {
         "contactParties": [
             {
                 "partyRole": party_role,
@@ -287,10 +416,7 @@ def build_bulk_ticket_payload(
         # Excel'den gelen değerler (mail ekinden -- güvenilmeyen kaynak da
         # olabilir) HTML açıklama içine gömülmeden önce escape edilmeli;
         # CSM ticket açıklamasını kendi arayüzünde HTML olarak render ediyor.
-        "description": (
-            f"<p>Toplu Kaydırma - Rezervasyon: {html.escape(str(reservation_no))} - "
-            f"{html.escape(shift_type_label)} - {html.escape(alternative_text)}</p>"
-        ),
+        "description": "<p>" + " - ".join(description_parts) + "</p>",
         "channel": fields["channel"],
         "subCategory": fields["subCategory"],
         "category": fields["category"],
@@ -311,10 +437,12 @@ def build_bulk_ticket_payload(
         "isParent": True,
         "reminders": [],
         "detectedLanguage": "",
-        "parentTicketUUID": parent_ticket_uuid,
-        "relationType": "LINKED_TICKET",
         "relatedProduct": {"serviceNumber": str(reservation_no)},
     }
+    if parent_ticket_uuid:
+        payload["parentTicketUUID"] = parent_ticket_uuid
+        payload["relationType"] = "LINKED_TICKET"
+    return payload
 
 
 def create_bulk_ticket(payload: Dict[str, Any], token: str) -> Dict[str, Any]:
@@ -368,6 +496,8 @@ def process_rows(rows: List[ExcelRow], fallback_parent_ticket_uuid: str = "") ->
             shift_type_label=row["shift_type"],
             alternative_text=row["alternative"],
             parent_ticket_uuid=parent_ticket_uuid,
+            hotel=row.get("hotel", ""),
+            room_type=row.get("room_type", ""),
         )
         outcome = create_bulk_ticket(payload, token)
         if outcome["success"]:
@@ -376,6 +506,7 @@ def process_rows(rows: List[ExcelRow], fallback_parent_ticket_uuid: str = "") ->
             "reservation_no": row["reservation_no"],
             "shift_type": row["shift_type"],
             "shift_type_code": classify_shift_type(row["shift_type"]),
+            "is_linked": bool(parent_ticket_uuid),
             "success": outcome["success"],
             "ticket_id": outcome.get("ticket_id"),
             "error": outcome.get("error"),

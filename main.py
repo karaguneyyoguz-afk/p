@@ -42,7 +42,7 @@ def _process_bulk_kaydirma_email(
     split out since it's a fundamentally different shape of work (many
     linked tickets from one Excel, not one ticket from the mail body)."""
     import io
-    from bulk_shift import parse_excel_rows, process_rows
+    from bulk_shift import parse_excel_rows, process_rows, generate_result_workbook
 
     excel_bytes = processor.extract_excel_attachment(email_message)
     if excel_bytes is None:
@@ -86,19 +86,13 @@ def _process_bulk_kaydirma_email(
         )
         return
 
-    missing_parent_rows = [r["reservation_no"] for r in rows if not r["parent_ticket_uuid"]]
-    if missing_parent_rows:
-        print(f"⚠️ parentTicketUUID eksik: {', '.join(missing_parent_rows[:10])}")
-        record_mail_event(
-            event="email_processed",
-            status="failed",
-            sender_email=sender_email,
-            subject=subject,
-            reason=f"parentTicketUUID eksik satırlar: {', '.join(missing_parent_rows[:10])}",
-            classification="bulk_kaydirma_missing_parent",
-            mail_body=body,
-        )
-        return
+    # Not: parentTicketUUID eksik satırlar artık bir hata DEĞİL -- BO/YÇM
+    # ekiplerinin Excel şablonunda bu sütun hiç yok, ve bu bilerek: her
+    # satırın kendi başına, hiçbir üst ticket'a bağlı olmayan bağımsız bir
+    # "ana ticket" olması isteniyor (kullanıcı tarafından bildirildi,
+    # 2026-08-26). Eos/wtatil'in parentTicketUUID dolu satırları hâlâ
+    # "ilişkili ticket" (LINKED_TICKET) olarak açılıyor -- bkz.
+    # bulk_shift.build_bulk_ticket_payload.
 
     try:
         summary = process_rows(rows)
@@ -126,7 +120,8 @@ def _process_bulk_kaydirma_email(
         ticket_details=summary,
         mail_body=body,
     )
-    send_bulk_kaydirma_summary_email(sender_email, subject, summary)
+    result_file_bytes = generate_result_workbook(excel_bytes, rows, summary["results"])
+    send_bulk_kaydirma_summary_email(sender_email, subject, summary, attachment_bytes=result_file_bytes)
 
 
 def process_email(

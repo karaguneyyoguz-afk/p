@@ -27,6 +27,8 @@ from bulk_shift import (
     classify_shift_type,
     build_bulk_ticket_payload,
     parse_excel_rows,
+    find_result_columns,
+    generate_result_workbook,
     MAX_ROWS,
 )
 from app import app
@@ -110,6 +112,42 @@ check(
 )
 
 # ==========================================================
+# build_bulk_ticket_payload -- standalone "ana ticket" (BO/YÇM: bos parent_ticket_uuid)
+# ==========================================================
+standalone_payload = build_bulk_ticket_payload(
+    reservation_no="777",
+    shift_type_label="Operasyon Kaynaklı",
+    alternative_text="x",
+    parent_ticket_uuid="",
+)
+check(
+    "payload (ANA TICKET, kullanici tarafindan istendi): bos parent_ticket_uuid -> parentTicketUUID/relationType alanlari HIC YOK",
+    "parentTicketUUID" not in standalone_payload and "relationType" not in standalone_payload,
+    standalone_payload,
+)
+check(
+    "payload (ANA TICKET): kirilim/raporlayan iliskili ticket'la AYNI (kullanici onayladi)",
+    standalone_payload["category"]["shortCode"] == "KAYDIRMA"
+    and standalone_payload["subCategory"]["shortCode"] == "OPERASYON_KAYNAKLI"
+    and standalone_payload["partyRole"]["party"]["fullName"] == "Onay Kaydırma",
+    standalone_payload,
+)
+
+hotel_payload = build_bulk_ticket_payload(
+    reservation_no="777",
+    shift_type_label="Operasyon Kaynaklı",
+    alternative_text="x",
+    parent_ticket_uuid="",
+    hotel="Örnek Otel",
+    room_type="Double",
+)
+check(
+    "payload: Otel/Oda Tipi verilince aciklamaya ekleniyor",
+    "Örnek Otel" in hotel_payload["description"] and "Double" in hotel_payload["description"],
+    hotel_payload["description"],
+)
+
+# ==========================================================
 # parse_excel_rows
 # ==========================================================
 def make_excel(rows, headers=("Rezervasyon No", "Kaydırma Tipi", "Alternatif 1", "parentTicketUUID")):
@@ -155,6 +193,124 @@ try:
 except ValueError as e:
     check("parse_excel_rows: eksik sutun ValueError firlatir", "Rezervasyon No" in str(e), str(e))
 
+# ==========================================================
+# parse_excel_rows -- BO/YÇM şablonu (parentTicketUUID sütunu HİÇ YOK,
+# birden fazla "Alternatif" sütunu, Otel/Oda Tipi opsiyonel sütunları)
+# ==========================================================
+bo_ycm_excel = make_excel(
+    [("346845477", "Operasyon Kaynaklı", "Ege Akdeniz Turu", "5 Gece Otel", "12.07 hareketli")],
+    headers=("Rezervasyon No", "Kaydırma Tipi", "Alternatif", "Alternatif", "Alternatif"),
+)
+bo_parsed = parse_excel_rows(bo_ycm_excel)
+check(
+    "parse_excel_rows (BO/YÇM, kullanici tarafindan bildirildi): parentTicketUUID sutunu hic yoksa hata FIRLATMAZ",
+    len(bo_parsed) == 1,
+    bo_parsed,
+)
+check(
+    "parse_excel_rows (BO/YÇM): parentTicketUUID sutunu yoksa bos string donuyor -> standalone ana ticket'a isaret eder",
+    bo_parsed[0]["parent_ticket_uuid"] == "",
+    bo_parsed[0],
+)
+check(
+    "parse_excel_rows (BO/YÇM): tekrar eden 'Alternatif' basliklarinin HEPSI birlestiriliyor",
+    bo_parsed[0]["alternative"] == "Ege Akdeniz Turu / 5 Gece Otel / 12.07 hareketli",
+    bo_parsed[0]["alternative"],
+)
+
+otel_oda_excel = make_excel(
+    [("111", "Otel Kaynaklı", "Alt 1", "", "Örnek Otel", "Double")],
+    headers=("Rezervasyon No", "Kaydırma Tipi", "Alternatif 1", "parentTicketUUID", "Otel", "Oda Tipi"),
+)
+otel_oda_parsed = parse_excel_rows(otel_oda_excel)
+check(
+    "parse_excel_rows: opsiyonel Otel/Oda Tipi sutunlari okunuyor",
+    otel_oda_parsed[0]["hotel"] == "Örnek Otel" and otel_oda_parsed[0]["room_type"] == "Double",
+    otel_oda_parsed[0],
+)
+
+row_index_excel = make_excel(
+    [
+        ("111", "Otel Kaynaklı", "x", ""),
+        (None, None, None, None),  # bos satir (atlanmali) -- sonraki satirin gercek Excel konumunu kaydirir
+        ("222", "Operasyon Kaynaklı", "y", ""),
+    ]
+)
+row_index_parsed = parse_excel_rows(row_index_excel)
+check(
+    "parse_excel_rows: excel_row_index bos satirlar atlansa bile GERCEK satir numarasini tasir (yazma icin gerekli)",
+    row_index_parsed[0]["excel_row_index"] == 2 and row_index_parsed[1]["excel_row_index"] == 4,
+    row_index_parsed,
+)
+
+# ==========================================================
+# find_result_columns / generate_result_workbook (BO/YÇM sonuc dosyasi)
+# ==========================================================
+result_template_excel = make_excel(
+    [
+        ("346845477", "Operasyon Kaynaklı", "Alt", "", "", ""),
+        # Gercek ornekte oldugu gibi AYNI rezervasyon no'nun birden fazla
+        # satirda tekrar etmesi -- eslestirme reservation_no ile DEGIL,
+        # excel_row_index (gercek satir numarasi) ile yapilmali.
+        ("353230473", "Operasyon Kaynaklı", "Alt", "", "", ""),
+        ("353230473", "Operasyon Kaynaklı", "Alt", "", "", ""),
+    ],
+    headers=("Rezervasyon No", "Kaydırma Tipi", "Alternatif 1", "Yeni Ticket ID", "Servis Durumu", "Servis Mesajı"),
+)
+result_columns = find_result_columns(result_template_excel)
+check(
+    "find_result_columns: BO/YÇM sonuc sutunlarinin 3'u de bulunuyor",
+    result_columns is not None and set(result_columns.keys()) == {"ticket_id", "status", "message"},
+    result_columns,
+)
+
+no_result_columns_excel = make_excel([("111", "Otel Kaynaklı", "x", "")])
+check(
+    "find_result_columns: sonuc sutunlari olmayan (Eos/wtatil) sablonda None doner",
+    find_result_columns(no_result_columns_excel) is None,
+)
+
+result_template_excel.seek(0)
+result_rows = parse_excel_rows(result_template_excel)
+result_template_excel.seek(0)
+original_bytes = result_template_excel.read()
+fake_results = [
+    {"ticket_id": "101946102", "success": True, "error": None},
+    {"ticket_id": None, "success": False, "error": "HTTP 500"},
+    {"ticket_id": "101946104", "success": True, "error": None},
+]
+generated_bytes = generate_result_workbook(original_bytes, result_rows, fake_results)
+check("generate_result_workbook: BO/YÇM sablonunda bytes doner (None degil)", generated_bytes is not None)
+
+from openpyxl import load_workbook as _load_workbook_for_test
+import io as _io_for_test
+
+readback_sheet = _load_workbook_for_test(_io_for_test.BytesIO(generated_bytes)).active
+check(
+    "generate_result_workbook: 1. satir (basarili) dogru satira yazilmis",
+    readback_sheet.cell(row=2, column=4).value == "101946102"
+    and readback_sheet.cell(row=2, column=5).value == "Başarılı",
+    [readback_sheet.cell(row=2, column=c).value for c in range(4, 7)],
+)
+check(
+    "generate_result_workbook: TEKRAR EDEN rezervasyon no'lu 2. ve 3. satirlar KARISMADAN, kendi satirina yaziliyor",
+    readback_sheet.cell(row=3, column=4).value is None
+    and readback_sheet.cell(row=3, column=5).value == "Hatalı"
+    and readback_sheet.cell(row=3, column=6).value == "HTTP 500"
+    and readback_sheet.cell(row=4, column=4).value == "101946104"
+    and readback_sheet.cell(row=4, column=5).value == "Başarılı",
+    [[readback_sheet.cell(row=r, column=c).value for c in range(4, 7)] for r in (3, 4)],
+)
+
+no_result_columns_excel.seek(0)
+plain_rows = parse_excel_rows(no_result_columns_excel)
+no_result_columns_excel.seek(0)
+plain_bytes = no_result_columns_excel.read()
+check(
+    "generate_result_workbook: sonuc sutunu olmayan sablonda None doner (Eos/wtatil icin ek dosya YOK)",
+    generate_result_workbook(plain_bytes, plain_rows, [{"ticket_id": "1", "success": True, "error": None}]) is None,
+)
+
 too_many_excel = make_excel([(str(i), "Otel Kaynaklı", "x", "uuid-1") for i in range(MAX_ROWS + 5)])
 try:
     parse_excel_rows(too_many_excel)
@@ -175,19 +331,12 @@ check("GET /api/bulk-shift/env -> 200 + environment alani", resp.status_code == 
 resp = client.post("/api/bulk-shift/upload", data={}, headers=csrf_headers)
 check("POST upload: dosya yoksa 400", resp.status_code == 400 and "dosya" in resp.get_json().get("error", "").lower())
 
-# openpyxl (read_only=True) closes the stream it's given once parsed, so each
-# upload needs its own fresh buffer rather than seeking/reusing one.
-resp = client.post(
-    "/api/bulk-shift/upload",
-    data={"file": (make_excel([("553044193", "Otel Kaynaklı", "Alt 1", "")]), "test.xlsx")},
-    content_type="multipart/form-data",
-    headers=csrf_headers,
-)
-check(
-    "POST upload: satirda parentTicketUUID yok VE form'da yedek de yoksa 400",
-    resp.status_code == 400 and "parentticketuuid" in resp.get_json().get("error", "").lower(),
-    resp.get_json(),
-)
+# Not: parentTicketUUID eksikliği artık burada test EDİLMİYOR -- bir hata
+# olmaktan çıktı (BO/YÇM'nin standalone "ana ticket" senaryosu, kullanıcı
+# tarafından istendi), bu da o isteğin process_rows -> get_bulk_shift_token
+# ile GERÇEK bir CSM ağ çağrısına kadar ilerlemesi anlamına gelir -- bu
+# dosyanın kasıtlı olarak asla yapmadığı şey. O davranış yukarıda
+# build_bulk_ticket_payload/parse_excel_rows seviyesinde (ağsız) test edildi.
 
 resp = client.post(
     "/api/bulk-shift/upload",

@@ -211,6 +211,9 @@ export interface BulkShiftResultRow {
   reservation_no: string
   shift_type: string
   shift_type_code: string
+  // false -> bağımsız "ana ticket" (BO/YÇM, parentTicketUUID hiç verilmedi);
+  // true -> mevcut bir ticket'a bağlı "ilişkili ticket" (Eos/wtatil).
+  is_linked: boolean
   success: boolean
   ticket_id?: string | null
   error?: string | null
@@ -222,6 +225,11 @@ export interface BulkShiftUploadResponse {
   success_count: number
   failed_count: number
   results: BulkShiftResultRow[]
+  // Yüklenen dosya "Yeni Ticket ID"/"Servis Durumu"/"Servis Mesajı"
+  // sütunlarını içeriyorsa (BO/YÇM şablonu), bu sütunlar doldurulmuş hâliyle
+  // base64 .xlsx olarak döner -- yoksa (Eos/wtatil) ikisi de yoktur.
+  result_file_base64?: string
+  result_file_name?: string
 }
 
 // ==========================================================

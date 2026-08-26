@@ -10,6 +10,7 @@ import re
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 from typing import Dict, List, Tuple, Optional
 from config import (
     EMAIL_USER, EMAIL_PASS, IMAP_SERVER,
@@ -2914,12 +2915,19 @@ def send_ticket_confirmation_email(recipient_email: str, subject: str, ticket_id
         print(f"❌ Ticket onay maili gönderilirken hata: {e}")
 
 
-def send_bulk_kaydirma_summary_email(recipient_email: str, subject: str, summary: dict) -> None:
+def send_bulk_kaydirma_summary_email(
+    recipient_email: str, subject: str, summary: dict, attachment_bytes: Optional[bytes] = None
+) -> None:
     """Mail-triggered Toplu Kaydırma sonucunu iş birimine bildirir -- her
     satır için ayrı bir onay maili göndermek yerine (100+ satırlık bir
     Excel'de bu spam olur), tek bir özet mail yeterli. Panel yüklemesinde
     (UI zaten bir sonuç tablosu gösterdiği için) bu mail gönderilmiyor,
-    sadece mail-tetikli akışta kullanılıyor."""
+    sadece mail-tetikli akışta kullanılıyor.
+
+    attachment_bytes: BO/YÇM şablonundaki "Yeni Ticket ID"/"Servis Durumu"/
+    "Servis Mesajı" sütunları doldurulmuş hâliyle geri gönderilen Excel
+    (bkz. bulk_shift.generate_result_workbook) -- None ise (ör. Eos/wtatil'in
+    sütunları olmayan şablonu) hiç ek dosya eklenmez."""
     try:
         message = MIMEMultipart()
         message['From'] = EMAIL_USER
@@ -2949,6 +2957,16 @@ def send_bulk_kaydirma_summary_email(recipient_email: str, subject: str, summary
         formatted_body += "\nSaygılarımızla,\nMüşteri Hizmetleri Ekibi"
 
         message.attach(MIMEText(formatted_body, 'plain', 'utf-8'))
+
+        if attachment_bytes:
+            attachment = MIMEApplication(
+                attachment_bytes,
+                _subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            attachment.add_header(
+                "Content-Disposition", "attachment", filename="toplu_kaydirma_sonuc.xlsx"
+            )
+            message.attach(attachment)
 
         server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
         server.login(EMAIL_USER, EMAIL_PASS)

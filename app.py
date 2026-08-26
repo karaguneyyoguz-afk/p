@@ -9,6 +9,8 @@ from flask_session import Session
 from flask_migrate import Migrate
 from datetime import datetime, timedelta
 from collections import Counter, OrderedDict
+import base64
+import io
 import json
 import os
 import re
@@ -36,6 +38,7 @@ from bulk_shift import (
     BULK_SHIFT_ENV,
     parse_excel_rows,
     process_rows,
+    generate_result_workbook,
 )
 from models import db
 from accounts import require_screen, get_csrf_token, current_user
@@ -888,19 +891,27 @@ def get_bulk_shift_env():
 @require_screen("bulk_shift")
 def upload_bulk_shift():
     """Parse an uploaded reservation-shift Excel export and create one CSM
-    "ilişkili ticket" (LINKED_TICKET) per row, linked to that row's own
-    parentTicketUUID column (an optional form parent_ticket_uuid fills in for
-    rows the export left that column blank on). Reporter is always the fixed
-    "Onay Kaydırma" system contact -- not collected from the form. Runs
-    synchronously (one HTTP call per row) — see bulk_shift.MAX_ROWS for the
-    row cap."""
+    ticket per row -- an "ilişkili ticket" (LINKED_TICKET) if the row (or the
+    optional form parent_ticket_uuid fallback) carries a parentTicketUUID
+    (Eos/wtatil), or a standalone "ana ticket" if not (BO/YÇM -- their
+    template has no parentTicketUUID column at all, and that's expected, not
+    an error). Reporter is always the fixed "Onay Kaydırma" system contact --
+    not collected from the form. Runs synchronously (one HTTP call per row)
+    — see bulk_shift.MAX_ROWS for the row cap.
+
+    If the uploaded template also has "Yeni Ticket ID"/"Servis Durumu"/
+    "Servis Mesajı" columns (BO/YÇM), the response includes that same file
+    with those columns filled in (result_file_base64/result_file_name) for
+    the panel to offer as a download."""
     if 'file' not in request.files:
         return jsonify({'error': 'Excel dosyası bulunamadı (file alanı boş)'}), 400
 
     fallback_parent_ticket_uuid = (request.form.get('parent_ticket_uuid') or '').strip()
+    uploaded_file = request.files['file']
+    original_bytes = uploaded_file.read()
 
     try:
-        rows = parse_excel_rows(request.files['file'].stream)
+        rows = parse_excel_rows(io.BytesIO(original_bytes))
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     except Exception as e:
@@ -909,22 +920,15 @@ def upload_bulk_shift():
     if not rows:
         return jsonify({'error': 'Excel dosyasında işlenecek satır bulunamadı'}), 400
 
-    missing_parent_rows = [
-        row['reservation_no'] for row in rows
-        if not (row['parent_ticket_uuid'] or fallback_parent_ticket_uuid)
-    ]
-    if missing_parent_rows:
-        return jsonify({
-            'error': (
-                "Şu rezervasyonlarda parentTicketUUID bulunamadı ve form'da da "
-                f"yedek bir üst ticket UUID'si verilmedi: {', '.join(missing_parent_rows[:10])}"
-            )
-        }), 400
-
     try:
         summary = process_rows(rows, fallback_parent_ticket_uuid=fallback_parent_ticket_uuid)
     except RuntimeError as e:
         return jsonify({'error': str(e)}), 502
+
+    result_file_bytes = generate_result_workbook(original_bytes, rows, summary["results"])
+    if result_file_bytes is not None:
+        summary['result_file_base64'] = base64.b64encode(result_file_bytes).decode('ascii')
+        summary['result_file_name'] = f"sonuc_{uploaded_file.filename or 'toplu_kaydirma.xlsx'}"
 
     return jsonify(summary)
 

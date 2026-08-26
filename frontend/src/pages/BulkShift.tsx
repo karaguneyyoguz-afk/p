@@ -1,12 +1,27 @@
 import { useRef, useState, type FormEvent } from 'react'
-import { Upload, AlertTriangle, FileSpreadsheet } from 'lucide-react'
+import { Upload, AlertTriangle, FileSpreadsheet, Download } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
-import { StatusBadge } from '@/components/ui/Badge'
+import { Badge, StatusBadge } from '@/components/ui/Badge'
 import { ExportCsvButton } from '@/components/ui/ExportCsvButton'
 import { useBulkShiftEnv, useUploadBulkShift } from '@/api/hooks'
 import { useToast } from '@/components/ui/Toast'
 import type { BulkShiftUploadResponse } from '@/types/api'
+
+function downloadResultFile(base64: string, filename: string) {
+  const bytes = atob(base64)
+  const buffer = new Uint8Array(bytes.length)
+  for (let i = 0; i < bytes.length; i++) buffer[i] = bytes.charCodeAt(i)
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
 
 const inputClass =
   'w-full rounded-lg border border-enigma-border bg-enigma-bg px-3 py-2 text-sm text-enigma-text placeholder:text-enigma-text-muted focus:border-enigma-primary focus:outline-none focus:ring-2 focus:ring-enigma-primary/20'
@@ -75,7 +90,7 @@ export function BulkShift() {
       <Card className="mb-4">
         <CardHeader
           title="Yükleme"
-          subtitle='Excel sütunları: "Rezervasyon No", "Kaydırma Tipi", "Alternatif 1", "parentTicketUUID"'
+          subtitle='Zorunlu sütunlar: "Rezervasyon No", "Kaydırma Tipi". Opsiyonel: "Alternatif 1" (veya birden çok "Alternatif" sütunu), "Otel", "Oda Tipi", "parentTicketUUID"'
         />
         <CardBody>
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -110,8 +125,13 @@ export function BulkShift() {
               />
               <p className="mt-1 text-xs text-enigma-text-muted">
                 Excel'deki <code>parentTicketUUID</code> sütunu zaten her satırın üst ticket'ını
-                taşır — burası sadece o sütun boş kalan satırlar için yedek değerdir. Raporlayan
-                kişi her zaman sabit "Onay Kaydırma" kontağıdır, ayrıca girilmez.
+                taşır — burası sadece o sütun boş kalan satırlar için yedek değerdir.{' '}
+                <strong className="text-enigma-text">
+                  Bir satırda (ne Excel'de ne burada) hiç üst ticket UUID'si yoksa hata vermez —
+                  o satır kendi başına, bağımsız bir "ana ticket" olarak açılır
+                </strong>{' '}
+                (BO/YÇM'nin kullandığı, <code>parentTicketUUID</code> sütunu hiç olmayan şablon
+                gibi). Raporlayan kişi her zaman sabit "Onay Kaydırma" kontağıdır, ayrıca girilmez.
               </p>
             </div>
 
@@ -133,19 +153,37 @@ export function BulkShift() {
             title="Sonuçlar"
             subtitle={`${result.total} kayıt · ${result.success_count} başarılı · ${result.failed_count} hatalı`}
             action={
-              <ExportCsvButton
-                filename="toplu-kaydirma-sonuclar.csv"
-                rows={[
-                  ['Rezervasyon No', 'Kaydırma Tipi', 'Durum', 'Ticket ID', 'Hata'],
-                  ...result.results.map((r) => [
-                    r.reservation_no,
-                    r.shift_type,
-                    r.success ? 'Başarılı' : 'Hatalı',
-                    r.ticket_id ?? '',
-                    r.error ?? '',
-                  ]),
-                ]}
-              />
+              <div className="flex items-center gap-2">
+                {result.result_file_base64 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      downloadResultFile(
+                        result.result_file_base64!,
+                        result.result_file_name || 'toplu_kaydirma_sonuc.xlsx',
+                      )
+                    }
+                    className="flex items-center gap-1.5 rounded-lg border border-enigma-border px-3 py-1.5 text-sm font-medium text-enigma-text hover:bg-enigma-bg"
+                  >
+                    <Download className="h-4 w-4" />
+                    Sonuç Excel'ini İndir
+                  </button>
+                )}
+                <ExportCsvButton
+                  filename="toplu-kaydirma-sonuclar.csv"
+                  rows={[
+                    ['Rezervasyon No', 'Kaydırma Tipi', 'İlişki', 'Durum', 'Ticket ID', 'Hata'],
+                    ...result.results.map((r) => [
+                      r.reservation_no,
+                      r.shift_type,
+                      r.is_linked ? 'İlişkili Ticket' : 'Ana Ticket',
+                      r.success ? 'Başarılı' : 'Hatalı',
+                      r.ticket_id ?? '',
+                      r.error ?? '',
+                    ]),
+                  ]}
+                />
+              </div>
             }
           />
           <CardBody>
@@ -155,6 +193,7 @@ export function BulkShift() {
                   <tr className="border-b border-enigma-border text-xs uppercase tracking-wider text-enigma-text-muted">
                     <th className="pb-2 pr-4 font-medium">Rezervasyon No</th>
                     <th className="pb-2 pr-4 font-medium">Kaydırma Tipi</th>
+                    <th className="pb-2 pr-4 font-medium">İlişki</th>
                     <th className="pb-2 pr-4 font-medium">Durum</th>
                     <th className="pb-2 pr-4 font-medium">Ticket / Hata</th>
                   </tr>
@@ -169,6 +208,11 @@ export function BulkShift() {
                         {row.reservation_no}
                       </td>
                       <td className="py-2.5 pr-4 text-enigma-text-muted">{row.shift_type}</td>
+                      <td className="py-2.5 pr-4">
+                        <Badge tone={row.is_linked ? 'primary' : 'neutral'}>
+                          {row.is_linked ? 'İlişkili Ticket' : 'Ana Ticket'}
+                        </Badge>
+                      </td>
                       <td className="py-2.5 pr-4">
                         <StatusBadge status={row.success ? 'success' : 'failed'} />
                       </td>
