@@ -26,6 +26,7 @@ from validators import (
     is_vendor_finance_correspondence
 )
 from csm_api import CSMAPIClient, TicketPayloadBuilder
+from phishing_check import analyze_mail
 from utils import clean_subject_line, clean_mailto_artifacts, normalize_turkish_characters
 from logging_utils import record_mail_event
 
@@ -164,6 +165,30 @@ def process_email(
             subject=subject,
             reason="Otomatik teslim edilemedi bildirimi (mailer-daemon) -- ticket oluşturulmadı",
             classification="bounce_notification",
+            mail_body=body,
+        )
+        print("-" * 50 + "\n")
+        return
+
+    # Phishing/spoofing şüphesi (bkz. phishing_check.py) -- görünen ad
+    # sahteciliği, gönderen alan adının typosquat'ı, Reply-To yönlendirmesi
+    # veya gizli/şüpheli linkler tespit edilirse ticket AÇILMAZ; mail
+    # kategorize edilmeden en baştan karantinaya (blocked + phishing_suspect
+    # sınıflandırması) düşer, manuel incelemeye bırakılır. bulk_kaydirma
+    # tetikleyicisi de dahil her şeyden önce kontrol edilir -- o akış tek
+    # başına subject eşleşmesiyle tetiklendiği için sahte bir "toplu
+    # kaydırma" maili buradan geçmeden onu tetikleyemesin diye.
+    phishing_result = analyze_mail(email_message, sender_email, sender_name, body)
+    if phishing_result["suspicious"]:
+        print(f"🎣 SONUÇ: Phishing/sahtecilik şüphesi tespit edildi: {'; '.join(phishing_result['signals'])}")
+        record_mail_event(
+            event="email_processed",
+            status="blocked",
+            sender_email=sender_email,
+            subject=subject,
+            reason="Phishing/sahtecilik şüphesi -- ticket otomatik oluşturulmadı, manuel inceleme gerekiyor",
+            details="; ".join(phishing_result["signals"]),
+            classification="phishing_suspect",
             mail_body=body,
         )
         print("-" * 50 + "\n")
