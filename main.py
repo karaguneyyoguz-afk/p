@@ -19,7 +19,7 @@ from mail_processor import (
     EmailProcessor, EmailCategorizer, send_notification_email,
     send_ticket_confirmation_email, send_rejection_email,
     send_missing_fields_email, send_vendor_redirect_email,
-    send_bulk_kaydirma_summary_email,
+    send_bulk_kaydirma_summary_email, send_unclear_request_email,
 )
 from validators import (
     contains_profanity, extract_reservation_number, detect_priority_level,
@@ -308,6 +308,26 @@ def process_email(
     # Categorize email
     categorization = categorizer.categorize(clean_subject, body, sender_email, attachment_fields)
     print(f"📌 Sınıflandırma: {categorization['classification']}")
+
+    # Hiçbir alt kırılımın içeriğine uymayan mailler (bkz.
+    # EmailCategorizer.DOMAIN_RELEVANCE_KEYWORDS) artık varsayılan
+    # TESIS_ILETISIM'e düşüp ticket açmıyor -- konuyla hiç ilgisi olmayan bir
+    # mail (ör. "bugün havalar nasıl") gerçek bir talep değildir; ticket
+    # açılmadan netleştirme cevabı gönderilir.
+    if categorization.get("sub_category_code") == "UNCLEAR_REQUEST":
+        print("❓ SONUÇ: Mail hiçbir kategoriye uymuyor, net bir talep tespit edilemedi.")
+        send_unclear_request_email(sender_email, subject, sender_name)
+        record_mail_event(
+            event="ticket_not_created",
+            status="skipped",
+            sender_email=sender_email,
+            subject=subject,
+            reason="Mail içeriği hiçbir alt kırılıma uymuyor -- net bir talep tespit edilemedi",
+            classification="unclear_request",
+            mail_body=body,
+        )
+        print("-" * 50 + "\n")
+        return
 
     # Not: kirilim ne olursa olsun, mailde "acil"/"opsiyon" gibi aciliyet
     # sinyalleri geciyorsa ticket'in Oncelik alani buna gore ayarlanmali

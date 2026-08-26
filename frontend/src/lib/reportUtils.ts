@@ -20,6 +20,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   rejected_content: 'Reddedilen İçerik',
   phishing_suspect: 'Phishing Şüphesi',
   link_only_content: 'Sadece Link İçeriyor',
+  unclear_request: 'Talep Anlaşılamadı',
   Diğer: 'Diğer',
 }
 
@@ -37,6 +38,7 @@ const CATEGORY_TONES: Record<string, CategoryTone> = {
   rejected_content: 'danger',
   phishing_suspect: 'danger',
   link_only_content: 'neutral',
+  unclear_request: 'neutral',
 }
 
 export function categoryTone(key: string): CategoryTone {

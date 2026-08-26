@@ -1383,8 +1383,25 @@ check("Tesekkur-13 (guvenlik): alakasiz metin fuzzy'e takilmamali", r["classific
 r = cat("", "Otelde havlu değişimi ile ilgili bilgi almak istiyorum.")
 check("Varsayilan-1: eslesme yok -> TESIS_ILETISIM", r["classification"] == "BILGI_ISTEK > TESIS > TESIS_ILETISIM", r["classification"])
 
+# Not: bu senaryo TESIS_ILETISIM'e degil artik UNCLEAR_REQUEST'e dusuyor --
+# "Otelde havlu değişimi" (Varsayilan-1) gibi konuyla ilgili ama spesifik bir
+# dala uymayan mailerden farkli olarak, bu metin seyahat/rezervasyon/musteri
+# hizmetleri konusuna HIC deginmiyor (DOMAIN_RELEVANCE_KEYWORDS'un hicbiri
+# gecmiyor) -- canli ortamda "bugun havalar nasil" / "BJK muhtemel 11" gibi
+# alakasiz maillerin yanlislikla TESIS_ILETISIM ticket'ina donusmesini
+# engellemek icin kasitli olarak eklenen davranis (kullanici tarafindan
+# bildirildi).
 r = cat("Merhaba", "Bu mail hicbir anahtar kelime icermiyor.")
-check("Varsayilan-2: bos/alakasiz metin", r["classification"] == "BILGI_ISTEK > TESIS > TESIS_ILETISIM", r["classification"])
+check("Varsayilan-2 (GUNCELLENDI): konuyla hic ilgisi olmayan metin -> UNCLEAR_REQUEST", r["classification"] == "UNCLEAR_REQUEST", r["classification"])
+
+r = cat("", "Bugün havalar nasıl acaba, çok merak ettim.")
+check("UnclearRequest-1 (CANLI ORNEK, kullanici tarafindan bildirildi): hava durumu sohbeti -> UNCLEAR_REQUEST", r["classification"] == "UNCLEAR_REQUEST", r["classification"])
+
+r = cat("", "BJK muhtemel 11: Ersin, Gabriel, Onana, Ridvan, Al Musrati, Rafa, Cerny, Immobile, El Bilal, Abraham, Djalo")
+check("UnclearRequest-2 (CANLI ORNEK, kullanici tarafindan bildirildi): spor/kadro haberi -> UNCLEAR_REQUEST", r["classification"] == "UNCLEAR_REQUEST", r["classification"])
+
+r = cat("", "Rezervasyonum hakkında bilgi almak istiyorum.")
+check("UnclearRequest-Koruma: gercek ama genel bir rezervasyon talebi UNCLEAR_REQUEST'e DUSMEMELI", r["classification"] == "BILGI_ISTEK > TESIS > TESIS_ILETISIM", r["classification"])
 
 # --- Kullanicinin onayladigi senaryolar (kirilim.md gozden gecirme sureci) ---
 r = cat(

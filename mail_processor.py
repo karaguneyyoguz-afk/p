@@ -424,7 +424,32 @@ class EmailProcessor:
 
 class EmailCategorizer:
     """Categorizes emails and determines ticket routing."""
-    
+
+    # Son çare (TESIS_ILETISIM catch-all) tetiklenmeden hemen önce sorulan
+    # tek soru: bu mail HİÇ seyahat/rezervasyon/müşteri hizmetleri konusuna
+    # değiniyor mu? Değinmiyorsa (ör. "bugün havalar nasıl", spor haberi,
+    # rastgele sohbet) artık gerçek bir talep değildir -- ticket açmak yerine
+    # "talebinizi netleştirin" cevabı gönderilir (bkz. categorize()'ın sonu).
+    # Kasıtlı olarak GENİŞ ve genel tutuldu (spesifik dallardaki dar/çakışma
+    # riskli anahtar kelimelerin aksine) -- amaç hassas sınıflandırma değil,
+    # "bu konuyla hiç ilgisi yok" olan azınlığı elemek. Genişliğinin doğruluğu
+    # test_validation.py'deki 358 gerçek senaryonun HİÇBİRİNİN buraya
+    # düşmediğiyle (hepsi zaten daha spesifik bir dalda yakalanıyor) doğrulandı.
+    DOMAIN_RELEVANCE_KEYWORDS = [
+        "rezervasyon", "tatilbudur", "tesis", "otel", "konaklama", "oda",
+        "tatil", "tur ", "turu", "turumuz", "gezi", "seyahat", "bilet",
+        "ucak", "ucus", "otobus", "transfer", "arac", "minibus", "vize",
+        "pasaport", "giris tarihi", "cikis tarihi", "check-in", "checkin",
+        "fatura", "odeme", "iade", "iptal", "kaydirma", "sikayet", "misafir",
+        "kisi sayisi", "yatak", "program", "rehber", "kaptan", "acente",
+        "wifi", "havuz", "kahvalti", "sigorta", "pnr", "bagaj", "aktarma",
+        "erken rezervasyon", "son dakika", "konsept", "her sey dahil",
+        "gecelik", "gece konaklama", "tur operatoru", "reklamasyon",
+        "musteri hizmetleri", "danisman", "rehberimiz", "otelimiz",
+        "seyahat acentesi", "ticket", "talebim", "talebimiz", "sorunum",
+        "sorunumuz", "magduriyet",
+    ]
+
     THANK_YOU_KEYWORDS = [
         "tesekkur", "tesekkurler", "tesekkur ederim", "sagol",
         "tsk", "tks", "tessskur", "tesegkur", "teskut", "tesegkurr"
@@ -2774,6 +2799,28 @@ class EmailCategorizer:
                 "classification": "BACKOFFICE_ISLEMLERI > DEGISIKLIK > DIGER"
             }
 
+        # Buraya kadar hiçbir spesifik dal eşleşmediyse, TESIS_ILETISIM
+        # varsayılanına düşmeden önce son bir soru: bu mail gerçekten
+        # seyahat/rezervasyon/müşteri hizmetleri konusuna değiniyor mu?
+        # Değinmiyorsa ("bugün havalar nasıl", spor haberi, alakasız sohbet
+        # -- canlı ortamda gözlemlendi) TESIS_ILETISIM diye bir ticket açmak
+        # yanlış; ticket açılmadan netleştirme cevabı gönderilmesi gerekir
+        # (bkz. main.py, sub_category_code == "UNCLEAR_REQUEST" kontrolü).
+        if not any(keyword in normalized_text for keyword in EmailCategorizer.DOMAIN_RELEVANCE_KEYWORDS):
+            return {
+                "channel_id": CHANNEL_ID,
+                "ticket_type_id": None,
+                "ticket_type_name": None,
+                "category_id": None,
+                "category_name": None,
+                "sub_category_id": None,
+                "sub_category_name": None,
+                "sub_category_code": "UNCLEAR_REQUEST",
+                "attributes": [],
+                "missing_fields": [],
+                "classification": "UNCLEAR_REQUEST"
+            }
+
         # Default: General information request
         return {
             "channel_id": CHANNEL_ID,
@@ -3048,3 +3095,36 @@ def send_missing_fields_email(recipient_email: str, subject: str, missing_fields
     
     except Exception as e:
         print(f"❌ Eksik alan maili gönderilirken hata: {e}")
+
+
+def send_unclear_request_email(recipient_email: str, subject: str, customer_name: str) -> None:
+    """Sent when categorize() couldn't match the mail to ANY seyahat/
+    rezervasyon/müşteri hizmetleri konusu (sub_category_code ==
+    "UNCLEAR_REQUEST", see EmailCategorizer.DOMAIN_RELEVANCE_KEYWORDS) --
+    the mail isn't a recognizable request at all, so no ticket is created;
+    this asks the sender to restate what they actually need."""
+    try:
+        message = MIMEMultipart()
+        message['From'] = EMAIL_USER
+        message['To'] = recipient_email
+        message['Subject'] = f"Re: {_safe_header_value(subject)} - Talebiniz Anlaşılamadı"
+
+        formatted_body = (
+            f"Sayın {customer_name},\n\n"
+            f"Uygun bir talep oluşturulamadı. Mesajınızdan rezervasyon, tatil, "
+            f"ödeme veya müşteri hizmetleri ile ilgili net bir talep anlaşılamadı.\n\n"
+            f"Lütfen talebinizi daha açık bir şekilde belirtiniz.\n\n"
+            f"Saygılarımızla,\n"
+            f"Müşteri Hizmetleri Ekibi"
+        )
+        message.attach(MIMEText(formatted_body, 'plain', 'utf-8'))
+
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, recipient_email, message.as_string())
+        server.quit()
+
+        print(f"❓ [TALEP ANLAŞILAMADI MAİLİ GÖNDERİLDİ] -> {recipient_email}")
+
+    except Exception as e:
+        print(f"❌ Talep anlaşılamadı maili gönderilirken hata: {e}")
