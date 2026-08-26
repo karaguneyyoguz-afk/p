@@ -246,6 +246,7 @@ export type ScreenKey =
   | 'emails'
   | 'tickets'
   | 'bulk_shift'
+  | 'content_rules'
   | 'settings'
   | 'users'
 
@@ -276,4 +277,65 @@ export interface ScreensPayload {
   role_screens: ScreenKey[]
   effective_screens: ScreenKey[]
   overrides: ScreenOverride[]
+}
+
+// ==========================================================
+// İçerik denetimi (uygunsuz içerik kuralları + işaretlenmiş mailler)
+// ==========================================================
+
+export type ContentRuleType = 'keyword' | 'regex'
+export type ContentRuleCategory = 'kufur' | 'spam' | 'tehdit' | 'yetiskin' | 'diger'
+
+export interface ContentRule {
+  id: number
+  pattern: string
+  rule_type: ContentRuleType
+  category: ContentRuleCategory
+  is_active: boolean
+  created_by_id: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ContentRulesResponse {
+  rules: ContentRule[]
+  categories: ContentRuleCategory[]
+  types: ContentRuleType[]
+}
+
+export interface ContentRuleTestResponse {
+  matched: boolean
+  category: ContentRuleCategory | null
+  rule_source: 'config' | 'db' | null
+  snippet: string | null
+}
+
+export type FlaggedMailStatus = 'pending' | 'approved' | 'rejected'
+
+export interface FlaggedMail {
+  id: number
+  sender_email: string
+  sender_name: string | null
+  subject: string
+  mail_body: string
+  matched_category: ContentRuleCategory
+  matched_rule_source: 'config' | 'db'
+  matched_rule_id: number | null
+  matched_pattern: string | null
+  matched_snippet: string | null
+  status: FlaggedMailStatus
+  reviewed_by_id: number | null
+  reviewed_at: string | null
+  created_at: string
+}
+
+export interface FlaggedMailsResponse {
+  flagged_mails: FlaggedMail[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface FlaggedMailDetailResponse {
+  flagged_mail: FlaggedMail
 }

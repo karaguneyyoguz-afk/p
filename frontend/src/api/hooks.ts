@@ -27,6 +27,15 @@ import type {
   Role,
   ScreenKey,
   ScreensPayload,
+  ContentRule,
+  ContentRuleType,
+  ContentRuleCategory,
+  ContentRulesResponse,
+  ContentRuleTestResponse,
+  FlaggedMail,
+  FlaggedMailStatus,
+  FlaggedMailsResponse,
+  FlaggedMailDetailResponse,
 } from '@/types/api'
 
 function toQueryString(params: object) {
@@ -447,5 +456,96 @@ export function useSetUserOverrides() {
       apiPut<ScreensPayload>(`/api/users/${userId}/overrides`, { overrides }),
     onSuccess: (_data, { userId }) =>
       queryClient.invalidateQueries({ queryKey: ['users', userId, 'overrides'] }),
+  })
+}
+
+// ==========================================================
+// İçerik denetimi (uygunsuz içerik kuralları + işaretlenmiş mailler)
+// ==========================================================
+
+export function useContentRules(params: { category?: string; rule_type?: string } = {}) {
+  return useQuery<ContentRulesResponse>({
+    queryKey: ['content-rules', params],
+    queryFn: () => apiGet(`/api/content-rules${toQueryString(params)}`),
+  })
+}
+
+export interface ContentRuleInput {
+  pattern: string
+  rule_type: ContentRuleType
+  category: ContentRuleCategory
+  is_active?: boolean
+}
+
+export function useCreateContentRule() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: ContentRuleInput) => apiPost<ContentRule>('/api/content-rules', input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content-rules'] }),
+  })
+}
+
+export function useUpdateContentRule() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...input }: { id: number } & Partial<ContentRuleInput>) =>
+      apiPatch<ContentRule>(`/api/content-rules/${id}`, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content-rules'] }),
+  })
+}
+
+export function useDeleteContentRule() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => apiDelete(`/api/content-rules/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content-rules'] }),
+  })
+}
+
+export function useTestContentRule() {
+  return useMutation({
+    mutationFn: (text: string) => apiPost<ContentRuleTestResponse>('/api/content-rules/test', { text }),
+  })
+}
+
+export interface FlaggedMailsParams {
+  status?: FlaggedMailStatus
+  limit?: number
+  offset?: number
+}
+
+export function useFlaggedMails(params: FlaggedMailsParams & PollOptions = {}) {
+  const { refetchInterval, ...query } = params
+  return useQuery<FlaggedMailsResponse>({
+    queryKey: ['flagged-mails', query],
+    queryFn: () => apiGet(`/api/flagged-mails${toQueryString(query)}`),
+    refetchInterval,
+  })
+}
+
+export function useFlaggedMail(id: number | undefined, reveal: boolean = false) {
+  return useQuery<FlaggedMailDetailResponse>({
+    queryKey: ['flagged-mails', id, reveal],
+    queryFn: () => apiGet(`/api/flagged-mails/${id}${reveal ? '?reveal=true' : ''}`),
+    enabled: id !== undefined,
+  })
+}
+
+export function useApproveFlaggedMail() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => apiPost<FlaggedMail>(`/api/flagged-mails/${id}/approve`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['flagged-mails'] })
+      queryClient.invalidateQueries({ queryKey: ['tickets'] })
+    },
+  })
+}
+
+export function useRejectFlaggedMail() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => apiPost<FlaggedMail>(`/api/flagged-mails/${id}/reject`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['flagged-mails'] }),
   })
 }
