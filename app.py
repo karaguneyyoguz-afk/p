@@ -54,7 +54,19 @@ FRONTEND_DIST = os.path.join(os.path.dirname(__file__), 'frontend', 'dist')
 # shadow our own catch-all below at the same '/<path:...>' pattern and 404 before it
 # ever gets a chance to fall back to index.html for client-side routes.
 app = Flask(__name__, static_folder=None)
-app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
+
+_flask_secret_key = os.getenv('FLASK_SECRET_KEY')
+if not _flask_secret_key:
+    if os.getenv('FLASK_ENV') == 'production':
+        # Bilinen/public bir default ile üretimde oturum imzalamak session
+        # forgery riski taşır -- .env'de gerçek bir FLASK_SECRET_KEY yoksa
+        # üretimde uygulama hiç başlamasın.
+        raise RuntimeError(
+            "FLASK_SECRET_KEY .env dosyasında tanımlı olmalı (production). "
+            "Üretmek için: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+    _flask_secret_key = 'dev-secret-key-change-in-production'
+app.config['SECRET_KEY'] = _flask_secret_key
 app.config['SESSION_TYPE'] = 'filesystem'
 # Same-origin architecture (Vite dev proxy / Flask serving the built SPA in
 # prod, see FRONTEND_DIST below) means there's no cross-site cookie exposure
@@ -139,7 +151,8 @@ def get_token_info():
         }
         return token_info
     except Exception as e:
-        return {'error': str(e)}
+        print(f"⚠️ Token bilgisi alınamadı: {e}")
+        return {'error': 'Token bilgisi alınamadı.'}
 
 
 # Routes
@@ -221,7 +234,7 @@ def run_email_processor():
             'timestamp': datetime.now().isoformat(),
             'error': str(e)
         })
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Mail işleme sırasında bir hata oluştu.'}), 500
     finally:
         processor.disconnect()
         system_state['is_running'] = False
@@ -256,9 +269,10 @@ def get_emails():
         
         processor.disconnect()
         return jsonify({'emails': emails, 'count': len(emails)})
-    
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"⚠️ E-posta listesi alınamadı: {e}")
+        return jsonify({'error': 'E-posta listesi alınamadı.'}), 500
 
 
 @app.route('/api/token/refresh', methods=['POST'])
@@ -274,7 +288,8 @@ def refresh_token():
             'token_info': token_info
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        print(f"⚠️ Token yenilenemedi: {e}")
+        return jsonify({'success': False, 'error': 'Token yenilenemedi.'}), 500
 
 
 @app.route('/api/token/info')
@@ -285,7 +300,8 @@ def token_info_endpoint():
         info = get_token_info()
         return jsonify({'token_info': info})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"⚠️ Token bilgisi alınamadı: {e}")
+        return jsonify({'error': 'Token bilgisi alınamadı.'}), 500
 
 
 @app.route('/api/process-email', methods=['POST'])
@@ -421,7 +437,7 @@ def process_email_manual():
             'timestamp': datetime.now().isoformat(),
             'error': str(e)
         })
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Mail işleme sırasında bir hata oluştu.'}), 500
 
 
 @app.route('/api/mail-logs')
@@ -923,4 +939,9 @@ def serve_enigma(path):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    # debug=True açıkken Werkzeug'ün interaktif hata konsolu aktif olur --
+    # bu, hatalı bir istekten sonra rastgele kod çalıştırmaya izin verir
+    # (bkz. Werkzeug/Flask debugger RCE). FLASK_ENV=production olmadığı
+    # sürece varsayılan hâlâ debug modu (yerel geliştirme için), ama artık
+    # üretimde kasıtlı bir .env değişikliği olmadan kapanıyor.
+    app.run(debug=os.getenv('FLASK_ENV') != 'production', host='127.0.0.1', port=5000)

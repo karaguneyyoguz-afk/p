@@ -17,6 +17,7 @@ about that captured example that are NOT obvious from CSM's UI:
      -- not the individual mail sender, and not something collected via a form.
 """
 
+import html
 import os
 from typing import Any, BinaryIO, Dict, List, Optional, TypedDict
 
@@ -26,6 +27,7 @@ from openpyxl import load_workbook
 from service_log import record_service_event
 
 MAX_ROWS = 500
+MAX_EXCEL_BYTES = 5 * 1024 * 1024  # 500 satırlık gerçek bir dosya birkaç yüz KB'dir
 
 # Original script's column names (Turkish, exact match from the source Excel export).
 COLUMN_ALIASES = {
@@ -49,8 +51,20 @@ def parse_excel_rows(file_stream: BinaryIO) -> List[ExcelRow]:
     Raises ValueError if required columns are missing or the sheet has more
     than MAX_ROWS data rows (a hard cap — this endpoint processes rows
     synchronously, one HTTP request per row to CSM, so an unbounded upload
-    would tie up a request/worker for an unbounded amount of time).
+    would tie up a request/worker for an unbounded amount of time). Also
+    raises ValueError if the raw file exceeds MAX_EXCEL_BYTES -- both mail
+    attachments and panel uploads are untrusted input, and openpyxl parsing
+    an oversized/crafted .xlsx (zip decompression bomb) before MAX_ROWS
+    ever gets a chance to apply is a DoS vector.
     """
+    file_stream.seek(0, os.SEEK_END)
+    size = file_stream.tell()
+    file_stream.seek(0)
+    if size > MAX_EXCEL_BYTES:
+        raise ValueError(
+            f"Excel dosyası çok büyük ({size // 1024} KB) — üst sınır {MAX_EXCEL_BYTES // 1024} KB."
+        )
+
     workbook = load_workbook(filename=file_stream, data_only=True, read_only=True)
     sheet = workbook.active
 
@@ -270,7 +284,13 @@ def build_bulk_ticket_payload(
         "availableOperations": [],
         "stage": {"shortCode": "START"},
         "partyRole": party_role,
-        "description": f"<p>Toplu Kaydırma - Rezervasyon: {reservation_no} - {shift_type_label} - {alternative_text}</p>",
+        # Excel'den gelen değerler (mail ekinden -- güvenilmeyen kaynak da
+        # olabilir) HTML açıklama içine gömülmeden önce escape edilmeli;
+        # CSM ticket açıklamasını kendi arayüzünde HTML olarak render ediyor.
+        "description": (
+            f"<p>Toplu Kaydırma - Rezervasyon: {html.escape(str(reservation_no))} - "
+            f"{html.escape(shift_type_label)} - {html.escape(alternative_text)}</p>"
+        ),
         "channel": fields["channel"],
         "subCategory": fields["subCategory"],
         "category": fields["category"],

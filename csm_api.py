@@ -4,6 +4,7 @@ CSM API Module
 Handles all interactions with the CSM (Customer Service Management) API.
 """
 
+import html
 import requests
 import json
 from typing import Dict, Optional, List
@@ -381,7 +382,11 @@ class TicketPayloadBuilder:
             "availableOperations": [],
             "stage": {"shortCode": "START"},
             "partyRole": party_role,
-            "description": body,
+            # CSM ticket açıklamasını kendi arayüzünde HTML olarak render
+            # ediyor; body tamamen güvenilmeyen (dış dünyadan gelen) mail
+            # gövdesi olduğu için escape edilmeden gönderilmesi CSM'yi
+            # görüntüleyen operatörlere karşı stored XSS'e yol açar.
+            "description": html.escape(body),
             "channel": {
                 "shortCode": "MAIL",
                 "name": "Email",

@@ -2759,6 +2759,14 @@ class EmailCategorizer:
         }
 
 
+def _safe_header_value(value: str) -> str:
+    """Strip CR/LF from a value before it goes into an outbound mail header.
+    `subject` here always originates from an inbound (attacker-controlled)
+    email -- reusing it verbatim in a header risks classic email header
+    injection (extra headers/recipients smuggled in via embedded \\r\\n)."""
+    return (value or "").replace("\r", "").replace("\n", "")
+
+
 def send_notification_email(recipient_email: str, subject: str, body: str) -> None:
     """
     Send automatic notification email to recipient.
@@ -2772,7 +2780,7 @@ def send_notification_email(recipient_email: str, subject: str, body: str) -> No
         message = MIMEMultipart()
         message['From'] = EMAIL_USER
         message['To'] = recipient_email
-        message['Subject'] = f"Re: {subject} - BİLDİRİM: Talebiniz İşleme Alınamadı"
+        message['Subject'] = f"Re: {_safe_header_value(subject)} - BİLDİRİM: Talebiniz İşleme Alınamadı"
         
         formatted_body = f"Sayın Müşterimiz,\n\n{body}\n\nSaygılarımızla."
         message.attach(MIMEText(formatted_body, 'plain', 'utf-8'))
@@ -2802,7 +2810,7 @@ def send_ticket_confirmation_email(recipient_email: str, subject: str, ticket_id
         message = MIMEMultipart()
         message['From'] = EMAIL_USER
         message['To'] = recipient_email
-        message['Subject'] = f"Re: {subject} - Talebiniz Başarıyla Oluşturulmuştur (#{ticket_id})"
+        message['Subject'] = f"Re: {_safe_header_value(subject)} - Talebiniz Başarıyla Oluşturulmuştur (#{ticket_id})"
         
         formatted_body = (
             f"Sayın {customer_name},\n\n"
@@ -2838,7 +2846,7 @@ def send_bulk_kaydirma_summary_email(recipient_email: str, subject: str, summary
         message = MIMEMultipart()
         message['From'] = EMAIL_USER
         message['To'] = recipient_email
-        message['Subject'] = f"Re: {subject} - Sonuç ({summary['success_count']}/{summary['total']} başarılı)"
+        message['Subject'] = f"Re: {_safe_header_value(subject)} - Sonuç ({summary['success_count']}/{summary['total']} başarılı)"
 
         success_rows = [r for r in summary['results'] if r['success']]
         failed_rows = [r for r in summary['results'] if not r['success']]
@@ -2888,7 +2896,7 @@ def send_rejection_email(recipient_email: str, subject: str, customer_name: str)
         message = MIMEMultipart()
         message['From'] = EMAIL_USER
         message['To'] = recipient_email
-        message['Subject'] = f"Re: {subject} - Talebiniz İşleme Alınamadı"
+        message['Subject'] = f"Re: {_safe_header_value(subject)} - Talebiniz İşleme Alınamadı"
         
         formatted_body = (
             f"Sayın {customer_name},\n\n"
@@ -2941,7 +2949,7 @@ def send_vendor_redirect_email(recipient_email: str, subject: str, customer_name
         message = MIMEMultipart()
         message['From'] = EMAIL_USER
         message['To'] = recipient_email
-        message['Subject'] = f"Re: {subject} - Yanlış Adres Yönlendirmesi"
+        message['Subject'] = f"Re: {_safe_header_value(subject)} - Yanlış Adres Yönlendirmesi"
 
         redirect_list_str = "\n".join([f"  • {addr}" for addr in VENDOR_FINANCE_REDIRECT_ADDRESSES])
 
@@ -2983,7 +2991,7 @@ def send_missing_fields_email(recipient_email: str, subject: str, missing_fields
         message = MIMEMultipart()
         message['From'] = EMAIL_USER
         message['To'] = recipient_email
-        message['Subject'] = f"Re: {subject} - Eksik Bilgiler"
+        message['Subject'] = f"Re: {_safe_header_value(subject)} - Eksik Bilgiler"
         
         missing_fields_str = "\n".join([f"  • {field}" for field in missing_fields])
         

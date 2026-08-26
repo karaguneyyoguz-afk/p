@@ -71,3 +71,7 @@ backend_server.log
 
 # SQLite database (user accounts) -- local dev data, not source
 instance/
+
+# Runtime processing logs -- real customer mail content/PII, never source
+mail_processing_log.jsonl
+service_requests_log.jsonl
