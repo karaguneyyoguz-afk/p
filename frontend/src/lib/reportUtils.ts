@@ -19,6 +19,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   TESEKKUR: 'Teşekkür',
   rejected_content: 'Reddedilen İçerik',
   phishing_suspect: 'Phishing Şüphesi',
+  link_only_content: 'Sadece Link İçeriyor',
   Diğer: 'Diğer',
 }
 
@@ -35,6 +36,7 @@ const CATEGORY_TONES: Record<string, CategoryTone> = {
   TESEKKUR: 'success',
   rejected_content: 'danger',
   phishing_suspect: 'danger',
+  link_only_content: 'neutral',
 }
 
 export function categoryTone(key: string): CategoryTone {

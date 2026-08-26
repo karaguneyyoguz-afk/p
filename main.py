@@ -212,6 +212,26 @@ def process_email(
         print("-" * 50 + "\n")
         return
 
+    # Mail body is (almost) just a bare link with no real question/request of
+    # its own (see EmailProcessor.is_link_only_content) -- not phishing, not
+    # marketing, but not a support request either; without this it fell
+    # through every classification branch into the TESIS_ILETISIM catch-all
+    # and became a ticket for a mail that isn't asking anything (observed
+    # live: a mail whose entire body was one YouTube link).
+    if processor.is_link_only_content(body):
+        print("🔗 SONUÇ: Mail yalnızca bir link içeriyor, gerçek bir talep tespit edilemedi, atlanıyor.")
+        record_mail_event(
+            event="email_processed",
+            status="skipped",
+            sender_email=sender_email,
+            subject=subject,
+            reason="Mail gövdesi yalnızca bir link içeriyor -- gerçek bir destek talebi tespit edilemedi",
+            classification="link_only_content",
+            mail_body=body,
+        )
+        print("-" * 50 + "\n")
+        return
+
     # Mail-triggered Toplu Kaydırma (bulk reservation shift): "toplu
     # kaydırma" in the subject + an .xlsx attachment creates one CSM
     # "ilişkili ticket" (LINKED_TICKET) per row via bulk_shift.py -- the same

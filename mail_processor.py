@@ -138,7 +138,10 @@ BULK_UNSUBSCRIBE_KEYWORDS = [
 
 class EmailProcessor:
     """Handles email retrieval and processing."""
-    
+
+    # is_link_only_content's threshold -- see that method's docstring.
+    MIN_REAL_CONTENT_CHARS = 15
+
     def __init__(self, username: Optional[str] = None, password: Optional[str] = None):
         """
         Initialize email processor.
@@ -293,6 +296,34 @@ class EmailProcessor:
             return True
         normalized = normalize_turkish_characters(body)
         return any(keyword in normalized for keyword in BULK_UNSUBSCRIBE_KEYWORDS)
+
+    @staticmethod
+    def is_link_only_content(body: str) -> bool:
+        """True if the mail carries no real request of its own -- just a bare
+        URL (plus maybe a one-word greeting) and nothing else. These aren't
+        phishing (see phishing_check.py -- a plain YouTube/haber link isn't
+        deceptive) and aren't bulk marketing either, but they also aren't a
+        support request: with no keyword for the categorizer to match, they
+        fell through every specific branch and landed in the TESIS_ILETISIM
+        catch-all default, creating a ticket for a mail that isn't actually
+        asking anything (observed live: a mail whose entire body was a single
+        YouTube link).
+
+        Deliberately conservative -- only mail whose content, once the
+        URL(s) are removed, is almost nothing (< MIN_REAL_CONTENT_CHARS)
+        counts. A real question that happens to include a link ("şu tur
+        hakkında bilgi var mı: https://... katılmak istiyorum") keeps plenty
+        of surrounding text and is untouched."""
+        from phishing_check import extract_urls
+
+        urls = extract_urls(body)
+        if not urls:
+            return False
+        remaining = body
+        for url in urls:
+            remaining = remaining.replace(url, " ")
+        remaining = re.sub(r"\s+", " ", remaining).strip()
+        return len(remaining) < EmailProcessor.MIN_REAL_CONTENT_CHARS
 
     @staticmethod
     def is_bounce_notification(msg: email.message.Message, subject: str) -> bool:
