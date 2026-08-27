@@ -32,7 +32,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from config import PROFANITY_WORDS
-from models import ContentRule, FlaggedMail
+from models import ContentRule, FlaggedMail, TrustedDomain
 from utils import normalize_turkish_characters
 
 REGEX_TIMEOUT_SECONDS = 2.0
@@ -170,6 +170,23 @@ def get_active_rules() -> List[ContentRule]:
         return session.query(ContentRule).filter_by(is_active=True).all()
     finally:
         session.close()
+
+
+def get_trusted_domains() -> List[str]:
+    """Panelden eklenen (kod tabanlı phishing_check.BASE_SAFE_DOMAINS'e EK)
+    güvenilir alan adları. DB'ye erişilemezse (kilitli dosya, vb.) boş liste
+    döner -- bir okuma hatası yüzünden mail işleme tamamen durmasın, sadece
+    o mail için ek alan adları o an görünmemiş olur, temel liste yine geçerli."""
+    try:
+        session = _get_session()
+        try:
+            return [row.domain for row in session.query(TrustedDomain).all()]
+        finally:
+            session.close()
+    except Exception:
+        return []
+
+
 
 
 def check_content(text: str) -> Optional[ModerationMatch]:

@@ -12,22 +12,34 @@ domain, a Reply-To that quietly redirects replies elsewhere, and links that
 hide their real destination (IP-literal hosts, punycode/IDN homographs, URL
 shorteners, or anchor text naming one domain while the href goes to another).
 
-SAFE_DOMAINS is a manually maintained allowlist -- add any other domain the
-company legitimately sends/links from (a second TLD, a payment provider,
-etc.) here, otherwise it will be misflagged as a typosquat/external link.
+BASE_SAFE_DOMAINS is a permanent, code-level allowlist baseline -- add any
+other domain the company itself sends/links from here. get_safe_domains()
+unions this with panel-managed TrustedDomain rows (content_rules_routes.py's
+"Kabul Edilen Linkler" section, kullanıcı isteği: hem koddan hem panelden
+güncellenebilsin) -- same hybrid pattern content_moderation.py uses for
+PROFANITY_WORDS.
 """
 
 import re
 from email.utils import parseaddr
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from urllib.parse import urlparse
 
 from utils import normalize_turkish_characters
 
-SAFE_DOMAINS = {
+BASE_SAFE_DOMAINS = {
     "tatilbudur.com",
     "cloudcsmetiya.com",  # CSM (Etiya) -- ticket system links may point here
 }
+
+
+def get_safe_domains() -> Set[str]:
+    """BASE_SAFE_DOMAINS + panelden eklenmiş TrustedDomain'ler. DB'ye
+    erişilemezse (kilitli dosya vb.) sessizce sadece temel listeye düşer --
+    bkz. content_moderation.get_trusted_domains'in aynı fail-safe mantığı."""
+    from content_moderation import get_trusted_domains
+
+    return BASE_SAFE_DOMAINS | set(get_trusted_domains())
 
 # Normalized (accent-stripped, lowercased) brand keywords that, if present in
 # a display name whose address isn't in SAFE_DOMAINS, indicate spoofing.
@@ -66,15 +78,17 @@ def _levenshtein(a: str, b: str) -> int:
     return prev[-1]
 
 
-def is_typosquat_domain(domain: str) -> Optional[str]:
-    """Returns the SAFE_DOMAINS entry `domain` looks like a typo of, or None.
+def is_typosquat_domain(domain: str, safe_domains: Optional[Set[str]] = None) -> Optional[str]:
+    """Returns the safe-domain entry `domain` looks like a typo of, or None.
     A 1-2 character edit distance from a known domain (extra/missing/swapped
     letter, an inserted hyphen) is the classic typosquat pattern; exact
     matches and domains that are simply unrelated are not flagged."""
+    if safe_domains is None:
+        safe_domains = get_safe_domains()
     domain = (domain or "").lower()
-    if not domain or domain in SAFE_DOMAINS:
+    if not domain or domain in safe_domains:
         return None
-    for safe in SAFE_DOMAINS:
+    for safe in safe_domains:
         if 0 < _levenshtein(domain, safe) <= 2:
             return safe
     return None
@@ -132,7 +146,9 @@ def find_anchor_href_mismatches(html: str) -> List[str]:
     return signals
 
 
-def check_suspicious_links(body: str, html: str) -> List[str]:
+def check_suspicious_links(body: str, html: str, safe_domains: Optional[Set[str]] = None) -> List[str]:
+    if safe_domains is None:
+        safe_domains = get_safe_domains()
     signals = []
     seen_domains = set()
     for url in extract_urls(body) + extract_urls(html):
@@ -140,7 +156,7 @@ def check_suspicious_links(body: str, html: str) -> List[str]:
         if not host or host in seen_domains:
             continue
         seen_domains.add(host)
-        if host in SAFE_DOMAINS:
+        if host in safe_domains:
             continue
         if is_ip_literal_host(host):
             signals.append(f"IP adresine giden link: {url}")
@@ -149,18 +165,22 @@ def check_suspicious_links(body: str, html: str) -> List[str]:
         elif host in URL_SHORTENERS:
             signals.append(f"URL kısaltıcı linki (gerçek hedef gizli): {url}")
         else:
-            typosquat_of = is_typosquat_domain(host)
+            typosquat_of = is_typosquat_domain(host, safe_domains)
             if typosquat_of:
                 signals.append(f"'{typosquat_of}' alan adının olası taklidi: {host}")
     return signals
 
 
-def check_display_name_spoofing(sender_name: str, sender_email: str) -> Optional[str]:
+def check_display_name_spoofing(
+    sender_name: str, sender_email: str, safe_domains: Optional[Set[str]] = None
+) -> Optional[str]:
+    if safe_domains is None:
+        safe_domains = get_safe_domains()
     normalized_name = normalize_turkish_characters(sender_name or "").lower()
     if not any(keyword in normalized_name for keyword in BRAND_KEYWORDS):
         return None
     sender_domain = _domain_of(sender_email)
-    if sender_domain in SAFE_DOMAINS:
+    if sender_domain in safe_domains:
         return None
     return f"Görünen ad TatilBudur'a ait gibi ('{sender_name}') ama gönderen adresi ({sender_email}) değil"
 
@@ -179,9 +199,11 @@ def check_reply_to_mismatch(msg, sender_email: str) -> Optional[str]:
     return None
 
 
-def check_sender_domain_typosquat(sender_email: str) -> Optional[str]:
+def check_sender_domain_typosquat(sender_email: str, safe_domains: Optional[Set[str]] = None) -> Optional[str]:
+    if safe_domains is None:
+        safe_domains = get_safe_domains()
     sender_domain = _domain_of(sender_email)
-    typosquat_of = is_typosquat_domain(sender_domain)
+    typosquat_of = is_typosquat_domain(sender_domain, safe_domains)
     if typosquat_of:
         return f"Gönderen alan adı ({sender_domain}) '{typosquat_of}' alan adının olası taklidi"
     return None
@@ -192,16 +214,20 @@ def analyze_mail(msg, sender_email: str, sender_name: str, body: str) -> Dict[st
     [str, ...]}. Any single signal is enough to mark the mail suspicious --
     these are all deception-specific checks (see module docstring), not
     generic "this looks unusual" scoring, so false positives should be rare
-    by design; a real false positive means SAFE_DOMAINS/BRAND_KEYWORDS need
-    another legitimate entry, not that the check itself is too strict."""
+    by design; a real false positive means the safe-domain list/BRAND_KEYWORDS
+    need another legitimate entry, not that the check itself is too strict.
+
+    safe_domains is fetched ONCE here (one DB read) and threaded through
+    every sub-check, rather than each one independently re-querying."""
+    safe_domains = get_safe_domains()
     html = _extract_html_part(msg)
     signals: List[str] = []
 
-    spoof_signal = check_display_name_spoofing(sender_name, sender_email)
+    spoof_signal = check_display_name_spoofing(sender_name, sender_email, safe_domains)
     if spoof_signal:
         signals.append(spoof_signal)
 
-    typosquat_signal = check_sender_domain_typosquat(sender_email)
+    typosquat_signal = check_sender_domain_typosquat(sender_email, safe_domains)
     if typosquat_signal:
         signals.append(typosquat_signal)
 
@@ -209,7 +235,7 @@ def analyze_mail(msg, sender_email: str, sender_name: str, body: str) -> Dict[st
     if reply_to_signal:
         signals.append(reply_to_signal)
 
-    signals.extend(check_suspicious_links(body, html))
+    signals.extend(check_suspicious_links(body, html, safe_domains))
     if html:
         signals.extend(find_anchor_href_mismatches(html))
 

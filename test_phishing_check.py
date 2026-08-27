@@ -10,13 +10,23 @@ NORMAL durum -- bu testler ayrica "sirf harici oldugu icin" hicbir seyin
 yanlislikla supheli isaretlenmedigini de dogruluyor (false-positive korumasi).
 """
 
+import os
 import sys
+import tempfile
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.message import Message
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+# get_safe_domains() (phishing_check.py) artık panelden eklenen TrustedDomain
+# satırlarını da okuyor -- gerçek instance/enigma.db yerine boş bir geçici
+# DB'ye yönlendiriyoruz (test_bulk_shift.py'deki ile aynı desen), yoksa bu
+# testler gerçek geliştirme veritabanını okur.
+_tmp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+_tmp_db.close()
+os.environ["DATABASE_URL"] = f"sqlite:///{_tmp_db.name}"
 
 from phishing_check import (
     analyze_mail,
@@ -138,6 +148,36 @@ check(
     "E2E-1: sahte görünen ad + Reply-To yönlendirmesi + gizli link aynı anda -> şüpheli, birden fazla sinyal",
     result["suspicious"] is True and len(result["signals"]) >= 2,
     result["signals"],
+)
+
+# ==========================================================
+# 8) Panelden eklenen guvenilir alan adlari (TrustedDomain) -- get_safe_domains
+# ==========================================================
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from models import db as _models_db, TrustedDomain
+from phishing_check import get_safe_domains
+
+_engine = create_engine(os.environ["DATABASE_URL"])
+_models_db.metadata.create_all(_engine, tables=[TrustedDomain.__table__])
+_Session = sessionmaker(bind=_engine)
+_session = _Session()
+_session.add(TrustedDomain(domain="ornek-tedarikci.com", created_by_id=None))
+_session.commit()
+_session.close()
+
+safe_domains = get_safe_domains()
+check(
+    "TrustedDomain-1 (panelden eklenen): DB'deki alan adi get_safe_domains() sonucuna giriyor",
+    "ornek-tedarikci.com" in safe_domains and "tatilbudur.com" in safe_domains,
+    safe_domains,
+)
+
+signals = check_suspicious_links("Bkz: https://ornek-tedarikci.com/kampanya", "", safe_domains)
+check(
+    "TrustedDomain-2: panelden eklenen alan adina giden link artik supheli DEGIL",
+    len(signals) == 0,
+    signals,
 )
 
 # ==========================================================

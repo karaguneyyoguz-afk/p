@@ -129,6 +129,29 @@ class ContentRule(db.Model):
         }
 
 
+class TrustedDomain(db.Model):
+    """Panelden eklenen, phishing_check.py'nin güvenli/izin verilen alan adı
+    listesine (SAFE_DOMAINS tabanına ek olarak) eklenen alan adları -- ör.
+    kabul edilen mail içeriklerinde geçen bir ortak/tedarikçi linki.
+    tatilbudur.com/cloudcsmetiya.com gibi kod tabanlı temel liste kaldırılamaz;
+    bu tablo sadece ONA EKLENEN ekstra alan adlarını tutar."""
+
+    __tablename__ = "trusted_domains"
+
+    id = db.Column(db.Integer, primary_key=True)
+    domain = db.Column(db.String(255), unique=True, nullable=False)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime(), nullable=False, default=_utcnow)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "domain": self.domain,
+            "created_by_id": self.created_by_id,
+            "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
+        }
+
+
 FLAGGED_MAIL_STATUSES = ("pending", "approved", "rejected")
 
 

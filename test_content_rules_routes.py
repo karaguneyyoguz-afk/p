@@ -20,8 +20,9 @@ _tmp_db.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp_db.name}"
 
 from app import app
+from config import PROFANITY_WORDS
 from dev_test_helpers import login_test_client
-from models import ContentRule, FlaggedMail, db
+from models import ContentRule, FlaggedMail, TrustedDomain, db
 
 passed = 0
 failed = 0
@@ -102,7 +103,17 @@ resp = admin_client.post(
 check("CRUD (doğrulama): boş pattern -> 400", resp.status_code == 400, resp.get_json())
 
 resp = admin_client.get("/api/content-rules")
-check("CRUD: liste 2 aktif kural içeriyor (ReDoS/geçersiz olanlar hiç kaydedilmedi)", resp.get_json()["rules"].__len__() == 2, resp.get_json())
+panel_rules = [r for r in resp.get_json()["rules"] if r["source"] == "panel"]
+config_rules = [r for r in resp.get_json()["rules"] if r["source"] == "config"]
+check(
+    "CRUD: liste panel'den 2 aktif kural içeriyor (ReDoS/geçersiz olanlar hiç kaydedilmedi)",
+    len(panel_rules) == 2, resp.get_json(),
+)
+check(
+    "CRUD (YENİ ÖZELLİK, kullanıcı isteği): config.PROFANITY_WORDS'ün tamamı da 'source: config' olarak listede",
+    len(config_rules) == len(PROFANITY_WORDS) and all(r["pattern"] in PROFANITY_WORDS for r in config_rules),
+    len(config_rules),
+)
 
 rule_id = created_rule["id"]
 resp = admin_client.patch(f"/api/content-rules/{rule_id}", json={"is_active": False}, headers=admin_headers)
@@ -112,7 +123,8 @@ resp = admin_client.delete(f"/api/content-rules/{rule_id}", headers=admin_header
 check("CRUD: kural silme -> 200", resp.status_code == 200, resp.get_json())
 
 resp = admin_client.get("/api/content-rules")
-check("CRUD: silinen kural artık listede yok", len(resp.get_json()["rules"]) == 1, resp.get_json())
+panel_rules = [r for r in resp.get_json()["rules"] if r["source"] == "panel"]
+check("CRUD: silinen kural artık panel listesinde yok", len(panel_rules) == 1, panel_rules)
 
 # ==========================================================
 # /api/content-rules/test -- kaydetmeden deneme
@@ -157,6 +169,66 @@ check("FlaggedMail: status filtresi çalışıyor", resp.get_json()["total"] >= 
 
 resp = admin_client.get("/api/flagged-mails?status=approved")
 check("FlaggedMail: olmayan durum için boş liste (henüz onaylanan yok)", resp.get_json()["total"] == 0, resp.get_json())
+
+# ==========================================================
+# Kabul edilen linkler (TrustedDomain) -- kullanıcı isteği: bu ekranda olsun
+# ==========================================================
+resp = operator_client.get("/api/trusted-domains")
+check("Yetki: operator güvenilir alan adlarını da göremiyor (403)", resp.status_code == 403, resp.status_code)
+
+resp = admin_client.get("/api/trusted-domains")
+check(
+    "TrustedDomain: temel liste (tatilbudur.com vb.) base_domains'te görünüyor",
+    "tatilbudur.com" in resp.get_json()["base_domains"],
+    resp.get_json(),
+)
+
+resp = admin_client.post(
+    "/api/trusted-domains",
+    json={"domain": "https://Ornek-Tedarikci.com/kampanya?x=1"},
+    headers=admin_headers,
+)
+check(
+    "TrustedDomain: tam bir URL yapıştırılınca sadece alan adı çıkarılıp kaydediliyor",
+    resp.status_code == 201 and resp.get_json()["domain"] == "ornek-tedarikci.com",
+    resp.get_json(),
+)
+domain_id = resp.get_json()["id"]
+
+resp = admin_client.post("/api/trusted-domains", json={"domain": "ornek-tedarikci.com"}, headers=admin_headers)
+check("TrustedDomain: aynı alan adı ikinci kez eklenemiyor (409)", resp.status_code == 409, resp.get_json())
+
+resp = admin_client.post("/api/trusted-domains", json={"domain": "tatilbudur.com"}, headers=admin_headers)
+check("TrustedDomain: zaten temel listede olan bir alan adı reddediliyor (409)", resp.status_code == 409, resp.get_json())
+
+resp = admin_client.post("/api/trusted-domains", json={"domain": "gecersiz alan adi!!"}, headers=admin_headers)
+check("TrustedDomain: geçersiz alan adı formatı reddediliyor (400)", resp.status_code == 400, resp.get_json())
+
+resp = admin_client.get("/api/trusted-domains")
+check(
+    "TrustedDomain: eklenen alan adı listede görünüyor",
+    any(d["domain"] == "ornek-tedarikci.com" for d in resp.get_json()["domains"]),
+    resp.get_json(),
+)
+
+resp = admin_client.delete(f"/api/trusted-domains/{domain_id}", headers=admin_headers)
+check("TrustedDomain: silme -> 200", resp.status_code == 200, resp.get_json())
+
+resp = admin_client.get("/api/trusted-domains")
+check(
+    "TrustedDomain: silinen alan adı artık listede yok",
+    all(d["id"] != domain_id for d in resp.get_json()["domains"]),
+    resp.get_json(),
+)
+
+# phishing_check.get_safe_domains() gerçekten bu tabloyu okuyor mu -- uçtan uca
+admin_client.post("/api/trusted-domains", json={"domain": "guvenilir-ortak.com"}, headers=admin_headers)
+from phishing_check import get_safe_domains
+check(
+    "TrustedDomain (uçtan uca): panelden eklenen alan adı phishing_check.get_safe_domains()'te görünüyor",
+    "guvenilir-ortak.com" in get_safe_domains(),
+    get_safe_domains(),
+)
 
 # ==========================================================
 # OZET

@@ -6,14 +6,22 @@ Bu dosyadaki her endpoint @require_screen("content_rules") ile korunuyor --
 React tarafında menüyü gizlemek yeterli değil, kontrol burada sunucu
 tarafında yapılıyor (kullanıcının kendi belirttiği gereksinim)."""
 
+import re
+from urllib.parse import urlparse
+
 from flask import Blueprint, g, jsonify, request
 
 from accounts import record_audit_log, require_screen
+from config import PROFANITY_WORDS
 from content_moderation import check_content, create_flagged_mail, validate_regex_pattern
 from csm_api import CSMAPIClient
 from logging_utils import record_mail_event
 from mail_processor import EmailCategorizer, send_rejection_email
-from models import CONTENT_RULE_CATEGORIES, CONTENT_RULE_TYPES, ContentRule, FlaggedMail, _utcnow, db
+from models import (
+    CONTENT_RULE_CATEGORIES, CONTENT_RULE_TYPES, ContentRule, FlaggedMail,
+    TrustedDomain, _utcnow, db,
+)
+from phishing_check import BASE_SAFE_DOMAINS
 
 content_rules_bp = Blueprint("content_rules", __name__, url_prefix="/api")
 
@@ -36,6 +44,29 @@ def _validate_rule_fields(data: dict, partial: bool = False) -> str | None:
     return None
 
 
+def _config_word_rules() -> list[dict]:
+    """config.PROFANITY_WORDS'ü panel listesiyle AYNI şekle (source
+    etiketiyle) döker -- kullanıcı isteği: mevcut kod tabanlı kelimeler de bu
+    ekranda görünsün. Sentetik "config-<kelime>" id'si taşırlar; frontend bu
+    satırlarda düzenle/sil'i gizler (gerçek bir ContentRule satırı değiller,
+    /api/content-rules/<int:rule_id> zaten string id kabul etmediği için
+    backend'de ayrıca bir engelleme gerekmiyor)."""
+    return [
+        {
+            "id": f"config-{word}",
+            "pattern": word,
+            "rule_type": "keyword",
+            "category": "kufur",
+            "is_active": True,
+            "source": "config",
+            "created_by_id": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+        for word in PROFANITY_WORDS
+    ]
+
+
 @content_rules_bp.route("/content-rules")
 @require_screen("content_rules")
 def list_content_rules():
@@ -47,7 +78,21 @@ def list_content_rules():
     if rule_type:
         query = query.filter_by(rule_type=rule_type)
     rules = query.order_by(ContentRule.created_at.desc()).all()
-    return jsonify({"rules": [r.to_dict() for r in rules], "categories": CONTENT_RULE_CATEGORIES, "types": CONTENT_RULE_TYPES})
+
+    db_rules = [{**r.to_dict(), "source": "panel"} for r in rules]
+    config_rules = _config_word_rules()
+    # Aynı filtreler (varsa) config kelimelerine de uygulanır -- kullanıcı
+    # "kufur" kategorisine filtrelediğinde config kelimeleri kaybolmasın.
+    if category:
+        config_rules = [r for r in config_rules if r["category"] == category]
+    if rule_type:
+        config_rules = [r for r in config_rules if r["rule_type"] == rule_type]
+
+    return jsonify({
+        "rules": config_rules + db_rules,
+        "categories": CONTENT_RULE_CATEGORIES,
+        "types": CONTENT_RULE_TYPES,
+    })
 
 
 @content_rules_bp.route("/content-rules", methods=["POST"])
@@ -236,3 +281,62 @@ def reject_flagged_mail(flagged_id: int):
     db.session.commit()
     record_audit_log(g.current_user, "flagged_mail_rejected", detail=f"#{row.id}: {row.sender_email} / {row.subject}")
     return jsonify(row.to_dict(reveal=True))
+
+
+_DOMAIN_PATTERN = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$")
+
+
+def _normalize_domain_input(value: str) -> str | None:
+    """"https://Ornek.com/kampanya" -> "ornek.com"; kullanıcı tam bir link
+    yapıştırsa da sadece alan adını saklar. Geçersizse None döner."""
+    value = (value or "").strip().lower()
+    if not value:
+        return None
+    if "://" not in value:
+        value = f"//{value}"
+    host = (urlparse(value).hostname or "").strip(".")
+    if not host or not _DOMAIN_PATTERN.match(host):
+        return None
+    return host
+
+
+@content_rules_bp.route("/trusted-domains")
+@require_screen("content_rules")
+def list_trusted_domains():
+    rows = TrustedDomain.query.order_by(TrustedDomain.created_at.desc()).all()
+    return jsonify({
+        "domains": [d.to_dict() for d in rows],
+        "base_domains": sorted(BASE_SAFE_DOMAINS),
+    })
+
+
+@content_rules_bp.route("/trusted-domains", methods=["POST"])
+@require_screen("content_rules")
+def create_trusted_domain():
+    data = request.get_json(silent=True) or {}
+    domain = _normalize_domain_input(data.get("domain", ""))
+    if not domain:
+        return jsonify({"error": "Geçerli bir alan adı girin (ör. ornek.com)."}), 400
+    if domain in BASE_SAFE_DOMAINS:
+        return jsonify({"error": f"'{domain}' zaten kod tabanlı temel listede."}), 409
+    if TrustedDomain.query.filter_by(domain=domain).first():
+        return jsonify({"error": f"'{domain}' zaten ekli."}), 409
+
+    row = TrustedDomain(domain=domain, created_by_id=g.current_user.id)
+    db.session.add(row)
+    db.session.commit()
+    record_audit_log(g.current_user, "trusted_domain_created", detail=domain)
+    return jsonify(row.to_dict()), 201
+
+
+@content_rules_bp.route("/trusted-domains/<int:domain_id>", methods=["DELETE"])
+@require_screen("content_rules")
+def delete_trusted_domain_route(domain_id: int):
+    row = db.session.get(TrustedDomain, domain_id)
+    if row is None:
+        return jsonify({"error": "Kayıt bulunamadı."}), 404
+    domain = row.domain
+    db.session.delete(row)
+    db.session.commit()
+    record_audit_log(g.current_user, "trusted_domain_deleted", detail=f"#{domain_id}: {domain}")
+    return jsonify({"success": True})
