@@ -86,10 +86,37 @@ _engine = None
 _SessionFactory = None
 
 
+def _resolve_relative_sqlite_url(database_url: str) -> str:
+    """Flask-SQLAlchemy (app.py's own db.session, used by the panel's CRUD)
+    resolves a RELATIVE sqlite:///x.db URL against the Flask app's instance
+    folder (<project>/instance/), not the current working directory --
+    that's a documented Flask-SQLAlchemy convention, meant to keep sqlite
+    files out of the source tree. Plain SQLAlchemy's create_engine (used
+    here, since this module intentionally has no Flask app to bind to --
+    see module docstring) does NOT know about that convention and resolves
+    the same relative path against the CWD instead.
+
+    Without this, this module's engine and the panel's db.session silently
+    point at two DIFFERENT files -- confirmed live: a rule added through
+    the panel lands in instance/enigma.db, while this module (before this
+    fix) opened an empty, schema-less enigma.db at the project root and
+    never saw it (or even errored: "no such table"). Mirroring Flask's own
+    resolution here keeps both sides reading/writing the same database."""
+    prefix = "sqlite:///"
+    if not database_url.startswith(prefix):
+        return database_url  # not sqlite, or already an absolute/other URL
+    path_part = database_url[len(prefix):]
+    if path_part.startswith("/") or (len(path_part) > 1 and path_part[1] == ":"):
+        return database_url  # already absolute (POSIX or Windows drive letter)
+    instance_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "instance")
+    absolute_path = os.path.join(instance_dir, path_part)
+    return f"sqlite:///{absolute_path}"
+
+
 def _get_session():
     global _engine, _SessionFactory
     if _SessionFactory is None:
-        database_url = os.getenv("DATABASE_URL", "sqlite:///enigma.db")
+        database_url = _resolve_relative_sqlite_url(os.getenv("DATABASE_URL", "sqlite:///enigma.db"))
         _engine = create_engine(database_url)
         _SessionFactory = sessionmaker(bind=_engine)
     return _SessionFactory()

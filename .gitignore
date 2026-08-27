@@ -71,6 +71,10 @@ backend_server.log
 
 # SQLite database (user accounts) -- local dev data, not source
 instance/
+# Stray root-level sqlite file some non-Flask scripts created before
+# content_moderation.py's DB path resolution was fixed to match
+# Flask-SQLAlchemy's instance-folder convention.
+/enigma.db
 
 # Runtime processing logs -- real customer mail content/PII, never source
 mail_processing_log.jsonl

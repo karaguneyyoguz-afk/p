@@ -39,6 +39,35 @@ def check(name, condition, detail=""):
         results.append(("FAIL", name, detail))
 
 
+# ==========================================================
+# _resolve_relative_sqlite_url -- content_moderation.py'nin standalone
+# SQLAlchemy engine'inin, Flask-SQLAlchemy'nin (panelin db.session'ı) AYNI
+# dosyaya baktığından emin olması. CANLI ORTAMDA BULUNDU: .env'deki
+# DATABASE_URL=sqlite:///enigma.db (göreli yol) ile panel instance/enigma.db
+# yazarken, bu modül düzeltilmeden önce proje kökündeki boş/tablosuz bir
+# enigma.db'ye bakıyordu -- panelden eklenen HİÇBİR ContentRule/TrustedDomain
+# gerçek mail işlemede hiç görülmüyordu.
+# ==========================================================
+from content_moderation import _resolve_relative_sqlite_url
+
+check(
+    "_resolve_relative_sqlite_url (CANLI HATA DÜZELTMESİ): göreli yol instance/ klasörüne çözülüyor",
+    _resolve_relative_sqlite_url("sqlite:///enigma.db").replace("\\", "/").endswith("instance/enigma.db"),
+    _resolve_relative_sqlite_url("sqlite:///enigma.db"),
+)
+check(
+    "_resolve_relative_sqlite_url: zaten mutlak olan (Windows sürücü harfli) bir yol DOKUNULMADAN kalıyor",
+    _resolve_relative_sqlite_url("sqlite:///C:/Users/test/db.sqlite") == "sqlite:///C:/Users/test/db.sqlite",
+)
+check(
+    "_resolve_relative_sqlite_url: zaten mutlak (POSIX) bir yol dokunulmadan kalıyor",
+    _resolve_relative_sqlite_url("sqlite:////tmp/test.db") == "sqlite:////tmp/test.db",
+)
+check(
+    "_resolve_relative_sqlite_url: sqlite dışı bir URL (ör. postgres) hiç dokunulmadan geçiyor",
+    _resolve_relative_sqlite_url("postgresql://user:pass@host/db") == "postgresql://user:pass@host/db",
+)
+
 admin_client = app.test_client()
 admin_csrf = login_test_client(app, admin_client, email="admin@local.test", role="admin")
 admin_headers = {"X-CSRF-Token": admin_csrf}
