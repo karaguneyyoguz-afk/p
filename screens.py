@@ -22,7 +22,7 @@ SCREENS = {
     "emails": "E-postalar",
     "tickets": "Talepler",
     "bulk_shift": "Toplu Kaydırma",
-    "content_rules": "İçerik Kuralları",
+    "content_rules": "Fraud",
     "jobs": "Job'lar",
     "settings": "Ayarlar",
     "users": "Kullanıcılar",

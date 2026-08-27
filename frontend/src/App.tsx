@@ -31,8 +31,11 @@ const Monitoring = lazy(() =>
 const BulkShift = lazy(() =>
   import('@/pages/BulkShift').then((m) => ({ default: m.BulkShift })),
 )
-const ContentRules = lazy(() =>
-  import('@/pages/ContentRules').then((m) => ({ default: m.ContentRules })),
+const FraudRules = lazy(() =>
+  import('@/pages/FraudRules').then((m) => ({ default: m.FraudRules })),
+)
+const FraudMails = lazy(() =>
+  import('@/pages/FraudMails').then((m) => ({ default: m.FraudMails })),
 )
 const Jobs = lazy(() => import('@/pages/Jobs').then((m) => ({ default: m.Jobs })))
 const JobDetail = lazy(() =>
@@ -140,10 +143,18 @@ function App() {
               }
             />
             <Route
-              path="content-rules"
+              path="fraud/rules"
               element={
                 <RequireScreen screen="content_rules">
-                  <ContentRules />
+                  <FraudRules />
+                </RequireScreen>
+              }
+            />
+            <Route
+              path="fraud/mail"
+              element={
+                <RequireScreen screen="content_rules">
+                  <FraudMails />
                 </RequireScreen>
               }
             />

@@ -13,6 +13,7 @@ import {
   Users as UsersIcon,
   ShieldAlert,
   Timer,
+  MailWarning,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/contexts/AuthContext'
@@ -40,9 +41,15 @@ const navGroups = [
       { to: '/emails', label: 'E-postalar', icon: Mail, screen: 'emails' as ScreenKey },
       { to: '/tickets', label: 'Talepler', icon: Ticket, screen: 'tickets' as ScreenKey },
       { to: '/bulk-shift', label: 'Toplu Kaydırma', icon: FileSpreadsheet, screen: 'bulk_shift' as ScreenKey },
-      { to: '/content-rules', label: 'İçerik Kuralları', icon: ShieldAlert, screen: 'content_rules' as ScreenKey },
       { to: '/settings', label: 'Ayarlar', icon: Settings, screen: 'settings' as ScreenKey },
       { to: '/users', label: 'Kullanıcılar', icon: UsersIcon, screen: 'users' as ScreenKey },
+    ],
+  },
+  {
+    label: 'Fraud',
+    items: [
+      { to: '/fraud/mail', label: 'Şüpheli Mailler', icon: MailWarning, screen: 'content_rules' as ScreenKey },
+      { to: '/fraud/rules', label: 'Uygunsuz İçerik Kelime Tanımı', icon: ShieldAlert, screen: 'content_rules' as ScreenKey },
     ],
   },
 ]
