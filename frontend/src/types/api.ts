@@ -287,14 +287,18 @@ export type ContentRuleType = 'keyword' | 'regex'
 export type ContentRuleCategory = 'kufur' | 'spam' | 'tehdit' | 'yetiskin' | 'diger'
 
 export interface ContentRule {
-  id: number
+  // config kaynaklı satırlarda "config-<kelime>" gibi sentetik bir string id
+  // -- panelden düzenlenip silinemezler, koddan (config.PROFANITY_WORDS)
+  // düzenlenirler.
+  id: number | string
   pattern: string
   rule_type: ContentRuleType
   category: ContentRuleCategory
   is_active: boolean
+  source: 'config' | 'panel'
   created_by_id: number | null
-  created_at: string
-  updated_at: string
+  created_at: string | null
+  updated_at: string | null
 }
 
 export interface ContentRulesResponse {
@@ -338,4 +342,18 @@ export interface FlaggedMailsResponse {
 
 export interface FlaggedMailDetailResponse {
   flagged_mail: FlaggedMail
+}
+
+export interface TrustedDomain {
+  id: number
+  domain: string
+  created_by_id: number | null
+  created_at: string
+}
+
+export interface TrustedDomainsResponse {
+  domains: TrustedDomain[]
+  // Koddan kaldırılamayan temel liste (tatilbudur.com vb.) -- ayrı, salt
+  // görüntüleme amaçlı.
+  base_domains: string[]
 }

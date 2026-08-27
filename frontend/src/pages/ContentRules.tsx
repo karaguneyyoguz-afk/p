@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Plus, Trash2, FlaskConical, Eye, Check, X as XIcon } from 'lucide-react'
+import { Plus, Trash2, FlaskConical, Eye, Check, X as XIcon, Link2 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -15,8 +15,18 @@ import {
   useFlaggedMail,
   useApproveFlaggedMail,
   useRejectFlaggedMail,
+  useTrustedDomains,
+  useCreateTrustedDomain,
+  useDeleteTrustedDomain,
 } from '@/api/hooks'
-import type { ContentRule, ContentRuleCategory, ContentRuleType, FlaggedMail, FlaggedMailStatus } from '@/types/api'
+import type {
+  ContentRule,
+  ContentRuleCategory,
+  ContentRuleType,
+  FlaggedMail,
+  FlaggedMailStatus,
+  TrustedDomain,
+} from '@/types/api'
 
 const inputClass =
   'w-full rounded-lg border border-enigma-border bg-enigma-bg px-3 py-2 text-sm text-enigma-text placeholder:text-enigma-text-muted focus:border-enigma-primary focus:outline-none focus:ring-2 focus:ring-enigma-primary/20'
@@ -62,7 +72,7 @@ export function ContentRules() {
       />
 
       <Card className="mb-4">
-        <CardHeader title="Kurallar" subtitle="Kodda sabit bir liste de ayrıca çalışmaya devam ediyor -- buradakiler ona ek" />
+        <CardHeader title="Kurallar" subtitle="Koddaki sabit liste ('Kod' etiketli) ve panelden eklenenler ('Panel' etiketli) birlikte gösteriliyor" />
         <CardBody className="space-y-4">
           <NewRuleForm />
           {rulesLoading ? (
@@ -77,6 +87,7 @@ export function ContentRules() {
                     <th className="pb-2 pr-4 font-medium">Kalıp</th>
                     <th className="pb-2 pr-4 font-medium">Tip</th>
                     <th className="pb-2 pr-4 font-medium">Kategori</th>
+                    <th className="pb-2 pr-4 font-medium">Kaynak</th>
                     <th className="pb-2 pr-4 font-medium">Durum</th>
                     <th className="pb-2 pr-4 font-medium">İşlemler</th>
                   </tr>
@@ -92,7 +103,9 @@ export function ContentRules() {
         </CardBody>
       </Card>
 
-      <Card>
+      <TrustedDomainsSection />
+
+      <Card className="mb-4">
         <CardHeader
           title="İncelemeyi Bekleyen Mailler"
           subtitle="Uygunsuz içerik kuralına takılan mailler -- otomatik ticket açılmaz, buradan onaylanır/reddedilir"
@@ -162,6 +175,106 @@ export function ContentRules() {
 
       {flaggedId !== null && <FlaggedMailModal id={flaggedId} onClose={() => setFlaggedId(null)} />}
     </div>
+  )
+}
+
+function TrustedDomainsSection() {
+  const { data, isLoading } = useTrustedDomains()
+  const createDomain = useCreateTrustedDomain()
+  const deleteDomain = useDeleteTrustedDomain()
+  const toast = useToast()
+
+  const [domainInput, setDomainInput] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  const baseDomains = data?.base_domains ?? []
+  const domains = data?.domains ?? []
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    createDomain.mutate(domainInput.trim(), {
+      onSuccess: () => {
+        toast.show('Alan adı eklendi', 'success')
+        setDomainInput('')
+      },
+      onError: (err) => setError(err instanceof Error ? err.message : 'Eklenemedi'),
+    })
+  }
+
+  const handleDelete = (domain: TrustedDomain) => {
+    if (!window.confirm(`"${domain.domain}" güvenilir listeden çıkarılsın mı?`)) return
+    deleteDomain.mutate(domain.id, {
+      onError: (e) => toast.show(e instanceof Error ? e.message : 'Silinemedi', 'error'),
+    })
+  }
+
+  return (
+    <Card className="mb-4">
+      <CardHeader
+        title="Kabul Edilen Linkler"
+        subtitle="Mail içeriğinde geçtiğinde şüpheli/harici link olarak işaretlenmeyecek, güvenilir kabul edilen alan adları"
+      />
+      <CardBody className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
+          <input
+            className={inputClass}
+            placeholder="ör. ornek-tedarikci.com (tam link de yapıştırabilirsin)"
+            value={domainInput}
+            onChange={(e) => setDomainInput(e.target.value)}
+            required
+          />
+          <button
+            type="submit"
+            disabled={createDomain.isPending}
+            className="flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-enigma-primary px-4 py-2 text-sm font-medium text-white hover:bg-enigma-primary-dark disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" />
+            Ekle
+          </button>
+        </form>
+        {error && <p className="rounded-lg bg-enigma-danger-light px-3 py-2 text-sm text-enigma-danger">{error}</p>}
+
+        {isLoading ? (
+          <div className="h-16 animate-pulse rounded-lg bg-enigma-bg" />
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {baseDomains.map((domain) => (
+              <span
+                key={domain}
+                title="Kod tabanlı temel liste, kaldırılamaz"
+                className="flex items-center gap-1.5 rounded-full border border-enigma-border bg-enigma-bg px-3 py-1 text-xs text-enigma-text-muted"
+              >
+                <Link2 className="h-3 w-3" />
+                {domain}
+                <Badge tone="info">Kod</Badge>
+              </span>
+            ))}
+            {domains.map((domain) => (
+              <span
+                key={domain.id}
+                className="flex items-center gap-1.5 rounded-full border border-enigma-border bg-enigma-bg px-3 py-1 text-xs text-enigma-text"
+              >
+                <Link2 className="h-3 w-3" />
+                {domain.domain}
+                <Badge tone="primary">Panel</Badge>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(domain)}
+                  className="ml-1 text-enigma-text-muted hover:text-enigma-danger"
+                  aria-label={`${domain.domain} sil`}
+                >
+                  <XIcon className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+            {baseDomains.length === 0 && domains.length === 0 && (
+              <p className="text-sm text-enigma-text-muted">Henüz eklenmiş bir alan adı yok</p>
+            )}
+          </div>
+        )}
+      </CardBody>
+    </Card>
   )
 }
 
@@ -262,6 +375,7 @@ function RuleRow({ rule }: { rule: ContentRule }) {
   const updateRule = useUpdateContentRule()
   const deleteRule = useDeleteContentRule()
   const toast = useToast()
+  const isConfigRule = rule.source === 'config'
 
   const handleDelete = () => {
     if (!window.confirm(`"${rule.pattern}" kuralı silinsin mi?`)) return
@@ -285,19 +399,32 @@ function RuleRow({ rule }: { rule: ContentRule }) {
         <Badge tone="neutral">{CATEGORY_LABELS[rule.category]}</Badge>
       </td>
       <td className="py-2.5 pr-4">
-        <button type="button" onClick={handleToggleActive} disabled={updateRule.isPending}>
-          <Badge tone={rule.is_active ? 'success' : 'neutral'}>{rule.is_active ? 'Aktif' : 'Pasif'}</Badge>
-        </button>
+        <Badge tone={isConfigRule ? 'info' : 'primary'}>{isConfigRule ? 'Kod' : 'Panel'}</Badge>
       </td>
       <td className="py-2.5 pr-4">
-        <button
-          type="button"
-          onClick={handleDelete}
-          className="flex items-center gap-1 rounded-lg border border-enigma-border px-3 py-1 text-xs font-medium text-enigma-danger hover:bg-enigma-danger-light"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          Sil
-        </button>
+        {isConfigRule ? (
+          <Badge tone="success">Aktif</Badge>
+        ) : (
+          <button type="button" onClick={handleToggleActive} disabled={updateRule.isPending}>
+            <Badge tone={rule.is_active ? 'success' : 'neutral'}>{rule.is_active ? 'Aktif' : 'Pasif'}</Badge>
+          </button>
+        )}
+      </td>
+      <td className="py-2.5 pr-4">
+        {isConfigRule ? (
+          <span className="text-xs text-enigma-text-muted" title="Bu kural koddaki config.PROFANITY_WORDS listesinden geliyor, panelden düzenlenemez/silinemez.">
+            Koddan düzenlenir
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="flex items-center gap-1 rounded-lg border border-enigma-border px-3 py-1 text-xs font-medium text-enigma-danger hover:bg-enigma-danger-light"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Sil
+          </button>
+        )}
       </td>
     </tr>
   )

@@ -36,6 +36,8 @@ import type {
   FlaggedMailStatus,
   FlaggedMailsResponse,
   FlaggedMailDetailResponse,
+  TrustedDomain,
+  TrustedDomainsResponse,
 } from '@/types/api'
 
 function toQueryString(params: object) {
@@ -488,7 +490,7 @@ export function useCreateContentRule() {
 export function useUpdateContentRule() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ...input }: { id: number } & Partial<ContentRuleInput>) =>
+    mutationFn: ({ id, ...input }: { id: number | string } & Partial<ContentRuleInput>) =>
       apiPatch<ContentRule>(`/api/content-rules/${id}`, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content-rules'] }),
   })
@@ -497,7 +499,7 @@ export function useUpdateContentRule() {
 export function useDeleteContentRule() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => apiDelete(`/api/content-rules/${id}`),
+    mutationFn: (id: number | string) => apiDelete(`/api/content-rules/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['content-rules'] }),
   })
 }
@@ -547,5 +549,32 @@ export function useRejectFlaggedMail() {
   return useMutation({
     mutationFn: (id: number) => apiPost<FlaggedMail>(`/api/flagged-mails/${id}/reject`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['flagged-mails'] }),
+  })
+}
+
+// ==========================================================
+// Kabul edilen linkler (TrustedDomain) -- phishing_check.get_safe_domains()
+// ==========================================================
+
+export function useTrustedDomains() {
+  return useQuery<TrustedDomainsResponse>({
+    queryKey: ['trusted-domains'],
+    queryFn: () => apiGet('/api/trusted-domains'),
+  })
+}
+
+export function useCreateTrustedDomain() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (domain: string) => apiPost<TrustedDomain>('/api/trusted-domains', { domain }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['trusted-domains'] }),
+  })
+}
+
+export function useDeleteTrustedDomain() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => apiDelete(`/api/trusted-domains/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['trusted-domains'] }),
   })
 }
