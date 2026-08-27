@@ -4,7 +4,7 @@ Email Automation System - Web UI Dashboard
 Flask-based web interface for managing email automation and ticket creation.
 """
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, g, request, jsonify, send_from_directory
 from flask_session import Session
 from flask_migrate import Migrate
 from datetime import datetime, timedelta
@@ -945,6 +945,21 @@ def upload_bulk_shift():
         summary = process_rows(rows, fallback_parent_ticket_uuid=fallback_parent_ticket_uuid)
     except RuntimeError as e:
         return jsonify({'error': str(e)}), 502
+
+    # Not: bu record_mail_event çağrısı önceden HİÇ YOKTU -- panelden yüklenen
+    # toplu kaydırma sonuçları (başarılı veya başarısız) Loglar sayfasında
+    # görünmüyordu, sadece o an ekrandaki geçici sonuç tablosunda kalıyordu.
+    # Mail-tetikli akış (main.py) zaten aynı şekilde logluyor; ikisi tutarlı
+    # olsun diye buraya da eklendi.
+    record_mail_event(
+        event="ticket_created" if summary["success_count"] > 0 else "ticket_not_created",
+        status="success" if summary["failed_count"] == 0 else "failed",
+        sender_email=g.current_user.email,
+        subject=f"Toplu Kaydırma (panel): {uploaded_file.filename or ''}",
+        reason=f"Toplu kaydırma: {summary['success_count']}/{summary['total']} ticket oluşturuldu",
+        classification="bulk_kaydirma",
+        ticket_details=summary,
+    )
 
     result_file_bytes = generate_result_workbook(original_bytes, rows, summary["results"])
     if result_file_bytes is not None:

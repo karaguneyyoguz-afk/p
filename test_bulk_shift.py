@@ -31,8 +31,20 @@ from bulk_shift import (
     generate_result_workbook,
     MAX_ROWS,
 )
+import app as app_module
+import logging_utils
 from app import app
 from dev_test_helpers import login_test_client
+
+# Panelin /api/bulk-shift/upload'ının başarılı bir process_rows() çağrısından
+# SONRA yazdığı mail log kaydını gerçek mail_processing_log.jsonl'a değil,
+# bu dosyaya yazdırıyoruz (CANLI HATA DÜZELTMESİ: bu kayıt önceden hiç
+# yazılmıyordu, panelden yapılan toplu kaydırmalar -- başarılı ya da
+# başarısız -- Loglar sayfasında hiç görünmüyordu).
+_tmp_mail_log = os.path.join(os.path.dirname(__file__), "_test_bulk_shift_mail_log.jsonl")
+if os.path.exists(_tmp_mail_log):
+    os.remove(_tmp_mail_log)
+logging_utils.LOG_FILE = _tmp_mail_log
 
 passed = 0
 failed = 0
@@ -352,6 +364,65 @@ check(
     resp.status_code == 400 and "Rezervasyon No" in resp.get_json().get("error", ""),
     resp.get_json(),
 )
+
+# ==========================================================
+# POST upload: BASARILI (process_rows mock'lanarak, gercek CSM cagrisi
+# olmadan) sonuc mail_processing_log.jsonl'a yaziliyor mu -- CANLI HATA
+# DUZELTMESI: bu satir hic yoktu, panelden yapilan toplu kaydirmalar
+# (basarili VEYA basarisiz) Loglar sayfasinda hic gorunmuyordu.
+# ==========================================================
+_original_process_rows = app_module.process_rows
+
+
+def _fake_process_rows(rows, fallback_parent_ticket_uuid=""):
+    return {
+        "environment": "prod",
+        "total": 2,
+        "success_count": 0,
+        "failed_count": 2,
+        "results": [
+            {
+                "reservation_no": r["reservation_no"], "shift_type": r["shift_type"],
+                "shift_type_code": "OPERASYON_KAYNAKLI", "is_linked": bool(r["parent_ticket_uuid"]),
+                "success": False, "ticket_id": None, "error": "HTTP 500: Ticket kapatilamaz.",
+            }
+            for r in rows
+        ],
+    }
+
+
+app_module.process_rows = _fake_process_rows
+try:
+    resp = client.post(
+        "/api/bulk-shift/upload",
+        data={"file": (make_excel([("111", "Otel Kaynaklı", "x", ""), ("222", "Otel Kaynaklı", "y", "")]), "test.xlsx")},
+        content_type="multipart/form-data",
+        headers=csrf_headers,
+    )
+finally:
+    app_module.process_rows = _original_process_rows
+
+check("POST upload (mock): basarisiz sonuc bile 200 donuyor (ozet JSON'da)", resp.status_code == 200, resp.get_json())
+
+mail_logs = logging_utils.read_mail_events(limit=10)
+check(
+    "POST upload (CANLI HATA DUZELTMESI): panel yuklemesi artik mail_processing_log'a yaziliyor",
+    len(mail_logs) == 1 and mail_logs[0]["classification"] == "bulk_kaydirma",
+    mail_logs,
+)
+check(
+    "POST upload: tum satirlar basarisizsa status='failed' olarak logluyor",
+    len(mail_logs) == 1 and mail_logs[0]["status"] == "failed" and mail_logs[0]["event"] == "ticket_not_created",
+    mail_logs[0] if mail_logs else None,
+)
+check(
+    "POST upload: kim yukledigi (panel kullanicisi) sender_email olarak kaydediliyor",
+    len(mail_logs) == 1 and mail_logs[0]["sender_email"] == "tester@local.test",
+    mail_logs[0] if mail_logs else None,
+)
+
+if os.path.exists(_tmp_mail_log):
+    os.remove(_tmp_mail_log)
 
 # ==========================================================
 # OZET
