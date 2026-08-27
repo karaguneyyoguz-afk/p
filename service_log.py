@@ -19,6 +19,7 @@ LOG_FILE = os.path.join(os.path.dirname(__file__), "service_requests_log.jsonl")
 _LOG_LOCK = Lock()
 
 _current_actor = "sistem"
+_current_job: Optional[str] = None
 
 
 def set_actor(actor: str) -> None:
@@ -29,6 +30,21 @@ def set_actor(actor: str) -> None:
 
 def get_actor() -> str:
     return _current_actor
+
+
+def set_job(job_name: Optional[str]) -> None:
+    """Called once by a recurring job's entrypoint (watch_mail.py,
+    run_scheduled_mail_check.py) -- see job_registry.py. Deliberately
+    separate from actor: actor is "what kind of process" (sistem/panel/cli,
+    already used across Monitoring/Loglar), job is "which specific
+    recurring job", used only by the Job'lar screen. Most actors (panel,
+    cli) never call this, so get_job() stays None for them."""
+    global _current_job
+    _current_job = job_name
+
+
+def get_job() -> Optional[str]:
+    return _current_job
 
 
 def record_service_event(
@@ -48,6 +64,7 @@ def record_service_event(
         "service": service,
         "action": action,
         "actor": get_actor(),
+        "job": get_job(),
         "status": status,
         "detail": detail,
         "duration_ms": duration_ms,

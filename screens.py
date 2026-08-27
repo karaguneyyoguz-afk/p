@@ -23,17 +23,19 @@ SCREENS = {
     "tickets": "Talepler",
     "bulk_shift": "Toplu Kaydırma",
     "content_rules": "İçerik Kuralları",
+    "jobs": "Job'lar",
     "settings": "Ayarlar",
     "users": "Kullanıcılar",
 }
 
 # Ticket/log DETAIL routes (/tickets/:id, /logs/:timestamp) use their list
-# screen's permission -- they are not separate screen keys.
+# screen's permission -- they are not separate screen keys. Aynısı
+# /jobs/:name detay sayfası için de geçerli -- "jobs" ekranına bağlı.
 ROLE_SCREENS: dict[str, set[str]] = {
     "admin": set(SCREENS.keys()),
     "yonetici": set(SCREENS.keys()) - {"users"},
     "operator": {"dashboard", "emails", "tickets", "bulk_shift"},
-    "izleyici": {"dashboard", "reports", "monitoring", "logs"},
+    "izleyici": {"dashboard", "reports", "monitoring", "logs", "jobs"},
 }
 
 

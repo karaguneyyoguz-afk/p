@@ -12,7 +12,8 @@ import imaplib
 from mail_processor import EmailProcessor, EmailCategorizer
 from csm_api import CSMAPIClient
 from main import process_email
-from service_log import set_actor
+from service_log import set_actor, set_job
+from job_registry import record_heartbeat
 
 POLL_SECONDS = 10
 RECONNECT_RETRY_SECONDS = 15
@@ -35,6 +36,7 @@ def safe_connect(processor: EmailProcessor) -> None:
 
 def watch() -> None:
     set_actor("sistem")
+    set_job("watch_mail")
     processor = EmailProcessor(username=None, password=None)
     categorizer = EmailCategorizer()
     csm_client = CSMAPIClient()
@@ -50,6 +52,7 @@ def watch() -> None:
             # yerel ag/DNS de gecici kesilebiliyor). Yakalanmayan HICBIR hata
             # bu dongudan disariya sizmamali; aksi halde izleme sessizce
             # tamamen durur (canli ortamda gozlemlendi).
+            record_heartbeat("watch_mail")
             try:
                 email_ids = processor.get_unread_emails()
                 if email_ids:

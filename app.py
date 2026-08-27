@@ -45,6 +45,7 @@ from models import db
 from accounts import require_screen, get_csrf_token, current_user
 from accounts_routes import accounts_bp
 from content_rules_routes import content_rules_bp
+from jobs_routes import jobs_bp
 
 # Load environment variables
 load_dotenv()
@@ -89,6 +90,7 @@ db.init_app(app)
 Migrate(app, db)
 app.register_blueprint(accounts_bp)
 app.register_blueprint(content_rules_bp)
+app.register_blueprint(jobs_bp)
 
 
 @app.before_request

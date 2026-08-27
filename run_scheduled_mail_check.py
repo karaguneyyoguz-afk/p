@@ -25,8 +25,9 @@ if sys.stderr.encoding and sys.stderr.encoding.lower() != "utf-8":
 from mail_processor import EmailProcessor, EmailCategorizer
 from csm_api import CSMAPIClient
 from main import process_email
-from service_log import set_actor
+from service_log import set_actor, set_job
 from logging_utils import record_mail_event
+from job_registry import record_heartbeat
 
 # Each entry: (label, username_or_None, password_or_None). None/None uses
 # the default EMAIL_USER/EMAIL_PASS from .env. Add the two company mailboxes
@@ -77,6 +78,8 @@ def check_mailbox(label: str, username, password) -> None:
 
 def main() -> None:
     set_actor("sistem")
+    set_job("scheduled_mail_check")
+    record_heartbeat("scheduled_mail_check")
     for label, username, password in MAILBOXES:
         check_mailbox(label, username, password)
 
