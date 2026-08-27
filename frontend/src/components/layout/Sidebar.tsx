@@ -12,6 +12,7 @@ import {
   FileSpreadsheet,
   Users as UsersIcon,
   ShieldAlert,
+  Timer,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/contexts/AuthContext'
@@ -30,6 +31,7 @@ const navGroups = [
     items: [
       { to: '/monitoring', label: 'Monitoring', icon: Activity, screen: 'monitoring' as ScreenKey },
       { to: '/logs', label: 'Loglar', icon: ScrollText, screen: 'logs' as ScreenKey },
+      { to: '/jobs', label: "Job'lar", icon: Timer, screen: 'jobs' as ScreenKey },
     ],
   },
   {

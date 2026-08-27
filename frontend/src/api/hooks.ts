@@ -38,6 +38,8 @@ import type {
   FlaggedMailDetailResponse,
   TrustedDomain,
   TrustedDomainsResponse,
+  JobsResponse,
+  JobDetailResponse,
 } from '@/types/api'
 
 function toQueryString(params: object) {
@@ -576,5 +578,26 @@ export function useDeleteTrustedDomain() {
   return useMutation({
     mutationFn: (id: number) => apiDelete(`/api/trusted-domains/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['trusted-domains'] }),
+  })
+}
+
+// ==========================================================
+// Job'lar (watch_mail.py / run_scheduled_mail_check.py)
+// ==========================================================
+
+export function useJobs(options: PollOptions = {}) {
+  return useQuery<JobsResponse>({
+    queryKey: ['jobs'],
+    queryFn: () => apiGet('/api/jobs'),
+    refetchInterval: options.refetchInterval,
+  })
+}
+
+export function useJobDetail(name: string | undefined, options: PollOptions = {}) {
+  return useQuery<JobDetailResponse>({
+    queryKey: ['jobs', name],
+    queryFn: () => apiGet(`/api/jobs/${name}`),
+    enabled: name !== undefined,
+    refetchInterval: options.refetchInterval,
   })
 }

@@ -12,6 +12,7 @@ export const SCREEN_LABELS: Record<ScreenKey, string> = {
   tickets: 'Talepler',
   bulk_shift: 'Toplu Kaydırma',
   content_rules: 'İçerik Kuralları',
+  jobs: "Job'lar",
   settings: 'Ayarlar',
   users: 'Kullanıcılar',
 }

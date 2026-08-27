@@ -247,6 +247,7 @@ export type ScreenKey =
   | 'tickets'
   | 'bulk_shift'
   | 'content_rules'
+  | 'jobs'
   | 'settings'
   | 'users'
 
@@ -356,4 +357,45 @@ export interface TrustedDomainsResponse {
   // Koddan kaldırılamayan temel liste (tatilbudur.com vb.) -- ayrı, salt
   // görüntüleme amaçlı.
   base_domains: string[]
+}
+
+// ==========================================================
+// Job'lar (arka plan işleri: watch_mail.py, run_scheduled_mail_check.py)
+// ==========================================================
+
+export type JobStatus = 'active' | 'stale' | 'never_run'
+
+export interface JobSummary {
+  name: string
+  label: string
+  description: string
+  interval_label: string
+  entrypoint: string
+  last_heartbeat: string | null
+  status: JobStatus
+}
+
+export interface JobsResponse {
+  jobs: JobSummary[]
+}
+
+export interface JobServiceLogEntry {
+  timestamp: string
+  service: string
+  action: string
+  actor: string
+  job: string | null
+  status: string
+  detail: string
+  duration_ms: number | null
+}
+
+export interface JobMailLogEntry extends MailLogEntry {
+  job: string | null
+}
+
+export interface JobDetailResponse {
+  job: JobSummary
+  service_logs: JobServiceLogEntry[]
+  mail_logs: JobMailLogEntry[]
 }

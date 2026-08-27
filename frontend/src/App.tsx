@@ -34,6 +34,10 @@ const BulkShift = lazy(() =>
 const ContentRules = lazy(() =>
   import('@/pages/ContentRules').then((m) => ({ default: m.ContentRules })),
 )
+const Jobs = lazy(() => import('@/pages/Jobs').then((m) => ({ default: m.Jobs })))
+const JobDetail = lazy(() =>
+  import('@/pages/JobDetail').then((m) => ({ default: m.JobDetail })),
+)
 const Settings = lazy(() =>
   import('@/pages/Settings').then((m) => ({ default: m.Settings })),
 )
@@ -108,6 +112,22 @@ function App() {
               element={
                 <RequireScreen screen="monitoring">
                   <Monitoring />
+                </RequireScreen>
+              }
+            />
+            <Route
+              path="jobs"
+              element={
+                <RequireScreen screen="jobs">
+                  <Jobs />
+                </RequireScreen>
+              }
+            />
+            <Route
+              path="jobs/:name"
+              element={
+                <RequireScreen screen="jobs">
+                  <JobDetail />
                 </RequireScreen>
               }
             />
