@@ -21,6 +21,7 @@ from mail_processor import (
     send_ticket_confirmation_email,
     send_missing_fields_email, send_vendor_redirect_email,
     send_bulk_kaydirma_summary_email, send_unclear_request_email,
+    send_rejection_email,
 )
 from validators import (
     extract_reservation_number, detect_priority_level,
@@ -263,19 +264,24 @@ def process_email(
 
     # Uygunsuz içerik (küfür/hakaret/spam/tehdit -- bkz. content_moderation.py):
     # eskiden burada doğrudan reddedilip mail kapatılıyordu. Artık ticket
-    # akışına GİRMİYOR ama otomatik de reddedilmiyor -- FlaggedMail olarak
-    # kaydedilip operatör onayına/incelemesine bırakılıyor (kullanıcının
-    # "otomatik biletleştirme akışına doğrudan girmemeli" isteği).
+    # akışına GİRMİYOR ama FlaggedMail olarak kaydedilip operatör
+    # onayına/incelemesine de bırakılıyor (kullanıcının "otomatik
+    # biletleştirme akışına doğrudan girmemeli" isteği) -- müşteriye ise flag
+    # anında red maili gidiyor (kullanıcı tarafından bildirilen kural:
+    # "uygunsuz içeriklerde müşteriye mail dön"). Operatör panelden onaylarsa
+    # normal akış devam eder, reddederse aynı red maili tekrar gider --
+    # bilinçli olarak öyle bırakıldı (bkz. content_rules_routes.reject_flagged_mail).
     moderation_match = check_content(f"{clean_subject} {body}")
     if moderation_match:
-        print(f"🚩 SONUÇ: Uygunsuz içerik şüphesi ({moderation_match.category}), operatör onayına bırakılıyor.")
+        print(f"🚩 SONUÇ: Uygunsuz içerik şüphesi ({moderation_match.category}), müşteriye red maili gönderildi, operatör onayına bırakılıyor.")
         flagged_id = create_flagged_mail(sender_email, sender_name, subject, body, moderation_match)
+        send_rejection_email(sender_email, subject, sender_name)
         record_mail_event(
             event="email_processed",
             status="pending_review",
             sender_email=sender_email,
             subject=subject,
-            reason=f"Uygunsuz içerik şüphesi ({moderation_match.category}) -- operatör onayı bekleniyor",
+            reason=f"Uygunsuz içerik şüphesi ({moderation_match.category}) -- müşteriye red maili gönderildi, operatör onayı bekleniyor",
             details=f"flagged_mail_id={flagged_id}",
             classification="flagged_content",
             mail_body=body,
